@@ -465,3 +465,28 @@ def test_worktree_run_provides_prompt_file_and_role_env(
     )
     assert main(["run", "--agent-command", agent_script, "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip() == "TASK-001"
+
+
+@traces("REQ-005", "AC-01", "SPEC-005")
+@traces("REQ-005", "AC-02", "SPEC-005")
+def test_execution_environment_and_model_resolution(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify CLI > Task > Policy model precedence and template expansion in mt run."""
+    task_body = (
+        "---\nid: TASK-001\ntitle: Verify model env\ntype: test_contract\n"
+        "status: planned\ndepends_on: []\nrequired_files: []\n"
+        "write_files: [tests/helper_mod.py]\nmodel: gemini-3.8-flash-medium\n"
+        "verification_cmd: \"python3 -c 'raise SystemExit(0)'\"\n---\n"
+    )
+    _seed_git_task_repository(tmp_path, task_body)
+    script = (
+        'python3 -c "import os, sys; from pathlib import Path; '
+        "assert os.environ['MT_AGENT_MODEL'] == 'gemini-3.8-flash-low'; "
+        "assert os.environ['MT_EXECUTION_ENVIRONMENT'] == 'agy'; "
+        "assert sys.argv[1] == 'gemini-3.8-flash-low'; "
+        "Path('tests/helper_mod.py').write_text('VALUE = 3\\n')\" {model}"
+    )
+    run_args = ["run", "--agent-command", script, "--model", "gemini-3.8-flash-low"]
+    assert main([*run_args, "--environment", "agy", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip() == "TASK-001"
