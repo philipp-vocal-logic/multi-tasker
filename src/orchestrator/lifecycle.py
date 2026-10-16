@@ -1,6 +1,7 @@
 """End-to-end Orchestrator lifecycle commands (`initialize`, `intent`, `approve`)."""
 
 from concurrent.futures import ThreadPoolExecutor
+import contextlib
 from datetime import UTC, datetime
 import os
 from pathlib import Path
@@ -19,6 +20,7 @@ from src.domain.parser import (
     update_artifact_frontmatter,
 )
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
+from src.orchestrator.prompt_builder import build_agent_prompt
 from src.orchestrator.router import route_escalation
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
 from src.orchestrator.worktree import (
@@ -94,8 +96,19 @@ def _check_transition(
 
 
 def _mark_dirty_downstream(repository_root: Path, changed_id: str) -> list[str]:
-    """Transition downstream approved SPEC or done TASK items to needs_update."""
+    """Transition downstream SPEC/TASK to needs_update and upstream INT to processed."""
     by_identifier = load_artifacts_by_id(repository_root)
+    changed_document = by_identifier.get(changed_id)
+    if changed_document and changed_document.artifact_type == "REQ":
+        for upstream_id in changed_document.frontmatter.get("traces_to", []):
+            intent_document = by_identifier.get(str(upstream_id))
+            if intent_document and intent_document.frontmatter.get("status") in {
+                "open",
+                "processing",
+            }:
+                update_artifact_frontmatter(
+                    repository_root / intent_document.path, {"status": "processed"}
+                )
     dirty_ids = compute_dirty_subgraph(repository_root, changed_id)
     for artifact_id in dirty_ids:
         document = by_identifier.get(artifact_id)
@@ -173,24 +186,44 @@ def _list_escalations(worktree_path: Path) -> set[str]:
     }
 
 
+def _write_worktree_prompt_file(worktree_path: Path, task_id: str) -> Path:
+    """Write synthesized worker-agent prompt into worktree_path/.mt_prompt.md."""
+    prompt_text, _ = build_agent_prompt(worktree_path, "worker-agent", task_id)
+    prompt_file = worktree_path / ".mt_prompt.md"
+    prompt_file.write_text(prompt_text, encoding="utf-8")
+    return prompt_file
+
+
 def _invoke_agent_in_worktree(
-    worktree_path: Path, task_id: str, write_files: list[str], agent_command: str
+    worktree_path: Path,
+    task_id: str,
+    write_files: list[str],
+    agent_command: str,
+    timeout_seconds: float = 300.0,
 ) -> list[str]:
     """Execute agent_command inside worktree_path and return modified relative paths."""
     existing_escalations = _list_escalations(worktree_path)
+    prompt_file = _write_worktree_prompt_file(worktree_path, task_id)
     environment = {
         **os.environ,
+        "MT_AGENT_ROLE": "worker-agent",
         "MT_TASK_ID": task_id,
         "MT_WRITE_FILES": ",".join(write_files),
+        "MT_PROMPT_FILE": str(prompt_file),
     }
-    subprocess.run(
-        shlex.split(agent_command),
-        cwd=worktree_path,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            subprocess.run(
+                shlex.split(agent_command),
+                cwd=worktree_path,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+    finally:
+        prompt_file.unlink(missing_ok=True)
     if (worktree_path / ".git").exists():
         task_relative_path = f"artifacts/tasks/{task_id}.md"
         return [

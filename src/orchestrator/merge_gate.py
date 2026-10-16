@@ -32,6 +32,7 @@ class GateRequest:
     task_id: str | None = None
     verification_command: str | None = None
     changed_files: list[str] | None = None
+    verification_timeout_seconds: float = 60.0
 
 
 @dataclass(frozen=True)
@@ -59,13 +60,22 @@ def _load_base_artifact_states(
 
 
 def _run_verification_command(
-    worktree_path: Path, command_string: str
+    worktree_path: Path, command_string: str, timeout_seconds: float = 60.0
 ) -> list[Finding]:
     """Execute deterministic verification_command and emit a Finding on failure."""
     arguments = shlex.split(command_string)
-    process = subprocess.run(
-        arguments, cwd=worktree_path, capture_output=True, text=True, check=False
-    )
+    try:
+        process = subprocess.run(
+            arguments,
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        message = f"Command '{command_string}' timed out after {timeout_seconds}s"
+        return [Finding("verification_cmd", 1, "GATE_VERIFY_CMD_TIMEOUT", message)]
     if process.returncode == 0:
         return []
     lines = [
@@ -124,7 +134,9 @@ def evaluate_merge_gate(request: GateRequest) -> GateOutcome:
     if request.verification_command and not findings:
         findings.extend(
             _run_verification_command(
-                request.worktree_path, request.verification_command
+                request.worktree_path,
+                request.verification_command,
+                request.verification_timeout_seconds,
             )
         )
     return GateOutcome(len(findings) == 0, False, None, findings)
