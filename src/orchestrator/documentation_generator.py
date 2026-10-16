@@ -1,0 +1,186 @@
+"""Deterministic Markdown documentation and Mermaid diagram generator."""
+
+from pathlib import Path
+from typing import Any
+
+from src.domain.models import ArtifactDocument
+from src.domain.parser import (
+    load_artifacts_by_id,
+    load_state_transitions,
+    load_yaml_file,
+)
+from src.orchestrator.lineage import collect_test_trace_links
+
+
+def _render_architecture_section(repository_root: Path) -> list[str]:
+    """Render architecture layers table and Mermaid dependency flowchart."""
+    policy_path = repository_root / "policy" / "architecture.yaml"
+    policy = load_yaml_file(policy_path) if policy_path.exists() else {}
+    layers: list[dict[str, Any]] = policy.get("layers", [])
+    lines = [
+        "## 1. Architecture & Layer Boundaries",
+        "",
+        "| Layer | Paths | Allowed Internal Imports |",
+        "| :--- | :--- | :--- |",
+    ]
+    for layer in layers:
+        name = str(layer.get("name", ""))
+        paths = ", ".join(f"`{item}`" for item in layer.get("paths", []))
+        allowed = ", ".join(
+            f"`{item}`" for item in layer.get("allowed_internal_imports", [])
+        )
+        lines.append(f"| **{name}** | {paths} | {allowed} |")
+    lines.extend(["", "```mermaid", "flowchart TD"])
+    for layer in layers:
+        source_name = str(layer.get("name", ""))
+        for target_prefix in layer.get("allowed_internal_imports", []):
+            target_name = str(target_prefix).split(".")[-1]
+            if target_name and target_name != source_name:
+                edge = f'    {source_name}["{source_name}"]'
+                lines.append(f'{edge} --> {target_name}["{target_name}"]')
+    lines.extend(["```", ""])
+    return lines
+
+
+def _render_permissions_section(repository_root: Path) -> list[str]:
+    """Render agent WriteScope permissions table from policy/permissions.yaml."""
+    policy_path = repository_root / "policy" / "permissions.yaml"
+    policy = load_yaml_file(policy_path) if policy_path.exists() else {}
+    agents: dict[str, Any] = policy.get("agents", {})
+    header = (
+        "| Agent Role | Allowed Write Paths | Allowed Existing States "
+        "| Escalation Write |"
+    )
+    lines = [
+        "## 2. Agent WriteScope & Permission Topology",
+        "",
+        header,
+        "| :--- | :--- | :--- | :--- |",
+    ]
+    for role_name, configuration in agents.items():
+        write_rules = configuration.get("allowed_write", [])
+        paths = ", ".join(f"`{rule.get('path', '')}`" for rule in write_rules)
+        states = (
+            ", ".join(
+                str(state)
+                for rule in write_rules
+                for state in rule.get("allowed_existing_states", [])
+            )
+            or "Task-scoped"
+        )
+        escalation_rules = configuration.get("escalation_write", [])
+        escalation = (
+            ", ".join(f"`{rule.get('path', '')}`" for rule in escalation_rules)
+            or "None"
+        )
+        lines.append(f"| `{role_name}` | {paths} | {states} | {escalation} |")
+    lines.append("")
+    return lines
+
+
+def _render_state_lifecycles_section(repository_root: Path) -> list[str]:
+    """Render Mermaid stateDiagram-v2 blocks from policy/schemas.yaml."""
+    transitions = load_state_transitions(repository_root)
+    lines = ["## 3. Artifact State Lifecycles", ""]
+    for artifact_type, mapping in sorted(transitions.items()):
+        lines.extend(
+            [
+                f"### {artifact_type} State Machine",
+                "",
+                "```mermaid",
+                "stateDiagram-v2",
+            ]
+        )
+        for source_state, targets in sorted(mapping.items()):
+            for target_state in sorted(targets):
+                lines.append(f"    {source_state} --> {target_state}")
+        lines.extend(["```", ""])
+    return lines
+
+
+def _render_limits_and_glossary_section(repository_root: Path) -> list[str]:
+    """Render source code sizing limits and canonical domain glossary table."""
+    limits_path = repository_root / "policy" / "limits.yaml"
+    limits_policy = load_yaml_file(limits_path) if limits_path.exists() else {}
+    source_limits: dict[str, Any] = limits_policy.get("source_code", {})
+    glossary_path = repository_root / "policy" / "glossary.yaml"
+    glossary_policy = load_yaml_file(glossary_path) if glossary_path.exists() else {}
+    terms: list[dict[str, Any]] = glossary_policy.get("terms", [])
+    lines = [
+        "## 4. Source Code Sizing Limits & Domain Glossary",
+        "",
+        "| Limit Key | Value |",
+        "| :--- | :--- |",
+    ]
+    for key, value in sorted(source_limits.items()):
+        lines.append(f"| `{key}` | `{value}` |")
+    lines.extend(
+        [
+            "",
+            "| Canonical Term | Category | Forbidden Synonyms |",
+            "| :--- | :--- | :--- |",
+        ]
+    )
+    for entry in terms:
+        canonical = str(entry.get("canonical", ""))
+        category = str(entry.get("category", ""))
+        synonyms = ", ".join(
+            f"`{item}`" for item in entry.get("forbidden_synonyms", [])[:5]
+        )
+        lines.append(f"| **{canonical}** | `{category}` | {synonyms} |")
+    lines.append("")
+    return lines
+
+
+def _append_artifact_trace_edges(
+    by_identifier: dict[str, ArtifactDocument], lines: list[str]
+) -> None:
+    """Append Mermaid flowchart nodes and edges for repository artifacts."""
+    for artifact_id, document in sorted(by_identifier.items()):
+        title = str(document.frontmatter.get("title", document.artifact_type))
+        status = str(document.frontmatter.get("status", "ok"))
+        safe_id = artifact_id.replace("-", "_")
+        lines.append(f'    {safe_id}["{artifact_id}: {title} ({status})"]')
+        for upstream in document.frontmatter.get("traces_to", []):
+            upstream_safe = str(upstream).replace("-", "_")
+            lines.append(f"    {upstream_safe} --> {safe_id}")
+        for dependency in document.frontmatter.get("depends_on", []):
+            dependency_safe = str(dependency).replace("-", "_")
+            lines.append(f"    {dependency_safe} -.-> {safe_id}")
+
+
+def _render_traceability_section(repository_root: Path) -> list[str]:
+    """Render live artifact inventory, Mermaid traceability graph, and test links."""
+    by_identifier = load_artifacts_by_id(repository_root)
+    lines = [
+        "## 5. Live Repository Traceability Graph",
+        "",
+        "```mermaid",
+        "flowchart TD",
+    ]
+    _append_artifact_trace_edges(by_identifier, lines)
+    lines.extend(["```", "", "### Verified TestContract Links", ""])
+    for (
+        requirement_id,
+        criterion_id,
+        specification_id,
+        location,
+    ) in collect_test_trace_links(repository_root):
+        pair = f"`{requirement_id}:{criterion_id}` (`{specification_id}`)"
+        lines.append(f"- `{location}` $\\rightarrow$ {pair}")
+    lines.append("")
+    return lines
+
+
+def generate_repository_documentation(repository_root: Path) -> str:
+    """Generate complete Markdown specification and diagrams from live repo state."""
+    sections = [
+        "# Incremental Multilevel Agent System — Generated Live Specification",
+        "",
+        *_render_architecture_section(repository_root),
+        *_render_permissions_section(repository_root),
+        *_render_state_lifecycles_section(repository_root),
+        *_render_limits_and_glossary_section(repository_root),
+        *_render_traceability_section(repository_root),
+    ]
+    return "\n".join(sections).strip() + "\n"
