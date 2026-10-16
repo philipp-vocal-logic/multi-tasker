@@ -229,6 +229,8 @@ schemas:
           maxItems: 3
           items: { type: "string" }
         verification_cmd: { type: "string", minLength: 3 }
+        model: { type: "string", minLength: 3 }
+        execution_environment: { type: "string", minLength: 2 }
 
   ESC:
     path_glob: "artifacts/escalations/ESC-*.md"

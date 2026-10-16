@@ -20,6 +20,12 @@ escalation_exclusivity:
   forbid_domain_writes_when_escalating: true
   max_escalation_files_per_run: 1
 
+execution_environments:
+  default_environment: "agy"
+  default_model: "gemini-3.8-flash-high"
+  environments:
+    agy: "agy --mode accept-edits --dangerously-skip-permissions --model {model} --print \"Execute Task {task_id} following {prompt_file}\""
+
 agents:
   requirement-agent:
     read_scope:
