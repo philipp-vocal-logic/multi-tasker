@@ -1,0 +1,164 @@
+"""Zero-noise CLI entrypoint for `mt`."""
+
+import argparse
+from pathlib import Path
+import sys
+from typing import Any
+
+from src.checkers.runner import ALL_CHECKS, run_checks
+from src.cli.output import emit_findings
+from src.orchestrator.documentation_generator import (
+    generate_repository_documentation,
+)
+from src.orchestrator.lifecycle import (
+    approve_artifact,
+    create_intent,
+    initialize_repository,
+    resolve_escalation,
+    run_scheduled_tasks,
+)
+from src.orchestrator.lineage import trace_lineage
+from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
+
+
+def _add_lifecycle_parsers(subparsers: Any) -> None:
+    """Register initialize, intent, approve, resolve, run, trace, and documentation."""
+    for name in ("initialize", "documentation"):
+        subparser = subparsers.add_parser(name)
+        subparser.add_argument("--root", default=".", help="Repository root directory.")
+    for name, argument_name in (
+        ("intent", "text"),
+        ("approve", "artifact_id"),
+        ("trace", "target"),
+    ):
+        subparser = subparsers.add_parser(name)
+        subparser.add_argument(argument_name)
+        subparser.add_argument("--root", default=".", help="Repository root directory.")
+    resolve_parser = subparsers.add_parser("resolve")
+    resolve_parser.add_argument("escalation_id", help="ESC-NNN identifier.")
+    resolve_parser.add_argument("--by", required=True, dest="resolved_by")
+    resolve_parser.add_argument(
+        "--root", default=".", help="Repository root directory."
+    )
+    run_parser = subparsers.add_parser("run")
+    run_parser.add_argument("--max-workers", type=int, default=1)
+    run_parser.add_argument("--agent-command", default=None, dest="agent_command")
+    run_parser.add_argument("--root", default=".", help="Repository root directory.")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build argument parser for `mt` CLI."""
+    parser = argparse.ArgumentParser(prog="mt", add_help=True)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    check_parser = subparsers.add_parser(
+        "check", help="Run deterministic policy checks."
+    )
+    check_parser.add_argument(
+        "checks",
+        nargs="*",
+        default=["all"],
+        help=f"Checks to run: all, {', '.join(ALL_CHECKS)}",
+    )
+    check_parser.add_argument("--agent", dest="agent_role", default=None)
+    check_parser.add_argument("--task", dest="task_id", default=None)
+    check_parser.add_argument("--paths", nargs="*", default=None)
+    check_parser.add_argument("--root", default=".", help="Repository root directory.")
+    schedule_parser = subparsers.add_parser(
+        "schedule", help="List conflict-free parallel Task batch."
+    )
+    schedule_parser.add_argument(
+        "--root", default=".", help="Repository root directory."
+    )
+    impact_parser = subparsers.add_parser(
+        "impact", help="List downstream dirty-flagged artifacts."
+    )
+    impact_parser.add_argument(
+        "artifact_id", help="Changed Requirement or Decision ID."
+    )
+    impact_parser.add_argument("--root", default=".", help="Repository root directory.")
+    _add_lifecycle_parsers(subparsers)
+    return parser
+
+
+def _run_check_command(arguments: argparse.Namespace) -> int:
+    """Execute `mt check` and write Findings-only output."""
+    repository_root = Path(arguments.root).resolve()
+    findings = run_checks(
+        repository_root=repository_root,
+        check_names=list(arguments.checks),
+        target_paths=arguments.paths,
+        agent_role=arguments.agent_role,
+        task_id=arguments.task_id,
+    )
+    return emit_findings(repository_root, findings)
+
+
+def _run_tasks_command(
+    repository_root: Path, max_workers: int, agent_command: str | None
+) -> int:
+    """Execute `mt run` and output completed Task IDs or Findings."""
+    done_ids, findings = run_scheduled_tasks(
+        repository_root, max_workers, agent_command
+    )
+    if findings:
+        return emit_findings(repository_root, findings)
+    for task_id in done_ids:
+        sys.stdout.write(f"{task_id}\n")
+    return 0
+
+
+def _dispatch_lifecycle(
+    command: str, arguments: argparse.Namespace, repository_root: Path
+) -> int:
+    """Dispatch initialize, intent, approve, resolve, run, trace, or documentation."""
+    if command == "initialize":
+        return emit_findings(repository_root, initialize_repository(repository_root))
+    if command == "intent":
+        sys.stdout.write(f"{create_intent(repository_root, str(arguments.text))}\n")
+        return 0
+    if command == "approve":
+        return emit_findings(
+            repository_root,
+            approve_artifact(repository_root, str(arguments.artifact_id)),
+        )
+    if command == "resolve":
+        findings = resolve_escalation(
+            repository_root,
+            str(arguments.escalation_id),
+            str(arguments.resolved_by),
+        )
+        return emit_findings(repository_root, findings)
+    if command == "run":
+        return _run_tasks_command(
+            repository_root, int(arguments.max_workers), arguments.agent_command
+        )
+    if command == "documentation":
+        sys.stdout.write(generate_repository_documentation(repository_root))
+        return 0
+    for line in trace_lineage(repository_root, str(arguments.target)):
+        sys.stdout.write(f"{line}\n")
+    return 0
+
+
+def main(argument_values: list[str] | None = None) -> int:
+    """Execute CLI command and emit low-noise output."""
+    arguments = build_parser().parse_args(argument_values)
+    if arguments.command == "check":
+        return _run_check_command(arguments)
+    repository_root = Path(arguments.root).resolve()
+    if arguments.command == "schedule":
+        batch, _ = select_parallel_batch(repository_root)
+        for task_id in batch:
+            sys.stdout.write(f"{task_id}\n")
+        return 0
+    if arguments.command == "impact":
+        for artifact_id in compute_dirty_subgraph(
+            repository_root, str(arguments.artifact_id)
+        ):
+            sys.stdout.write(f"{artifact_id}\n")
+        return 0
+    return _dispatch_lifecycle(str(arguments.command), arguments, repository_root)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
