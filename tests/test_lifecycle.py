@@ -399,3 +399,69 @@ def test_run_with_git_commit_and_escalation_reroute_cap(
     assert get_git_changed_files(tmp_path) == []
     assert main(["trace", "TASK-001", "--root", str(tmp_path)]) == 0
     assert "COMMIT " in capsys.readouterr().out
+
+
+@traces("REQ-004", "AC-02", "SPEC-004")
+def test_role_prompt_synthesis_and_context_assembly(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify `mt prompt` for all 5 roles, target context, and error findings."""
+    assert main(["prompt", "unknown-role", "--root", str(REPOSITORY_ROOT)]) == 1
+    assert "[CLI_UNKNOWN_AGENT_ROLE]" in capsys.readouterr().out
+    missing_args = ["prompt", "worker-agent", "--target", "TASK-999", "--root"]
+    assert main([*missing_args, str(REPOSITORY_ROOT)]) == 1
+    assert "[CLI_ARTIFACT_NOT_FOUND]" in capsys.readouterr().out
+    for role in (
+        "requirement-agent",
+        "specification-agent",
+        "planner-agent",
+        "worker-agent",
+        "review-agent",
+    ):
+        assert main(["prompt", role, "--root", str(REPOSITORY_ROOT)]) == 0
+        assert f"# Role Prompt: `{role}`" in capsys.readouterr().out
+    target_args = ["prompt", "worker-agent", "--target", "TASK-002", "--root"]
+    assert main([*target_args, str(REPOSITORY_ROOT)]) == 0
+    scoped_output = capsys.readouterr().out
+    assert "### Artifact `TASK-002`" in scoped_output
+    assert "### Artifact `SPEC-001`" in scoped_output
+    assert "### Required File `tests/test_checkers.py`" in scoped_output
+
+
+@traces("REQ-004", "AC-02", "SPEC-004")
+@traces("REQ-004", "AC-03", "SPEC-004")
+def test_worktree_run_provides_prompt_file_and_role_env(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify `mt approve` marks Intent processed and `mt run` sets MT_PROMPT_FILE."""
+    task_body = (
+        "---\nid: TASK-001\ntitle: Verify prompt env\ntype: test_contract\n"
+        "status: planned\ndepends_on: []\nrequired_files: []\n"
+        "write_files: [tests/helper_mod.py]\n"
+        "verification_cmd: \"python3 -c 'raise SystemExit(0)'\"\n---\n"
+    )
+    _seed_git_task_repository(tmp_path, task_body)
+    _write_document(
+        tmp_path / "artifacts/intents/INT-001.md",
+        "---\nid: INT-001\nstatus: open\ncreated_at: '2026-10-16T00:00:00Z'\n---\nOk\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-001.md",
+        "---\nid: REQ-001\nstatus: draft\ntraces_to: [INT-001]\n---\n"
+        "## Statement\nOk\n",
+    )
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 0
+    intent_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/intents/INT-001.md", "INT-001.md"
+    )
+    assert intent_doc and intent_doc.frontmatter["status"] == "processed"
+    _git_commit_all(tmp_path, "REQ-001: Approve requirement [traces: INT-001, REQ-001]")
+    agent_script = (
+        'python3 -c "import os; from pathlib import Path; '
+        "prompt = Path(os.environ['MT_PROMPT_FILE']).read_text(); "
+        "assert os.environ['MT_AGENT_ROLE'] == 'worker-agent'; "
+        "assert 'TASK-001' in prompt; "
+        "Path('tests/helper_mod.py').write_text('VALUE = 2\\n')\""
+    )
+    assert main(["run", "--agent-command", agent_script, "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip() == "TASK-001"

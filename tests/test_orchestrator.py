@@ -142,6 +142,25 @@ def test_merge_gate_enforces_tamper_perms_escalation_and_cmd(tmp_path: Path) -> 
     assert tamper.findings[0].rule_id == "GATE_POLICY_TAMPERED"
 
 
+@traces("REQ-004", "AC-01", "SPEC-004")
+def test_merge_gate_enforces_verification_command_timeout(tmp_path: Path) -> None:
+    """Verify MergeGate emits GATE_VERIFY_CMD_TIMEOUT when verification_cmd hangs."""
+    base, worktree_dir, agent = tmp_path / "base", tmp_path / "wt", "req-agent"
+    _seed_minimal_policies(base)
+    _seed_minimal_policies(worktree_dir)
+    requirement_path = "artifacts/requirements/REQ-001.md"
+    _write_document(
+        worktree_dir / requirement_path, "---\nid: REQ-001\nstatus: draft\n---\n"
+    )
+    timeout_cmd = "python3 -c 'import time; time.sleep(0.2)'"
+    timed_out = evaluate_merge_gate(
+        GateRequest(
+            base, worktree_dir, agent, None, timeout_cmd, [requirement_path], 0.01
+        )
+    )
+    assert timed_out.findings[0].rule_id == "GATE_VERIFY_CMD_TIMEOUT"
+
+
 @traces("REQ-002", "AC-03", "SPEC-002")
 def test_parallel_scheduler_and_dirty_subgraph(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]

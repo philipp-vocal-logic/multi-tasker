@@ -315,3 +315,31 @@ def test_git_commit_traceability_validation(tmp_path: Path) -> None:
     assert "TRACE_COMMIT_FORMAT" in {
         finding.rule_id for finding in check_traceability(tmp_path)
     }
+
+
+@traces("REQ-004", "AC-03", "SPEC-004")
+def test_git_commit_scope_and_intent_traceability(tmp_path: Path) -> None:
+    """Verify check_traceability detects unscoped Task commits and orphan Intents."""
+    _write_document(
+        tmp_path / "policy/traceability.yaml",
+        "traceability_rules: {verify_git_commit_traceability: true}\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/intents/INT-001.md",
+        "---\nid: INT-001\nstatus: processed\n---\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/tasks/TASK-001.md",
+        "---\nid: TASK-001\nstatus: done\nwrite_files: [src/allowed.py]\n---\n",
+    )
+    _write_document(tmp_path / "src/rogue.py", "VALUE = 1\n")
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    seed_cmd = ["git", "-c", "user.name=mt", "-c", "user.email=mt@local", "commit"]
+    subprocess.run(
+        [*seed_cmd, "-q", "-m", "TASK-001: Rogue write [traces: TASK-001]"],
+        cwd=tmp_path,
+        check=True,
+    )
+    rules = {finding.rule_id for finding in check_traceability(tmp_path)}
+    assert {"TRACE_COMMIT_UNSCOPED_FILE", "TRACE_UNPROCESSED_INTENT"}.issubset(rules)
