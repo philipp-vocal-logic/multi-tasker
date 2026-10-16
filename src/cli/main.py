@@ -18,6 +18,7 @@ from src.orchestrator.lifecycle import (
     run_scheduled_tasks,
 )
 from src.orchestrator.lineage import trace_lineage
+from src.orchestrator.prompt_builder import build_agent_prompt
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
 
 
@@ -44,6 +45,10 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     run_parser.add_argument("--max-workers", type=int, default=1)
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
     run_parser.add_argument("--root", default=".", help="Repository root directory.")
+    prompt_parser = subparsers.add_parser("prompt")
+    prompt_parser.add_argument("agent_role", help="Canonical agent role.")
+    prompt_parser.add_argument("--target", default=None, dest="target_id")
+    prompt_parser.add_argument("--root", default=".", help="Repository root directory.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -107,6 +112,17 @@ def _run_tasks_command(
     return 0
 
 
+def _run_prompt_command(repository_root: Path, arguments: argparse.Namespace) -> int:
+    """Execute `mt prompt` and write synthesized role prompt or Findings."""
+    prompt_text, findings = build_agent_prompt(
+        repository_root, str(arguments.agent_role), arguments.target_id
+    )
+    if findings:
+        return emit_findings(repository_root, findings)
+    sys.stdout.write(prompt_text)
+    return 0
+
+
 def _dispatch_lifecycle(
     command: str, arguments: argparse.Namespace, repository_root: Path
 ) -> int:
@@ -146,6 +162,8 @@ def main(argument_values: list[str] | None = None) -> int:
     if arguments.command == "check":
         return _run_check_command(arguments)
     repository_root = Path(arguments.root).resolve()
+    if arguments.command == "prompt":
+        return _run_prompt_command(repository_root, arguments)
     if arguments.command == "schedule":
         batch, _ = select_parallel_batch(repository_root)
         for task_id in batch:

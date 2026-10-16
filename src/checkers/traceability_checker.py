@@ -8,6 +8,7 @@ from typing import Any
 from src.checkers.common import (
     collect_repository_files,
     extract_test_traces,
+    get_git_commit_files,
     get_git_commit_subjects,
     parse_python_ast,
 )
@@ -263,18 +264,77 @@ def _stage_active(target_paths: list[str] | None, prefixes: tuple[str, ...]) -> 
     return not target_paths or any(path.startswith(prefixes) for path in target_paths)
 
 
+def _check_task_commit_scope(
+    repository_root: Path,
+    commit_hash: str,
+    subject: str,
+    by_identifier: dict[str, ArtifactDocument],
+) -> list[Finding]:
+    """Verify a TASK-NNN commit only modifies files within its write_files scope."""
+    prefix = subject.split(":", maxsplit=1)[0].strip()
+    task_document = by_identifier.get(prefix)
+    if not prefix.startswith("TASK-") or task_document is None:
+        return []
+    allowed_writes = {
+        str(item) for item in task_document.frontmatter.get("write_files", [])
+    }
+    upstream_prefixes = (
+        "artifacts/intents/",
+        "artifacts/requirements/",
+        "artifacts/specifications/",
+    )
+    findings: list[Finding] = []
+    for changed in get_git_commit_files(repository_root, commit_hash):
+        unscoped_code = (
+            changed.startswith(("src/", "tests/"))
+            and Path(changed).name != "__init__.py"
+            and changed not in allowed_writes
+        )
+        if unscoped_code or changed.startswith(upstream_prefixes):
+            message = f"Commit '{commit_hash}' modifies unscoped file '{changed}'."
+            findings.append(
+                Finding("git-log", 1, "TRACE_COMMIT_UNSCOPED_FILE", message)
+            )
+    return findings
+
+
+def _check_intent_to_requirement_coverage(
+    by_identifier: dict[str, ArtifactDocument],
+) -> list[Finding]:
+    """Verify every processed Intent is referenced by at least one Requirement."""
+    covered_intents = {
+        str(item)
+        for document in by_identifier.values()
+        if document.artifact_type == "REQ"
+        for item in document.frontmatter.get("traces_to", [])
+    }
+    return [
+        Finding(
+            document.path,
+            1,
+            "TRACE_UNPROCESSED_INTENT",
+            f"Processed Intent '{document.frontmatter.get('id')}' has no Requirement.",
+        )
+        for document in by_identifier.values()
+        if document.artifact_type == "INT"
+        and document.frontmatter.get("status") == "processed"
+        and str(document.frontmatter.get("id", "")) not in covered_intents
+    ]
+
+
 def _check_git_commit_history(
     repository_root: Path,
     by_identifier: dict[str, ArtifactDocument],
     rules: dict[str, Any],
 ) -> list[Finding]:
-    """Validate git log subjects against commit_message_pattern and artifact IDs."""
+    """Validate git log subjects, Task commit write scopes, and Intent coverage."""
     pattern_text = str(rules.get("commit_message_pattern", DEFAULT_COMMIT_PATTERN))
-    if not rules.get("verify_git_commit_traceability", True):
+    commits = get_git_commit_subjects(repository_root)
+    if not rules.get("verify_git_commit_traceability", True) or not commits:
         return []
     compiled_pattern = re.compile(pattern_text)
-    findings: list[Finding] = []
-    for commit_hash, subject in get_git_commit_subjects(repository_root):
+    findings = _check_intent_to_requirement_coverage(by_identifier)
+    for commit_hash, subject in commits:
         if not compiled_pattern.match(subject):
             message = f"Commit '{commit_hash}' subject '{subject}' is not traceable."
             findings.append(Finding("git-log", 1, "TRACE_COMMIT_FORMAT", message))
@@ -287,6 +347,11 @@ def _check_git_commit_history(
                 findings.append(
                     Finding("git-log", 1, "TRACE_COMMIT_UNKNOWN_ID", message)
                 )
+        findings.extend(
+            _check_task_commit_scope(
+                repository_root, commit_hash, subject, by_identifier
+            )
+        )
     return findings
 
 

@@ -63,6 +63,20 @@ def get_git_commit_subjects(repository_root: Path) -> list[tuple[str, str]]:
     return commits
 
 
+def get_git_commit_files(repository_root: Path, commit_hash: str) -> list[str]:
+    """Return modified relative file paths in a specific Git commit."""
+    process = subprocess.run(
+        ["git", "show", "--pretty=format:", "--name-only", commit_hash],
+        cwd=repository_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if process.returncode != 0:
+        return []
+    return [line.strip() for line in process.stdout.splitlines() if line.strip()]
+
+
 def collect_repository_files(
     repository_root: Path,
     target_paths: list[str] | None,
