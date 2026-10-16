@@ -262,6 +262,30 @@ def _evaluate_role_permissions(
     return findings
 
 
+def _validate_execution_environments(policy: dict[str, Any]) -> list[Finding]:
+    """Validate execution_environments configuration in policy/permissions.yaml."""
+    execution_config: dict[str, Any] = policy.get("execution_environments", {})
+    if not execution_config:
+        return []
+    default_env = str(execution_config.get("default_environment", ""))
+    default_model = str(execution_config.get("default_model", ""))
+    environments: dict[str, Any] = execution_config.get("environments", {})
+    templates = {str(name): str(command) for name, command in environments.items()}
+    if (default_env and default_env not in templates) or not default_model:
+        message = "Invalid execution_environments in policy/permissions.yaml."
+        return [Finding("policy/permissions.yaml", 1, "PERM_INVALID_EXEC_ENV", message)]
+    return []
+
+
+def _check_unscoped_policy_writes(files: list[str]) -> list[Finding]:
+    """Return findings for protected policy files modified without an agent role."""
+    return [
+        Finding(path, 1, "PERM_POLICY_MODIFIED", "Protected policy modified.")
+        for path in files
+        if fnmatch(path, "policy/**")
+    ]
+
+
 def check_permissions(
     repository_root: Path,
     agent_role: str | None = None,
@@ -275,25 +299,23 @@ def check_permissions(
         message = "Missing policy/permissions.yaml."
         return [Finding("policy/permissions.yaml", 1, "PERM_POLICY_MISSING", message)]
     policy = load_yaml_file(permissions_path)
+    environment_findings = _validate_execution_environments(policy)
     files = (
         changed_files
         if changed_files is not None
         else get_git_changed_files(repository_root)
     )
     if agent_role is None:
-        return [
-            Finding(path, 1, "PERM_POLICY_MODIFIED", "Protected policy modified.")
-            for path in files
-            if fnmatch(path, "policy/**")
-        ]
+        return [*environment_findings, *_check_unscoped_policy_writes(files)]
     agents_configuration: dict[str, Any] = policy.get("agents", {})
     if agent_role not in agents_configuration:
         message = f"Unknown agent role '{agent_role}'."
         return [Finding("policy/permissions.yaml", 1, "PERM_UNKNOWN_AGENT", message)]
-    return _evaluate_role_permissions(
+    role_findings = _evaluate_role_permissions(
         repository_root,
         files,
         policy,
         agents_configuration[agent_role],
         (task_id, existing_states or {}),
     )
+    return [*environment_findings, *role_findings]
