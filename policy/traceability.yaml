@@ -1,0 +1,17 @@
+# Bidirectional Artifact & Code Traceability Policy
+# Enforced deterministically by `mt check traceability` via PyYAML and Python `ast`.
+version: 1
+
+traceability_rules:
+  require_all_referenced_ids_exist: true
+  require_upstream_approved_for_spec: true
+  require_upstream_approved_for_task: true
+  require_100_percent_req_ac_covered_by_spec: true
+  require_100_percent_spec_ac_covered_by_test_decorator: true
+  require_files_declared_in_spec_target_files: true
+  require_spec_target_files_covered_by_tasks: true
+  test_decorator_name: "traces"
+  test_decorator_signature: ["req_id", "ac_id", "spec_id"]
+  forbid_dependency_cycles_in_tasks: true
+  verify_git_commit_traceability: true
+  commit_message_pattern: "^(INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}: .+ \\[traces: [A-Z]+-[0-9]{3,}(?:, [A-Z]+-[0-9]{3,})*\\]$"

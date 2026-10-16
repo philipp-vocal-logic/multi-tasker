@@ -1,0 +1,23 @@
+# Python Source Code Conciseness & Sizing Policy
+# Enforced deterministically by `mt check limits` using Python `ast` and `tokenize`.
+version: 1
+
+source_code:
+  max_file_lines: 500
+  max_function_lines: 40
+  max_function_args: 5
+  max_class_methods: 10
+  max_docstring_lines: 3
+  max_docstring_words: 35
+  max_inline_comment_lines: 2
+  max_inline_comment_words: 25
+
+remediation:
+  LIMIT_FILE_LINES: "Extract cohesive functions or classes into a separate module and register it in SPEC target_files and TASK write_files; never compact formatting."
+  LIMIT_FUNC_LINES: "Extract cohesive helper functions; never compact multi-line expressions (ruff format will re-expand them)."
+  LIMIT_FUNC_ARGS: "Group related parameters into a frozen @dataclass in src/domain/models.py."
+  LIMIT_CLASS_METHODS: "Split responsibilities into smaller classes or module-level helper functions."
+  LIMIT_DOCSTRING_LINES: "Keep docstrings to a concise summary of at most 3 lines; move design prose to artifacts."
+  LIMIT_DOCSTRING_WORDS: "Trim docstring wording to at most 35 words while keeping a clear summary."
+  LIMIT_COMMENT_LEN: "Keep inline comments to at most 2 contiguous lines or extract a self-explanatory helper function."
+  LIMIT_COMMENT_WORDS: "Trim inline comment to at most 25 words."

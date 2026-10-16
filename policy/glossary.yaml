@@ -1,0 +1,380 @@
+# Shared Domain Glossary — Single Source of Truth for Vocabulary & Word Meaning
+# Enforced deterministically by `mt check glossary` across Markdown artifacts, Python AST identifiers, and file names.
+version: 1
+
+enforcement:
+  check_markdown_prose: true
+  check_code_identifiers: true
+  check_file_names: true
+  fail_on_forbidden_synonym: true
+  fail_on_identifier_case_mismatch: true
+
+terms:
+  # ============================================================================
+  # 1. Core Artifacts & Traceability Entities
+  # ============================================================================
+  - canonical: "Intent"
+    id_prefix: "INT"
+    category: "artifact"
+    definition: >
+      An immutable record (artifacts/intents/INT-NNN.md) authored by the Human
+      capturing a raw feature request, change request, or goal.
+    allowed_forms: ["Intent", "Intents", "intent", "intents", "INT"]
+    code_identifiers: ["Intent", "intent", "intent_id"]
+    forbidden_synonyms:
+      - "UserStory"
+      - "User Story"
+      - "Story"
+      - "Ticket"
+      - "FeatureRequest"
+      - "Epic"
+      - "PromptRequest"
+
+  - canonical: "Requirement"
+    id_prefix: "REQ"
+    category: "artifact"
+    definition: >
+      A versioned, atomic statement of what the system must do
+      (artifacts/requirements/REQ-NNN.md), proposed by the RequirementAgent and
+      approved by the Human.
+    allowed_forms: ["Requirement", "Requirements", "requirement", "requirements", "REQ"]
+    code_identifiers: ["Requirement", "requirement", "requirement_id", "req_id"]
+    forbidden_synonyms:
+      - "Need"
+      - "CapabilityDoc"
+      - "FeatureSpec"
+      - "BusinessRule"
+      - "PrdItem"
+
+  - canonical: "AcceptanceCriterion"
+    id_prefix: "AC"
+    category: "artifact_component"
+    definition: >
+      A single testable condition (GIVEN / WHEN / THEN) inside a Requirement
+      identified by AC-XX that must be covered by a Specification and a TestContract.
+    allowed_forms:
+      - "AcceptanceCriterion"
+      - "AcceptanceCriteria"
+      - "Acceptance Criterion"
+      - "Acceptance Criteria"
+      - "acceptance_criteria"
+      - "AC"
+    code_identifiers: ["AcceptanceCriterion", "acceptance_criteria", "criterion_id", "ac_id"]
+    forbidden_synonyms:
+      - "TestScenario"
+      - "SuccessCondition"
+      - "DefinitionOfDone"
+      - "DoD"
+      - "CheckItem"
+
+  - canonical: "ImpactAnalysis"
+    category: "artifact_component"
+    definition: >
+      The mandatory section in a Requirement explaining to the Human what adding,
+      modifying, or deprecating the Requirement means for existing behavior and artifacts.
+    allowed_forms: ["ImpactAnalysis", "Impact Analysis", "impact_analysis"]
+    code_identifiers: ["ImpactAnalysis", "impact_analysis"]
+    forbidden_synonyms:
+      - "ChangeSummary"
+      - "BlastRadius"
+      - "SideEffects"
+      - "ConsequenceReport"
+
+  - canonical: "Specification"
+    id_prefix: "SPEC"
+    category: "artifact"
+    definition: >
+      A technical design artifact (artifacts/specifications/SPEC-NNN.md) authored by
+      the SpecificationAgent that translates approved Requirements and Decisions into
+      public interfaces, target_files, and TestContract mappings.
+    allowed_forms: ["Specification", "Specifications", "specification", "specifications", "SPEC"]
+    code_identifiers: ["Specification", "specification", "specification_id", "spec_id"]
+    forbidden_synonyms:
+      - "TechDesign"
+      - "TechnicalDesign"
+      - "Blueprint"
+      - "ArchitectureDoc"
+      - "DesignDoc"
+      - "RFC"
+
+  - canonical: "Task"
+    id_prefix: "TASK"
+    category: "artifact"
+    definition: >
+      An atomic unit of work (artifacts/tasks/TASK-NNN.md) scoped by the PlannerAgent
+      for a single WorkerAgent execution, with explicit write_files, depends_on,
+      required_files, and verification_cmd.
+    allowed_forms: ["Task", "Tasks", "task", "tasks", "TASK"]
+    code_identifiers: ["Task", "task", "task_id"]
+    forbidden_synonyms:
+      - "Subtask"
+      - "Sub-task"
+      - "WorkItem"
+      - "WorkPackage"
+      - "Job"
+      - "TodoItem"
+      - "Chore"
+
+  - canonical: "TestContract"
+    category: "task_type"
+    definition: >
+      An executable test file under tests/** created by a test_contract Task prior to
+      implementation, decorated with @traces(REQ, AC, SPEC) and locked against modification
+      by implementation Tasks.
+    allowed_forms: ["TestContract", "TestContracts", "Test Contract", "Test Contracts", "test_contract"]
+    code_identifiers: ["TestContract", "test_contract"]
+    forbidden_synonyms:
+      - "TestSuiteSpec"
+      - "TestPlan"
+      - "ContractTest"
+      - "SpecTest"
+
+  - canonical: "Escalation"
+    id_prefix: "ESC"
+    category: "artifact"
+    definition: >
+      An immutable single-problem blocker report (artifacts/escalations/ESC-NNN.md)
+      emitted by an agent when it cannot complete its assignment due to ambiguity,
+      rule_conflict, infeasible_scope, or test_contract_defect.
+    allowed_forms: ["Escalation", "Escalations", "escalation", "escalations", "ESC"]
+    code_identifiers: ["Escalation", "escalation", "escalation_id", "esc_id"]
+    forbidden_synonyms:
+      - "BlockerTicket"
+      - "HelpRequest"
+      - "Incident"
+      - "AgentErrorReport"
+      - "StopReport"
+
+  - canonical: "Decision"
+    id_prefix: "DEC"
+    category: "artifact"
+    definition: >
+      A binding resolution artifact (artifacts/decisions/DEC-NNN.md) authored and
+      approved by the Human in response to an Escalation, persisted as a configurable
+      constraint for downstream agent runs.
+    allowed_forms: ["Decision", "Decisions", "decision", "decisions", "DEC"]
+    code_identifiers: ["Decision", "decision", "decision_id", "dec_id"]
+    forbidden_synonyms:
+      - "ADR"
+      - "HumanOverride"
+      - "Ruling"
+      - "ClarificationNote"
+      - "AnswerFile"
+
+  - canonical: "ReviewRecord"
+    id_prefix: "REV"
+    category: "artifact"
+    definition: >
+      An append-only audit artifact (artifacts/reviews/REV-NNN.md) written by the
+      ReviewAgent recording a pass/fail verdict and findings for a specific stage.
+    allowed_forms: ["ReviewRecord", "ReviewRecords", "Review Record", "Review Records", "REV"]
+    code_identifiers: ["ReviewRecord", "review_record", "review_id", "rev_id"]
+    forbidden_synonyms:
+      - "AuditLog"
+      - "SignOffSheet"
+      - "InspectionReport"
+      - "ReviewTicket"
+
+  # ============================================================================
+  # 2. Actors & Agent Roles
+  # ============================================================================
+  - canonical: "Human"
+    category: "actor"
+    definition: >
+      The user who authors Intents, confirms Requirement updates, and resolves
+      Escalations via Decisions.
+    allowed_forms: ["Human", "human"]
+    code_identifiers: ["Human", "human"]
+    forbidden_synonyms:
+      - "Operator"
+      - "EndUser"
+      - "Stakeholder"
+      - "ProductOwner"
+      - "Customer"
+
+  - canonical: "Orchestrator"
+    category: "actor"
+    definition: >
+      The deterministic CLI runtime (`mt`) that manages Worktrees, schedules parallel
+      Tasks, runs `mt check` validators, enforces MergeGates, and routes Escalations.
+    allowed_forms: ["Orchestrator", "orchestrator"]
+    code_identifiers: ["Orchestrator", "orchestrator"]
+    forbidden_synonyms:
+      - "SupervisorAgent"
+      - "MasterAgent"
+      - "CoordinatorBot"
+      - "ControllerDaemon"
+      - "PipelineEngine"
+
+  - canonical: "RequirementAgent"
+    category: "actor"
+    definition: >
+      The scoped LLM agent (`requirement-agent`) permitted only to create or update
+      draft/needs_update Requirement files from an Intent.
+    allowed_forms: ["RequirementAgent", "Requirement Agent", "requirement-agent"]
+    code_identifiers: ["RequirementAgent", "requirement_agent"]
+    forbidden_synonyms:
+      - "AnalystAgent"
+      - "BusinessAnalystAgent"
+      - "ProductManagerAgent"
+      - "PMBot"
+
+  - canonical: "SpecificationAgent"
+    category: "actor"
+    definition: >
+      The scoped LLM agent (`specification-agent`) permitted only to create or update
+      draft/needs_update Specification files from approved Requirements and Decisions.
+    allowed_forms: ["SpecificationAgent", "Specification Agent", "specification-agent"]
+    code_identifiers: ["SpecificationAgent", "specification_agent"]
+    forbidden_synonyms:
+      - "ArchitectAgent"
+      - "DesignerAgent"
+      - "TechLeadAgent"
+      - "SpecWriter"
+
+  - canonical: "PlannerAgent"
+    category: "actor"
+    definition: >
+      The scoped LLM agent (`planner-agent`) permitted only to create or update Task
+      files decomposing Specifications into test_contract and implementation Tasks.
+    allowed_forms: ["PlannerAgent", "Planner Agent", "planner-agent"]
+    code_identifiers: ["PlannerAgent", "planner_agent"]
+    forbidden_synonyms:
+      - "ScrumMasterAgent"
+      - "BreakdownAgent"
+      - "DispatcherAgent"
+      - "TaskSplitter"
+
+  - canonical: "WorkerAgent"
+    category: "actor"
+    definition: >
+      The scoped LLM agent (`worker-agent`) executing a single Task inside an isolated
+      Worktree, restricted to modifying only TASK.write_files.
+    allowed_forms: ["WorkerAgent", "Worker Agent", "worker-agent"]
+    code_identifiers: ["WorkerAgent", "worker_agent"]
+    forbidden_synonyms:
+      - "CoderAgent"
+      - "DeveloperAgent"
+      - "BuilderAgent"
+      - "ImplementerBot"
+      - "ExecutorAgent"
+
+  - canonical: "ReviewAgent"
+    category: "actor"
+    definition: >
+      The scoped LLM agent (`review-agent`) that verifies Requirements, Specifications,
+      Tasks, TestContracts, and implementation code after deterministic CLI checks pass.
+    allowed_forms: ["ReviewAgent", "Review Agent", "review-agent"]
+    code_identifiers: ["ReviewAgent", "review_agent"]
+    forbidden_synonyms:
+      - "CriticAgent"
+      - "QAAgent"
+      - "InspectorAgent"
+      - "JudgeAgent"
+      - "AuditorAgent"
+
+  # ============================================================================
+  # 3. Execution, Isolation & Enforcement Concepts
+  # ============================================================================
+  - canonical: "Policy"
+    category: "enforcement"
+    definition: >
+      An immutable YAML configuration file in `policy/*.yaml` defining permissions,
+      glossary terms, size limits, clean-code rules, architecture layers, or schemas.
+    allowed_forms: ["Policy", "Policies", "policy", "policies"]
+    code_identifiers: ["Policy", "policy"]
+    forbidden_synonyms:
+      - "GuidelineDoc"
+      - "Rulebook"
+      - "GuardrailConfig"
+      - "ConventionFile"
+      - "perms_checker"
+      - "check_perms"
+      - "arch_checker"
+      - "check_arch"
+      - "check_code"
+      - "schema_validator"
+      - "ArtifactDoc"
+      - "docs_gen"
+      - "init_repo"
+      - "verify_clean_repo"
+
+  - canonical: "MergeGate"
+    category: "enforcement"
+    definition: >
+      The deterministic verification barrier in the Orchestrator that validates a clean
+      Worktree against `policy/permissions.yaml`, `mt check`, `verification_cmd`, and
+      ReviewRecord approval before fast-forward merging onto the BaseBranch.
+    allowed_forms: ["MergeGate", "MergeGates", "Merge Gate", "Merge Gates", "merge_gate"]
+    code_identifiers: ["MergeGate", "merge_gate"]
+    forbidden_synonyms:
+      - "PullRequestGate"
+      - "PRCheck"
+      - "CommitFirewall"
+      - "QualityBarrier"
+
+  - canonical: "Worktree"
+    category: "execution"
+    definition: >
+      An isolated Git working tree (`.worktrees/<id>`) branched from a verified clean
+      BaseBranch commit in which a single agent invocation executes.
+    allowed_forms: ["Worktree", "Worktrees", "worktree", "worktrees"]
+    code_identifiers: ["Worktree", "worktree", "worktree_path"]
+    forbidden_synonyms:
+      - "SandboxDir"
+      - "TempClone"
+      - "WorkspaceCopy"
+      - "ScratchRepo"
+
+  - canonical: "BaseBranch"
+    category: "execution"
+    definition: >
+      The primary verified clean Git branch from which agent Worktrees are forked and
+      into which passing changes are fast-forward merged under `merge_lock`.
+    allowed_forms: ["BaseBranch", "Base Branch", "base_branch"]
+    code_identifiers: ["BaseBranch", "base_branch", "base_sha"]
+    forbidden_synonyms:
+      - "TrunkBranch"
+      - "IntegrationBranch"
+      - "UpstreamRepo"
+
+  - canonical: "WriteScope"
+    category: "enforcement"
+    definition: >
+      The explicit set of file paths or globs (`allowed_write` in `policy/permissions.yaml`
+      or `write_files` in `TASK-NNN.md`) that an agent is permitted to create or modify.
+    allowed_forms: ["WriteScope", "Write Scope", "write_scope", "write_files", "allowed_write"]
+    code_identifiers: ["WriteScope", "write_scope", "write_files", "allowed_write"]
+    forbidden_synonyms:
+      - "EditablePaths"
+      - "MutableFiles"
+      - "TouchList"
+      - "FileWhitelist"
+
+  - canonical: "Finding"
+    category: "enforcement"
+    definition: >
+      A single-line violation (`<filepath>:<line>: [<RULE_ID>] <message>`) emitted by
+      `mt check` or recorded in a ReviewRecord when an artifact or source file breaks a Policy.
+    allowed_forms: ["Finding", "Findings", "finding", "findings"]
+    code_identifiers: ["Finding", "finding", "findings"]
+    forbidden_synonyms:
+      - "LintWarning"
+      - "RuleBreach"
+      - "Complaint"
+      - "DiagnosticMessage"
+
+  - canonical: "Traceability"
+    category: "enforcement"
+    definition: >
+      The complete, verifiable bidirectional lineage connecting Intent -> Requirement (AC)
+      -> Decision -> Specification -> Task -> TestContract (@traces) -> Implementation Commit.
+    allowed_forms: ["Traceability", "traceability", "traces_to", "traces"]
+    code_identifiers: ["Traceability", "traceability", "traces_to", "traces"]
+    forbidden_synonyms:
+      - "ProvenanceChain"
+      - "AuditTrailLink"
+      - "BacklinkGraph"
+      - "trace_checker"
+      - "check_trace"
+      - "test_trace_and_cli"
