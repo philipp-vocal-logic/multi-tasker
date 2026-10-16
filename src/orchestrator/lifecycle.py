@@ -20,7 +20,7 @@ from src.domain.parser import (
     update_artifact_frontmatter,
 )
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
-from src.orchestrator.prompt_builder import build_agent_prompt
+from src.orchestrator.prompt_builder import build_agent_prompt, resolve_task_execution
 from src.orchestrator.router import route_escalation
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
 from src.orchestrator.worktree import (
@@ -194,36 +194,13 @@ def _write_worktree_prompt_file(worktree_path: Path, task_id: str) -> Path:
     return prompt_file
 
 
-def _invoke_agent_in_worktree(
+def _collect_worktree_changes(
     worktree_path: Path,
     task_id: str,
     write_files: list[str],
-    agent_command: str,
-    timeout_seconds: float = 300.0,
+    existing_escalations: set[str],
 ) -> list[str]:
-    """Execute agent_command inside worktree_path and return modified relative paths."""
-    existing_escalations = _list_escalations(worktree_path)
-    prompt_file = _write_worktree_prompt_file(worktree_path, task_id)
-    environment = {
-        **os.environ,
-        "MT_AGENT_ROLE": "worker-agent",
-        "MT_TASK_ID": task_id,
-        "MT_WRITE_FILES": ",".join(write_files),
-        "MT_PROMPT_FILE": str(prompt_file),
-    }
-    try:
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            subprocess.run(
-                shlex.split(agent_command),
-                cwd=worktree_path,
-                env=environment,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=timeout_seconds,
-            )
-    finally:
-        prompt_file.unlink(missing_ok=True)
+    """Collect modified relative file paths in worktree_path after agent execution."""
     if (worktree_path / ".git").exists():
         task_relative_path = f"artifacts/tasks/{task_id}.md"
         return [
@@ -233,6 +210,62 @@ def _invoke_agent_in_worktree(
         ]
     new_escalations = sorted(_list_escalations(worktree_path) - existing_escalations)
     return new_escalations if new_escalations else write_files
+
+
+def _prepare_worker_invocation(
+    task_id: str,
+    write_files: list[str],
+    prompt_file: Path,
+    execution_context: tuple[str, str, str],
+) -> tuple[str, dict[str, str]]:
+    """Build rendered command string and subprocess environment for worker execution."""
+    command_template, environment_name, model_name = execution_context
+    rendered_command = (
+        command_template.replace("{model}", model_name)
+        .replace("{task_id}", task_id)
+        .replace("{prompt_file}", str(prompt_file))
+    )
+    environment = {
+        **os.environ,
+        "MT_AGENT_ROLE": "worker-agent",
+        "MT_TASK_ID": task_id,
+        "MT_WRITE_FILES": ",".join(write_files),
+        "MT_PROMPT_FILE": str(prompt_file),
+        "MT_AGENT_MODEL": model_name,
+        "MT_EXECUTION_ENVIRONMENT": environment_name,
+    }
+    return rendered_command, environment
+
+
+def _invoke_agent_in_worktree(
+    worktree_path: Path,
+    task_id: str,
+    write_files: list[str],
+    execution_context: tuple[str, str, str],
+    timeout_seconds: float = 300.0,
+) -> list[str]:
+    """Execute resolved command inside worktree_path and return modified paths."""
+    existing_escalations = _list_escalations(worktree_path)
+    prompt_file = _write_worktree_prompt_file(worktree_path, task_id)
+    rendered_command, environment = _prepare_worker_invocation(
+        task_id, write_files, prompt_file, execution_context
+    )
+    try:
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            subprocess.run(
+                shlex.split(rendered_command),
+                cwd=worktree_path,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+    finally:
+        prompt_file.unlink(missing_ok=True)
+    return _collect_worktree_changes(
+        worktree_path, task_id, write_files, existing_escalations
+    )
 
 
 def _finalize_task_outcome(
@@ -275,34 +308,63 @@ def _finalize_task_outcome(
     return outcome.findings
 
 
-def _prepare_task_worktree(repository_root: Path, document: ArtifactDocument) -> Path:
-    """Create an isolated Worktree from clean BaseBranch and mark Task in_progress."""
+def _prepare_batch_worktrees(
+    repository_root: Path, max_workers: int
+) -> list[tuple[ArtifactDocument, Path]]:
+    """Select parallel Task batch and create an in_progress Worktree for each Task."""
+    batch, _ = select_parallel_batch(repository_root)
+    by_identifier = load_artifacts_by_id(repository_root)
+    selected = [
+        by_identifier[task_id]
+        for task_id in batch[: max(1, max_workers)]
+        if task_id in by_identifier
+    ]
+    prepared: list[tuple[ArtifactDocument, Path]] = []
+    for document in selected:
+        task_id = str(document.frontmatter["id"])
+        worktree_path = create_worktree(repository_root, task_id)
+        update_artifact_frontmatter(
+            worktree_path / document.path, {"status": "in_progress"}
+        )
+        prepared.append((document, worktree_path))
+    return prepared
+
+
+def _resolve_and_invoke_worktree(
+    worktree_path: Path,
+    document: ArtifactDocument,
+    execution_options: tuple[str | None, str | None, str | None],
+) -> list[str]:
+    """Resolve execution context and invoke worker command when configured."""
     task_id = str(document.frontmatter["id"])
-    worktree_path = create_worktree(repository_root, task_id)
-    update_artifact_frontmatter(
-        worktree_path / document.path, {"status": "in_progress"}
+    write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
+    execution_context = resolve_task_execution(
+        worktree_path, document, execution_options
     )
-    return worktree_path
+    if (
+        execution_options[0]
+        or execution_options[2]
+        or document.frontmatter.get("execution_environment")
+    ):
+        return _invoke_agent_in_worktree(
+            worktree_path, task_id, write_files, execution_context
+        )
+    return write_files
 
 
 def _execute_single_task(
     repository_root: Path,
     document: ArtifactDocument,
     worktree_path: Path,
-    agent_command: str | None,
+    execution_options: tuple[str | None, str | None, str | None],
     merge_lock: threading.Lock,
 ) -> list[Finding]:
     """Run MergeGate verification for a single Task in an isolated Worktree."""
     task_id = str(document.frontmatter["id"])
-    write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
     verification = str(document.frontmatter.get("verification_cmd", "")) or None
     try:
-        changed = (
-            _invoke_agent_in_worktree(
-                worktree_path, task_id, write_files, agent_command
-            )
-            if agent_command
-            else write_files
+        changed = _resolve_and_invoke_worktree(
+            worktree_path, document, execution_options
         )
         outcome = evaluate_merge_gate(
             GateRequest(
@@ -324,22 +386,17 @@ def _execute_single_task(
 
 
 def run_scheduled_tasks(
-    repository_root: Path, max_workers: int = 1, agent_command: str | None = None
+    repository_root: Path,
+    max_workers: int = 1,
+    agent_command: str | None = None,
+    model_override: str | None = None,
+    environment_override: str | None = None,
 ) -> tuple[list[str], list[Finding]]:
     """Execute conflict-free batch of eligible Tasks up to max_workers."""
-    batch, _ = select_parallel_batch(repository_root)
-    by_identifier = load_artifacts_by_id(repository_root)
-    selected = [
-        by_identifier[task_id]
-        for task_id in batch[: max(1, max_workers)]
-        if task_id in by_identifier
-    ]
-    if not selected:
+    prepared = _prepare_batch_worktrees(repository_root, max_workers)
+    if not prepared:
         return [], []
-    prepared = [
-        (document, _prepare_task_worktree(repository_root, document))
-        for document in selected
-    ]
+    execution_options = (agent_command, model_override, environment_override)
     merge_lock, completed, findings = threading.Lock(), [], []
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
         futures = [
@@ -350,7 +407,7 @@ def run_scheduled_tasks(
                     repository_root,
                     document,
                     worktree_path,
-                    agent_command,
+                    execution_options,
                     merge_lock,
                 ),
             )

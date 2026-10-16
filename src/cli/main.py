@@ -44,6 +44,8 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--max-workers", type=int, default=1)
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
+    run_parser.add_argument("--model", default=None, dest="model")
+    run_parser.add_argument("--environment", default=None, dest="environment")
     run_parser.add_argument("--root", default=".", help="Repository root directory.")
     prompt_parser = subparsers.add_parser("prompt")
     prompt_parser.add_argument("agent_role", help="Canonical agent role.")
@@ -98,12 +100,14 @@ def _run_check_command(arguments: argparse.Namespace) -> int:
     return emit_findings(repository_root, findings)
 
 
-def _run_tasks_command(
-    repository_root: Path, max_workers: int, agent_command: str | None
-) -> int:
+def _run_tasks_command(repository_root: Path, arguments: argparse.Namespace) -> int:
     """Execute `mt run` and output completed Task IDs or Findings."""
     done_ids, findings = run_scheduled_tasks(
-        repository_root, max_workers, agent_command
+        repository_root,
+        int(arguments.max_workers),
+        arguments.agent_command,
+        arguments.model,
+        arguments.environment,
     )
     if findings:
         return emit_findings(repository_root, findings)
@@ -145,9 +149,7 @@ def _dispatch_lifecycle(
         )
         return emit_findings(repository_root, findings)
     if command == "run":
-        return _run_tasks_command(
-            repository_root, int(arguments.max_workers), arguments.agent_command
-        )
+        return _run_tasks_command(repository_root, arguments)
     if command == "documentation":
         sys.stdout.write(generate_repository_documentation(repository_root))
         return 0
