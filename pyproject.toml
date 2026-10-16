@@ -13,8 +13,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "mypy>=1.10",
     "pytest>=8.0",
     "ruff>=0.4",
+    "types-PyYAML>=6.0",
 ]
 
 [project.scripts]
@@ -23,3 +25,8 @@ mt = "src.cli.main:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+

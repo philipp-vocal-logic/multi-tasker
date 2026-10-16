@@ -50,7 +50,7 @@ layers:
       - "tests"
 
   - name: "cli"
-    description: "Thin CLI entrypoints (`mt init`, `mt check`, `mt intent`, `mt approve`, `mt run`, `mt resolve`, `mt trace`)."
+    description: "Thin CLI entrypoints (`mt initialize`, `mt check`, `mt schedule`, `mt impact`, `mt intent`, `mt approve`, `mt run`, `mt resolve`, `mt trace`, `mt documentation`, `mt prompt`)."
     paths:
       - "src/cli/**"
     allowed_internal_imports:

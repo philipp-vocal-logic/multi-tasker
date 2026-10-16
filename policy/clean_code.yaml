@@ -25,7 +25,7 @@ linters:
     max_mccabe_complexity: 8
 
   mypy:
-    enabled: false
+    enabled: true
     cmd:
       - "mypy"
       - "--strict"
