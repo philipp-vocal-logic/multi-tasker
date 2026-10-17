@@ -9,6 +9,7 @@ traces_to:
 depends_on:
   - TASK-043
   - TASK-044
+  - TASK-046
 required_files:
   - tests/test_stage_runner.py
   - src/orchestrator/lifecycle.py
