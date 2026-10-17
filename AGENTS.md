@@ -2,7 +2,7 @@
 
 ## 1. Strict MVP Mindset (KISS & YAGNI)
 - **Zero Backward Compatibility or Shims**: Greenfield MVP only. Never add fallback paths, deprecated aliases, wrapper functions, or re-exports. Move refactored symbols cleanly and update callers in lockstep.
-- **Single Source of Truth**: `policy/*.yaml` and `artifacts/**` are the sole authoritative specification. Never maintain duplicate static specification or prompt files; generate documentation (`./mt documentation`) and role prompts (`./mt prompt <role>`) deterministically from live repository state.
+- **Single Source of Truth**: `policy/*.yaml` and `artifacts/**` are the sole authoritative specification. Never maintain duplicate static specification or prompt files; generate documentation (`./mt documentation` $\rightarrow$ gitignored `.report/specification.md`) and role prompts (`./mt prompt <role>`) deterministically from live repository state.
 - **Unabbreviated English Identifiers**: Never use abbreviations in filenames, CLI subcommands, classes, functions, parameters, or variables (e.g., `documentation_generator.py`, `ArtifactDocument`, `relative_path`, `configuration`, `frontmatter`).
 
 ## 2. Mandatory Dogfooding & Artifact Lifecycle Workflow
