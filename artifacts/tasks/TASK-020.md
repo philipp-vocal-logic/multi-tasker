@@ -2,14 +2,14 @@
 id: TASK-020
 title: Create TestContract for REQ-007 and SPEC-007
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-007
-  - SPEC-007
+- REQ-007
+- SPEC-007
 depends_on: []
 required_files: []
 write_files:
-  - tests/test_orchestrator.py
+- tests/test_orchestrator.py
 verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective
