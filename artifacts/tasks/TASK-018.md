@@ -2,13 +2,15 @@
 id: TASK-018
 title: Create TestContract for REQ-006 and SPEC-006
 type: test_contract
-status: planned
-traces_to: [REQ-006, SPEC-006]
+status: done
+traces_to:
+- REQ-006
+- SPEC-006
 depends_on: []
 required_files: []
 write_files:
-  - tests/test_orchestrator.py
-verification_cmd: "pytest -q tests/test_checkers.py"
+- tests/test_orchestrator.py
+verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective
 Create executable `TestContract` tests in `tests/test_orchestrator.py` covering `REQ-006:AC-01` and `REQ-006:AC-02`.

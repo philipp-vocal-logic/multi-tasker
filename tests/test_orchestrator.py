@@ -295,3 +295,20 @@ def test_all_policy_yaml_keys_are_enforced_and_read(
     remove_worktree(tmp_path, create_worktree(tmp_path, "spy-wt"))
     metadata_only = {"version", "description", "definition", "category", "id_prefix"}
     assert (defined - accessed) - metadata_only == set()
+
+
+@traces("REQ-006", "AC-01", "SPEC-006")
+@traces("REQ-006", "AC-02", "SPEC-006")
+def test_continual_report_documentation_generation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify .report/specification.md updates across lifecycle and CLI."""
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    report_file = tmp_path / ".report" / "specification.md"
+    gitignore_file = tmp_path / ".report" / ".gitignore"
+    assert report_file.is_file() and gitignore_file.read_text("utf-8").strip() == "*"
+    assert main(["intent", "Track report updates.", "--root", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert "INT-001" in report_file.read_text("utf-8")
+    assert main(["documentation", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == report_file.read_text("utf-8")
