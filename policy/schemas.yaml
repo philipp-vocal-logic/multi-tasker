@@ -231,6 +231,7 @@ schemas:
         verification_cmd: { type: "string", minLength: 3 }
         model: { type: "string", minLength: 3 }
         execution_environment: { type: "string", minLength: 2 }
+        context_mode: { type: "string", enum: ["inline", "paths"] }
 
   ESC:
     path_glob: "artifacts/escalations/ESC-*.md"
