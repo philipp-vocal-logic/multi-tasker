@@ -9,6 +9,7 @@ traces_to:
 depends_on:
   - TASK-039
   - TASK-040
+  - TASK-042
 required_files:
   - tests/test_stage_runner.py
   - src/domain/parser.py
