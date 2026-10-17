@@ -1,8 +1,9 @@
 ---
 id: TASK-052
-title: Add TestContract for External Project AGENTS.md Bootstrapping and Policy Guide Scaffolding
+title: Add TestContract for External Project AGENTS.md Bootstrapping and Policy Guide
+  Scaffolding
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-017
 - SPEC-017

@@ -236,8 +236,9 @@ def _write_file(path: Path, text: str) -> None:
 
 
 @traces("REQ-016", "AC-01", "SPEC-016")
+@traces("REQ-017", "AC-01", "SPEC-017")
 def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> None:
-    """Verify mt initialize scaffolds missing policy/*.yaml and .gitignore entries."""
+    """Verify mt initialize scaffolds policy/*.yaml, .gitignore, and AGENTS.md."""
     custom_limits = "source_code:\n  max_file_lines: 777\n"
     _write_file(tmp_path / "policy/limits.yaml", custom_limits)
     _write_file(tmp_path / ".gitignore", "__pycache__/\n")
@@ -248,6 +249,16 @@ def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> 
     gitignore_lines = (tmp_path / ".gitignore").read_text("utf-8").splitlines()
     for entry in ("__pycache__/", ".worktrees/", ".report/", ".mt_prompt.md"):
         assert entry in gitignore_lines
+    agents_guide = (tmp_path / "AGENTS.md").read_text("utf-8")
+    for expected in (
+        "policy/architecture.yaml",
+        "PERM_POLICY_MODIFIED",
+        "from multi_tasker.domain.models import traces",
+    ):
+        assert expected in agents_guide
+    _write_file(tmp_path / "AGENTS.md", "# Custom Guide\n")
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    assert (tmp_path / "AGENTS.md").read_text("utf-8") == "# Custom Guide\n"
 
 
 @traces("REQ-016", "AC-02", "SPEC-016")
