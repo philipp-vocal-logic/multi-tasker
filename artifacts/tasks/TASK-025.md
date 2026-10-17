@@ -2,18 +2,18 @@
 id: TASK-025
 title: Extract Worktree Task Execution Runner from Lifecycle Module for SPEC-009
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-009
-  - SPEC-009
+- REQ-009
+- SPEC-009
 depends_on:
-  - TASK-024
+- TASK-024
 required_files:
-  - tests/test_transitions_and_execution.py
+- tests/test_transitions_and_execution.py
 write_files:
-  - src/orchestrator/lifecycle.py
-  - src/orchestrator/task_runner.py
-  - src/cli/main.py
+- src/orchestrator/lifecycle.py
+- src/orchestrator/task_runner.py
+- src/cli/main.py
 verification_cmd: pytest -q tests/test_lifecycle.py tests/test_orchestrator.py
 ---
 ## Objective

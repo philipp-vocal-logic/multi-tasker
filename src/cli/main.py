@@ -15,11 +15,11 @@ from src.orchestrator.lifecycle import (
     create_intent,
     initialize_repository,
     resolve_escalation,
-    run_scheduled_tasks,
 )
 from src.orchestrator.lineage import trace_lineage
 from src.orchestrator.prompt_builder import build_agent_prompt
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
+from src.orchestrator.task_runner import run_scheduled_tasks
 
 
 def _add_lifecycle_parsers(subparsers: Any) -> None:
