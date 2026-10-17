@@ -2,7 +2,7 @@
 id: TASK-053
 title: Implement External AGENTS.md Guide Generator and mt initialize Scaffolding
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-017
 - SPEC-017

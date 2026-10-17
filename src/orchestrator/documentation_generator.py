@@ -207,3 +207,44 @@ def write_repository_documentation(repository_root: Path) -> Path:
         generate_repository_documentation(repository_root), encoding="utf-8"
     )
     return report_path
+
+
+def generate_external_agents_guide() -> str:
+    """Synthesize external project AGENTS.md bootstrapping and policy tuning guide."""
+    lines = [
+        "# AGENTS.md — External Project Bootstrapping & Development Guide",
+        "",
+        "## 1. One-Time Bootstrapping & Tailoring Policy Configuration",
+        "1. **Install & Initialize**: Install `multi-tasker` (`pip install -e <path>`) "
+        "and run `mt initialize`.",
+        "2. **Customize Architecture & Vocabulary (`policy/architecture.yaml`, "
+        "`policy/glossary.yaml`)**:",
+        "   - Replace `layers` (`paths`, `allowed_internal_imports`, "
+        "`forbidden_internal_imports`) and `allowed_third_party_packages` (keep "
+        '`"multi_tasker"` and `"pytest"`).',
+        "   - Keep core `mt` orchestration terms and agent roles in "
+        "`policy/glossary.yaml` and append project domain terms.",
+        "3. **Tune Use-Case Policies (`policy/pipeline.yaml`, "
+        "`policy/permissions.yaml`, `policy/clean_code.yaml`, "
+        "`policy/limits.yaml`, `policy/schemas.yaml`)**:",
+        "   - Configure stage `approval_gate` (`human`, `review-agent`, `auto`), "
+        "`execution_environments`, per-role `model`, `ast_rules`, and sizing bounds.",
+        "4. **Commit Baseline Policies (`PERM_POLICY_MODIFIED` Rule)**: Uncommitted "
+        "`policy/**` edits fail `mt check permissions` and `policy/` is read-only in "
+        "`Worktrees`. Run `mt intent 'Bootstrap project policies'` (`INT-001`) and "
+        "commit `INT-001: Bootstrap project policies [traces: INT-001]` before "
+        "running `mt check all` or `mt run`.",
+        "",
+        "## 2. Mandatory Artifact Lifecycle Workflow",
+        "Never edit `src/**`, `tests/**`, `policy/**`, or `done` `TASK-NNN.md` files "
+        "ad-hoc:",
+        "1. `mt intent '<goal>'` -> `artifacts/intents/INT-NNN.md`.",
+        "2. Author `artifacts/requirements/REQ-NNN.md` -> `mt approve REQ-NNN`.",
+        "3. Author `artifacts/specifications/SPEC-NNN.md` -> `mt approve SPEC-NNN`.",
+        "4. Author `artifacts/tasks/TASK-NNN.md`: `test_contract` importing "
+        "`from multi_tasker.domain.models import traces` (`@traces(...)`) followed by "
+        "`implementation` Tasks.",
+        "5. Execute via `mt run`, `mt run --agent <role> --target <id>`, or "
+        "`mt run --pipeline`, and verify `mt check all` exits `0` with empty `stdout`.",
+    ]
+    return "\n".join(lines) + "\n"

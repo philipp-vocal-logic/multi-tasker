@@ -15,6 +15,7 @@ from src.domain.parser import (
     update_artifact_frontmatter,
 )
 from src.orchestrator.documentation_generator import (
+    generate_external_agents_guide,
     write_repository_documentation,
 )
 from src.orchestrator.scheduler import compute_dirty_subgraph
@@ -51,6 +52,9 @@ def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
         gitignore_path.write_text(
             f"{prefix}" + "\n".join(missing) + "\n", encoding="utf-8"
         )
+    agents_path = repository_root / "AGENTS.md"
+    if not agents_path.exists():
+        agents_path.write_text(generate_external_agents_guide(), encoding="utf-8")
 
 
 def initialize_repository(repository_root: Path) -> list[Finding]:
