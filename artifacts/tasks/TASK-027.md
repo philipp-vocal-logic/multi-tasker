@@ -2,14 +2,14 @@
 id: TASK-027
 title: Create TestContract for Multi-Wave Execution and Approval Traceability
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-010
-  - SPEC-010
+- REQ-010
+- SPEC-010
 depends_on: []
 required_files: []
 write_files:
-  - tests/test_lifecycle.py
+- tests/test_lifecycle.py
 verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective

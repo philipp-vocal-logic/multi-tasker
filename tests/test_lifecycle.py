@@ -257,9 +257,8 @@ def test_cli_resolve_missing_and_task_resolution(
         tmp_path / "artifacts/tasks/TASK-001.md",
         "---\nid: TASK-001\nstatus: planned\n---\n",
     )
-    assert (
-        main(["resolve", "ESC-001", "--by", "TASK-001", "--root", str(tmp_path)]) == 0
-    )
+    resolve_args = ["resolve", "ESC-001", "--by", "TASK-001", "--root", str(tmp_path)]
+    assert main(resolve_args) == 0
     escalation, _ = parse_artifact_file(
         tmp_path / "artifacts/escalations/ESC-001.md", "ESC-001.md"
     )
@@ -280,10 +279,11 @@ def test_run_scheduled_tasks_worktree_execution(
         task_path,
         "---\nid: TASK-001\ntype: test_contract\nstatus: planned\n"
         "depends_on: []\nrequired_files: []\nwrite_files: [tests/helper_mod.py]\n"
-        "verification_cmd: \"python3 -c 'raise SystemExit(1)'\"\n---\n",
+        "verification_cmd: python3 -c \"print('E   boom'); "
+        "print('FAILED t'); raise SystemExit(1)\"\n---\n",
     )
     assert main(["run", "--root", str(tmp_path)]) == 1
-    assert "[GATE_VERIFY_CMD_FAILED]" in capsys.readouterr().out
+    assert "E   boom | FAILED t" in capsys.readouterr().out
     failed_document, _ = parse_artifact_file(task_path, "artifacts/tasks/TASK-001.md")
     assert failed_document and failed_document.frontmatter["status"] == "planned"
     _write_document(
@@ -316,10 +316,8 @@ def test_trace_lineage_and_documentation_generation(
     assert main(["trace", target_python, "--root", str(REPOSITORY_ROOT)]) == 0
     output_file = capsys.readouterr().out
     assert "SPEC-003" in output_file
-    assert (
-        "tests/test_lifecycle.py:test_trace_lineage_and_documentation_generation"
-        in output_file
-    )
+    expected_test = "test_trace_lineage_and_documentation_generation"
+    assert f"tests/test_lifecycle.py:{expected_test}" in output_file
     assert main(["documentation", "--root", str(REPOSITORY_ROOT)]) == 0
     documentation_output = capsys.readouterr().out
     for heading in (
@@ -329,3 +327,33 @@ def test_trace_lineage_and_documentation_generation(
         "## 5. Live Repository Traceability Graph",
     ):
         assert heading in documentation_output
+
+
+@traces("REQ-010", "AC-01", "SPEC-010")
+@traces("REQ-010", "AC-02", "SPEC-010")
+def test_multi_wave_run_and_approval_traceability_diagnostics(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify multi-wave mt run, E-line verify failures, and approve traceability."""
+    _seed_policies(tmp_path)
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-001.md",
+        "---\nid: REQ-001\nstatus: draft\ntraces_to: [INT-999]\n---\n"
+        "## Statement\nOk\n",
+    )
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 1
+    assert "[TRACE_MISSING_REF]" in capsys.readouterr().out
+    _write_document(tmp_path / "tests/w1.py", "VALUE = 1\n")
+    _write_document(tmp_path / "tests/w2.py", "VALUE = 2\n")
+    for task_id, deps, writes in (
+        ("TASK-001", "[]", "[tests/w1.py]"),
+        ("TASK-002", "[TASK-001]", "[tests/w2.py]"),
+    ):
+        _write_document(
+            tmp_path / f"artifacts/tasks/{task_id}.md",
+            f"---\nid: {task_id}\ntype: test_contract\nstatus: planned\n"
+            f"depends_on: {deps}\nrequired_files: []\nwrite_files: {writes}\n"
+            "verification_cmd: \"python3 -c 'raise SystemExit(0)'\"\n---\n",
+        )
+    assert main(["run", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip().splitlines() == ["TASK-001", "TASK-002"]
