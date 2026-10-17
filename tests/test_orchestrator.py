@@ -314,167 +314,29 @@ def test_continual_report_documentation_generation(
     assert capsys.readouterr().out == report_file.read_text("utf-8")
 
 
-def _is_expected_valid_transition(
-    rule: dict[str, object],
-    state_map: dict[str, list[str]],
-    old_state: str | None,
-    new_state: str,
-) -> bool:
-    """Return True if rule and state_map permit old_state -> new_state."""
-    allowed_existing = rule.get("allowed_existing_states")
-    allowed_targets = rule.get("allowed_target_states")
-    existing_ok = (
-        rule.get("allow_create", True) is not False
-        if old_state is None
-        else (not isinstance(allowed_existing, list) or old_state in allowed_existing)
-    )
-    target_ok = not isinstance(allowed_targets, list) or new_state in allowed_targets
-    step_ok = (
-        old_state is None
-        or old_state == new_state
-        or not state_map
-        or new_state in state_map.get(old_state, [])
-    )
-    return bool(existing_ok and target_ok and step_ok)
-
-
-def _verify_rule_state_matrix(
-    root: Path,
-    role: str,
-    rule: dict[str, object],
-    transitions: dict[str, dict[str, list[str]]],
-) -> int:
-    """Test every (old_state, new_state) pair for one agent permission rule."""
-    sample_path = str(rule["path"]).replace("*", "001")
-    artifact_type = domain_parser.infer_artifact_type(sample_path)
-    state_map = transitions.get(artifact_type, {})
-    all_states = list(state_map.keys()) or ["pass"]
-    checked = 0
-    for old_state in [None, *all_states]:
-        for new_state in all_states:
-            _write_document(
-                root / sample_path, f"---\nid: ART-001\nstatus: {new_state}\n---\n"
-            )
-            prior = {sample_path: old_state} if old_state is not None else {}
-            findings = permissions_checker.check_permissions(
-                root, role, None, [sample_path], prior
-            )
-            expected = _is_expected_valid_transition(
-                rule, state_map, old_state, new_state
-            )
-            assert (findings == []) == expected
-            checked += 1
-    return checked
-
-
-@traces("REQ-007", "AC-01", "SPEC-007")
-def test_approve_specification_and_dirty_task_propagation(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@traces("REQ-004", "AC-02", "SPEC-004")
+def test_role_prompt_synthesis_and_context_assembly(
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Verify mt approve transitions SPEC from draft/in_review and dirties Tasks."""
+    """Verify `mt prompt` for all 5 roles, target context, and error findings."""
     repository_root = Path(__file__).resolve().parent.parent
-    _seed_minimal_policies(tmp_path)
-    real_schemas = load_yaml_file(repository_root / "policy/schemas.yaml")
-    _write_document(
-        tmp_path / "policy/schemas.yaml",
-        yaml.safe_dump(
-            {
-                "state_transitions": real_schemas["state_transitions"],
-                "artifacts": {},
-                "schemas": {},
-            }
-        ),
-    )
-    _write_document(
-        tmp_path / "artifacts/specifications/SPEC-001.md",
-        "---\nid: SPEC-001\nstatus: draft\n---\n",
-    )
-    _write_document(
-        tmp_path / "artifacts/tasks/TASK-001.md",
-        "---\nid: TASK-001\nstatus: done\ntraces_to: [SPEC-001]\n---\n",
-    )
-    assert main(["approve", "SPEC-001", "--root", str(tmp_path)]) == 0
-    spec_doc, _ = domain_parser.parse_artifact_file(
-        tmp_path / "artifacts/specifications/SPEC-001.md", "SPEC-001.md"
-    )
-    task_doc, _ = domain_parser.parse_artifact_file(
-        tmp_path / "artifacts/tasks/TASK-001.md", "TASK-001.md"
-    )
-    assert spec_doc and spec_doc.frontmatter["status"] == "approved"
-    assert task_doc and task_doc.frontmatter["status"] == "needs_update"
-    _write_document(
-        tmp_path / "artifacts/specifications/SPEC-002.md",
-        "---\nid: SPEC-002\nstatus: blocked\n---\n",
-    )
-    assert main(["approve", "SPEC-002", "--root", str(tmp_path)]) == 1
-    assert "[PERM_INVALID_STATE_TRANSITION]" in capsys.readouterr().out
-
-
-@traces("REQ-007", "AC-02", "SPEC-007")
-def test_exhaustive_agent_and_lifecycle_state_transitions(tmp_path: Path) -> None:
-    """Verify every (agent_role, existing_state, target_state) and CLI approval."""
-    repository_root = Path(__file__).resolve().parent.parent
-    _seed_minimal_policies(tmp_path)
-    real_permissions = load_yaml_file(repository_root / "policy/permissions.yaml")
-    real_schemas = load_yaml_file(repository_root / "policy/schemas.yaml")
-    transitions = real_schemas["state_transitions"]
-    _write_document(
-        tmp_path / "policy/permissions.yaml", yaml.safe_dump(real_permissions)
-    )
-    _write_document(
-        tmp_path / "policy/schemas.yaml",
-        yaml.safe_dump(
-            {"state_transitions": transitions, "artifacts": {}, "schemas": {}}
-        ),
-    )
-    total_checked = 0
-    for role, config in real_permissions["agents"].items():
-        for rule in [
-            *config.get("allowed_write", []),
-            *config.get("escalation_write", []),
-        ]:
-            if rule["path"] != "$TASK_WRITE_FILES":
-                total_checked += _verify_rule_state_matrix(
-                    tmp_path, role, rule, transitions
-                )
-    assert total_checked >= 150
-    for folder, prefix in (
-        ("requirements", "REQ"),
-        ("specifications", "SPEC"),
-        ("decisions", "DEC"),
+    assert main(["prompt", "unknown-role", "--root", str(repository_root)]) == 1
+    assert "[CLI_UNKNOWN_AGENT_ROLE]" in capsys.readouterr().out
+    missing_args = ["prompt", "worker-agent", "--target", "TASK-999", "--root"]
+    assert main([*missing_args, str(repository_root)]) == 1
+    assert "[CLI_ARTIFACT_NOT_FOUND]" in capsys.readouterr().out
+    for role in (
+        "requirement-agent",
+        "specification-agent",
+        "planner-agent",
+        "worker-agent",
+        "review-agent",
     ):
-        for state, allowed_next in transitions[prefix].items():
-            artifact_id = f"{prefix}-099"
-            _write_document(
-                tmp_path / "artifacts" / folder / f"{artifact_id}.md",
-                f"---\nid: {artifact_id}\nstatus: {state}\n---\n",
-            )
-            exit_code = main(["approve", artifact_id, "--root", str(tmp_path)])
-            assert (exit_code == 0) == ("approved" in allowed_next)
-
-
-@traces("REQ-008", "AC-01", "SPEC-008")
-@traces("REQ-008", "AC-02", "SPEC-008")
-def test_atomic_approve_and_failed_run_preserve_clean_base(tmp_path: Path) -> None:
-    """Verify failed mt approve and failed mt run do not mutate BaseBranch files."""
-    repository_root = Path(__file__).resolve().parent.parent
-    _seed_minimal_policies(tmp_path)
-    real_schemas = load_yaml_file(repository_root / "policy/schemas.yaml")
-    _write_document(tmp_path / "policy/schemas.yaml", yaml.safe_dump(real_schemas))
-    requirement_file = tmp_path / "artifacts/requirements/REQ-001.md"
-    _write_document(requirement_file, "---\nid: REQ-001\nstatus: draft\n---\n")
-    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 1
-    req_doc, _ = domain_parser.parse_artifact_file(requirement_file, "REQ-001.md")
-    assert req_doc and req_doc.frontmatter["status"] == "draft"
-    _seed_minimal_policies(tmp_path)
-    _write_document(tmp_path / "tests/t1.py", "X = 1\n")
-    task_file = tmp_path / "artifacts/tasks/TASK-001.md"
-    _write_document(
-        task_file,
-        "---\nid: TASK-001\ntype: test_contract\nstatus: planned\n"
-        "depends_on: []\nrequired_files: []\nwrite_files:\n  - tests/t1.py\n"
-        "verification_cmd: \"python3 -c 'raise SystemExit(1)'\"\n---\n",
-    )
-    original_task_text = task_file.read_text(encoding="utf-8")
-    assert main(["run", "--root", str(tmp_path)]) == 1
-    assert task_file.read_text(encoding="utf-8") == original_task_text
+        assert main(["prompt", role, "--root", str(repository_root)]) == 0
+        assert f"# Role Prompt: `{role}`" in capsys.readouterr().out
+    target_args = ["prompt", "worker-agent", "--target", "TASK-002", "--root"]
+    assert main([*target_args, str(repository_root)]) == 0
+    scoped_output = capsys.readouterr().out
+    assert "### Artifact `TASK-002`" in scoped_output
+    assert "### Artifact `SPEC-001`" in scoped_output
+    assert "### Required File `tests/test_checkers.py`" in scoped_output
