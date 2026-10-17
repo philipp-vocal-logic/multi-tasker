@@ -137,13 +137,14 @@ def approve_artifact(repository_root: Path, artifact_id: str) -> list[Finding]:
     errors = _check_transition(repository_root, document, "approved")
     if errors:
         return errors
-    update_artifact_frontmatter(repository_root / document.path, {"status": "approved"})
     findings = run_checks(
         repository_root, ["glossary", "schemas"], target_paths=[document.path]
     )
-    if not findings:
-        _mark_dirty_downstream(repository_root, artifact_id)
-    return findings
+    if findings:
+        return findings
+    update_artifact_frontmatter(repository_root / document.path, {"status": "approved"})
+    _mark_dirty_downstream(repository_root, artifact_id)
+    return []
 
 
 def resolve_escalation(
@@ -287,7 +288,6 @@ def _finalize_task_outcome(
     """Apply passing Worktree changes or route Escalation under merge lock."""
     absolute_task = repository_root / document.path
     task_id = str(document.frontmatter.get("id", "TASK-000"))
-    previous_status = str(document.frontmatter.get("status", "planned"))
     if outcome.escalated and outcome.escalation_path:
         merge_worktree_files(repository_root, worktree_path, [outcome.escalation_path])
         route = route_escalation(repository_root, outcome.escalation_path)
@@ -313,7 +313,6 @@ def _finalize_task_outcome(
             format_task_commit_message(document),
         )
         return []
-    update_artifact_frontmatter(absolute_task, {"status": previous_status})
     return outcome.findings
 
 

@@ -2,7 +2,7 @@
 id: TASK-023
 title: Implement Atomic Approval and Clean Failed Task Execution for SPEC-008
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-008
 - SPEC-008
