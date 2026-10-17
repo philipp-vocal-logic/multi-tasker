@@ -2,7 +2,7 @@
 id: TASK-036
 title: Create TestContract for Per-Agent Worktree Execution and Role Models
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-013
 - SPEC-013
