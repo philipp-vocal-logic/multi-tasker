@@ -11,6 +11,7 @@ allowed_third_party_packages:
   - "yaml"
   - "jsonschema"
   - "pytest"
+  - "multi_tasker"
 
 layers:
   - name: "domain"

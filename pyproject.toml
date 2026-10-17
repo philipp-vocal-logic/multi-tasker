@@ -22,6 +22,25 @@ dev = [
 [project.scripts]
 mt = "src.cli.main:main"
 
+[tool.setuptools]
+package-dir = {"multi_tasker" = "src", "multi_tasker.policy_templates" = "policy", "src" = "src"}
+packages = [
+    "multi_tasker",
+    "multi_tasker.domain",
+    "multi_tasker.checkers",
+    "multi_tasker.orchestrator",
+    "multi_tasker.cli",
+    "multi_tasker.policy_templates",
+    "src",
+    "src.domain",
+    "src.checkers",
+    "src.orchestrator",
+    "src.cli",
+]
+
+[tool.setuptools.package-data]
+"multi_tasker.policy_templates" = ["*.yaml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
