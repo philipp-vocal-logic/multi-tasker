@@ -2,7 +2,7 @@
 id: TASK-051
 title: Keep Worktree PYTHONPATH Expression Single-Line in prompt_builder and stage_runner
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-016
 - SPEC-016

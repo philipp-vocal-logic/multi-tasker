@@ -100,9 +100,7 @@ def _prepare_stage_invocation(
     )
     environment = {
         **os.environ,
-        "PYTHONPATH": os.pathsep.join(
-            (str(worktree_path), str(Path(__file__).resolve().parents[2]))
-        ),
+        "PYTHONPATH": f"{worktree_path}{os.pathsep}{Path(__file__).parents[2]}",
         "MT_AGENT_ROLE": agent_role,
         "MT_TASK_ID": target_id,
         "MT_PROMPT_FILE": str(prompt_file),
