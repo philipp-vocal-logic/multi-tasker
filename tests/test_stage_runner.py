@@ -182,10 +182,12 @@ _PIPELINE_HELPER_SCRIPT = (
     "stage: specification\\nverdict: {v}\\nfindings: []\\n---\\nReview.\\n')\n"
     "elif role == 'worker-agent':\n"
     "    Path('tests').mkdir(exist_ok=True)\n"
-    '    Path("tests/test_p.py").write_text('
-    '"from src.domain.models import traces\\n\\n'
-    '@traces("REQ-001", "AC-01", "SPEC-001")\\n'
-    'def test_p() -> None:\\n    assert True\\n")\n'
+    "    q = chr(34)\n"
+    "    Path('tests/test_p.py').write_text(\n"
+    "        f'from src.domain.models import traces\\n\\n'\n"
+    "        f'@traces({q}REQ-001{q}, {q}AC-01{q}, {q}SPEC-001{q})\\n'\n"
+    "        f'def test_p() -> None:\\n    assert True\\n'\n"
+    "    )\n"
 )
 
 
