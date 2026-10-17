@@ -2,7 +2,7 @@
 id: TASK-038
 title: Implement Configurable Worktree Stage Runner and CLI Agent Dispatch
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-013
 - SPEC-013

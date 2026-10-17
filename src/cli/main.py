@@ -23,6 +23,7 @@ from src.orchestrator.lifecycle import (
 from src.orchestrator.lineage import trace_lineage
 from src.orchestrator.prompt_builder import VALID_CONTEXT_MODES, build_agent_prompt
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
+from src.orchestrator.stage_runner import is_worktree_agent_enabled, run_agent_stage
 from src.orchestrator.task_runner import run_scheduled_tasks
 
 
@@ -47,6 +48,8 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     )
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--max-workers", type=int, default=1)
+    run_parser.add_argument("--agent", default=None, dest="agent_role")
+    run_parser.add_argument("--target", default=None, dest="target_id")
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
     run_parser.add_argument("--model", default=None, dest="model")
     run_parser.add_argument("--environment", default=None, dest="environment")
@@ -106,22 +109,45 @@ def _run_check_command(arguments: argparse.Namespace) -> int:
     return emit_findings(repository_root, findings)
 
 
+def _dispatch_run_target(
+    repository_root: Path, arguments: argparse.Namespace
+) -> tuple[list[str], list[Finding]]:
+    """Dispatch mt run to run_agent_stage when --agent is set or run_scheduled_tasks."""
+    agent_role = getattr(arguments, "agent_role", None)
+    options = (arguments.agent_command, arguments.model, arguments.environment)
+    if agent_role is not None:
+        return run_agent_stage(
+            repository_root,
+            str(agent_role),
+            str(getattr(arguments, "target_id", "") or ""),
+            options,
+        )
+    if not is_worktree_agent_enabled(repository_root, "worker-agent"):
+        message = "Agent 'worker-agent' has worktree_execution disabled."
+        return [], [
+            Finding(
+                "policy/permissions.yaml", 1, "CLI_AGENT_WORKTREE_DISABLED", message
+            )
+        ]
+    return run_scheduled_tasks(
+        repository_root,
+        int(arguments.max_workers),
+        arguments.agent_command,
+        arguments.model,
+        arguments.environment,
+    )
+
+
 def _invoke_with_context_mode(
     repository_root: Path, arguments: argparse.Namespace
 ) -> tuple[list[str], list[Finding]]:
-    """Run scheduled tasks with temporary MT_CONTEXT_MODE override when provided."""
+    """Run stage or scheduled tasks with temporary MT_CONTEXT_MODE override."""
     context_mode = getattr(arguments, "context_mode", None)
     previous_mode = os.environ.get("MT_CONTEXT_MODE")
     if context_mode is not None:
         os.environ["MT_CONTEXT_MODE"] = str(context_mode)
     try:
-        return run_scheduled_tasks(
-            repository_root,
-            int(arguments.max_workers),
-            arguments.agent_command,
-            arguments.model,
-            arguments.environment,
-        )
+        return _dispatch_run_target(repository_root, arguments)
     finally:
         if context_mode is not None:
             if previous_mode is None:
