@@ -2,7 +2,7 @@
 id: TASK-022
 title: Create TestContract for REQ-008 and SPEC-008
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-008
 - SPEC-008

@@ -451,3 +451,30 @@ def test_exhaustive_agent_and_lifecycle_state_transitions(tmp_path: Path) -> Non
             )
             exit_code = main(["approve", artifact_id, "--root", str(tmp_path)])
             assert (exit_code == 0) == ("approved" in allowed_next)
+
+
+@traces("REQ-008", "AC-01", "SPEC-008")
+@traces("REQ-008", "AC-02", "SPEC-008")
+def test_atomic_approve_and_failed_run_preserve_clean_base(tmp_path: Path) -> None:
+    """Verify failed mt approve and failed mt run do not mutate BaseBranch files."""
+    repository_root = Path(__file__).resolve().parent.parent
+    _seed_minimal_policies(tmp_path)
+    real_schemas = load_yaml_file(repository_root / "policy/schemas.yaml")
+    _write_document(tmp_path / "policy/schemas.yaml", yaml.safe_dump(real_schemas))
+    requirement_file = tmp_path / "artifacts/requirements/REQ-001.md"
+    _write_document(requirement_file, "---\nid: REQ-001\nstatus: draft\n---\n")
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 1
+    req_doc, _ = domain_parser.parse_artifact_file(requirement_file, "REQ-001.md")
+    assert req_doc and req_doc.frontmatter["status"] == "draft"
+    _seed_minimal_policies(tmp_path)
+    _write_document(tmp_path / "tests/t1.py", "X = 1\n")
+    task_file = tmp_path / "artifacts/tasks/TASK-001.md"
+    _write_document(
+        task_file,
+        "---\nid: TASK-001\ntype: test_contract\nstatus: planned\n"
+        "depends_on: []\nrequired_files: []\nwrite_files:\n  - tests/t1.py\n"
+        "verification_cmd: \"python3 -c 'raise SystemExit(1)'\"\n---\n",
+    )
+    original_task_text = task_file.read_text(encoding="utf-8")
+    assert main(["run", "--root", str(tmp_path)]) == 1
+    assert task_file.read_text(encoding="utf-8") == original_task_text
