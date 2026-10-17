@@ -8,7 +8,7 @@ from typing import Any
 from src.checkers.runner import ALL_CHECKS, run_checks
 from src.cli.output import emit_findings
 from src.orchestrator.documentation_generator import (
-    generate_repository_documentation,
+    write_repository_documentation,
 )
 from src.orchestrator.lifecycle import (
     approve_artifact,
@@ -151,7 +151,9 @@ def _dispatch_lifecycle(
     if command == "run":
         return _run_tasks_command(repository_root, arguments)
     if command == "documentation":
-        sys.stdout.write(generate_repository_documentation(repository_root))
+        sys.stdout.write(
+            write_repository_documentation(repository_root).read_text(encoding="utf-8")
+        )
         return 0
     for line in trace_lineage(repository_root, str(arguments.target)):
         sys.stdout.write(f"{line}\n")

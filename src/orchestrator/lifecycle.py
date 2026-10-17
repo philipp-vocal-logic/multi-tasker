@@ -19,6 +19,9 @@ from src.domain.parser import (
     load_state_transitions,
     update_artifact_frontmatter,
 )
+from src.orchestrator.documentation_generator import (
+    write_repository_documentation,
+)
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
 from src.orchestrator.prompt_builder import build_agent_prompt, resolve_task_execution
 from src.orchestrator.router import route_escalation
@@ -41,6 +44,7 @@ def initialize_repository(repository_root: Path) -> list[Finding]:
         subprocess.run(
             ["git", "init", "-q"], cwd=repository_root, capture_output=True, check=False
         )
+    write_repository_documentation(repository_root)
     return []
 
 
@@ -77,6 +81,7 @@ def create_intent(
         f'---\nid: {intent_id}\nstatus: open\ncreated_at: "{created_at}"\n---\n{body}\n'
     )
     (intents_directory / f"{intent_id}.md").write_text(content, encoding="utf-8")
+    write_repository_documentation(repository_root)
     return intent_id
 
 
@@ -116,6 +121,7 @@ def _mark_dirty_downstream(repository_root: Path, changed_id: str) -> list[str]:
             update_artifact_frontmatter(
                 repository_root / document.path, {"status": "needs_update"}
             )
+    write_repository_documentation(repository_root)
     return dirty_ids
 
 
@@ -395,6 +401,7 @@ def run_scheduled_tasks(
     """Execute conflict-free batch of eligible Tasks up to max_workers."""
     prepared = _prepare_batch_worktrees(repository_root, max_workers)
     if not prepared:
+        write_repository_documentation(repository_root)
         return [], []
     execution_options = (agent_command, model_override, environment_override)
     merge_lock, completed, findings = threading.Lock(), [], []
@@ -416,4 +423,5 @@ def run_scheduled_tasks(
         for task_id, future in futures:
             result = future.result()
             findings.extend(result) if result else completed.append(task_id)
+    write_repository_documentation(repository_root)
     return completed, findings

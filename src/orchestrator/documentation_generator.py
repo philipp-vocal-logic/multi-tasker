@@ -184,3 +184,15 @@ def generate_repository_documentation(repository_root: Path) -> str:
         *_render_traceability_section(repository_root),
     ]
     return "\n".join(sections).strip() + "\n"
+
+
+def write_repository_documentation(repository_root: Path) -> Path:
+    """Generate live specification Markdown and write .report/specification.md."""
+    report_directory = repository_root / ".report"
+    report_directory.mkdir(parents=True, exist_ok=True)
+    (report_directory / ".gitignore").write_text("*\n", encoding="utf-8")
+    report_path = report_directory / "specification.md"
+    report_path.write_text(
+        generate_repository_documentation(repository_root), encoding="utf-8"
+    )
+    return report_path
