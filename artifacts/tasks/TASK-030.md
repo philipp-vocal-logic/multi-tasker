@@ -2,7 +2,7 @@
 id: TASK-030
 title: Create TestContract for CLI Invocation and Worktree Interaction Logging
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-011
 - SPEC-011
