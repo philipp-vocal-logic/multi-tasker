@@ -2,7 +2,7 @@
 id: TASK-033
 title: Create TestContract for Configurable Orchestrator Context Delivery Mode
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-012
 - SPEC-012
