@@ -2,17 +2,17 @@
 id: TASK-028
 title: Implement Multi-Wave Task Runner and Diagnostic Verification Summaries
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-010
-  - SPEC-010
+- REQ-010
+- SPEC-010
 depends_on:
-  - TASK-027
+- TASK-027
 required_files:
-  - tests/test_lifecycle.py
+- tests/test_lifecycle.py
 write_files:
-  - src/orchestrator/task_runner.py
-  - src/orchestrator/merge_gate.py
+- src/orchestrator/task_runner.py
+- src/orchestrator/merge_gate.py
 verification_cmd: pytest -q tests/test_orchestrator.py
 ---
 ## Objective

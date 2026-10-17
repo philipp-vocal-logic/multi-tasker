@@ -83,11 +83,13 @@ def _run_verification_command(
         for line in (process.stdout + "\n" + process.stderr).splitlines()
         if line.strip()
     ]
-    summary = (
-        lines[-1]
-        if lines
-        else f"Command '{command_string}' exited {process.returncode}"
-    )
+    error_lines = [line for line in lines if line.startswith("E ")]
+    if not lines:
+        summary = f"Command '{command_string}' exited {process.returncode}"
+    elif error_lines and error_lines[0] != lines[-1]:
+        summary = f"{error_lines[0]} | {lines[-1]}"
+    else:
+        summary = lines[-1]
     return [Finding("verification_cmd", 1, "GATE_VERIFY_CMD_FAILED", summary)]
 
 

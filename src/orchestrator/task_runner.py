@@ -235,19 +235,13 @@ def _execute_single_task(
             remove_worktree(repository_root, worktree_path)
 
 
-def run_scheduled_tasks(
+def _execute_wave(
     repository_root: Path,
-    max_workers: int = 1,
-    agent_command: str | None = None,
-    model_override: str | None = None,
-    environment_override: str | None = None,
+    prepared: list[tuple[ArtifactDocument, Path]],
+    max_workers: int,
+    execution_options: tuple[str | None, str | None, str | None],
 ) -> tuple[list[str], list[Finding]]:
-    """Execute conflict-free batch of eligible Tasks up to max_workers."""
-    prepared = _prepare_batch_worktrees(repository_root, max_workers)
-    if not prepared:
-        write_repository_documentation(repository_root)
-        return [], []
-    execution_options = (agent_command, model_override, environment_override)
+    """Execute one conflict-free wave of prepared Worktrees in parallel."""
     merge_lock, completed, findings = threading.Lock(), [], []
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
         futures = [
@@ -267,5 +261,30 @@ def run_scheduled_tasks(
         for task_id, future in futures:
             result = future.result()
             findings.extend(result) if result else completed.append(task_id)
+    return completed, findings
+
+
+def run_scheduled_tasks(
+    repository_root: Path,
+    max_workers: int = 1,
+    agent_command: str | None = None,
+    model_override: str | None = None,
+    environment_override: str | None = None,
+) -> tuple[list[str], list[Finding]]:
+    """Execute successive conflict-free waves of eligible Tasks until done or error."""
+    execution_options = (agent_command, model_override, environment_override)
+    completed: list[str] = []
+    findings: list[Finding] = []
+    while True:
+        prepared = _prepare_batch_worktrees(repository_root, max_workers)
+        if not prepared:
+            break
+        wave_completed, wave_findings = _execute_wave(
+            repository_root, prepared, max_workers, execution_options
+        )
+        completed.extend(wave_completed)
+        findings.extend(wave_findings)
+        if wave_findings or not wave_completed:
+            break
     write_repository_documentation(repository_root)
     return completed, findings
