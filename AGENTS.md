@@ -9,7 +9,7 @@
 Never edit `src/**`, `tests/**`, or completed (`done`) `TASK-NNN.md` artifacts ad-hoc. Every feature, bugfix, or refinement must progress through the canonical pipeline:
 1. **Intent (`INT-NNN`)**: Run `./mt intent "<goal>"` to create an `open` Intent in `artifacts/intents/INT-NNN.md`.
 2. **Requirement (`REQ-NNN`)**: Author `artifacts/requirements/REQ-NNN.md` (`status: draft`, `traces_to: [INT-NNN]`) and run `./mt approve REQ-NNN` (transitions `REQ-NNN` to `approved` and `INT-NNN` to `processed`).
-3. **Specification (`SPEC-NNN`)**: Author `artifacts/specifications/SPEC-NNN.md` (`status: approved`, `traces_to: [REQ-NNN]`), mapping all `REQ-NNN:AC-XX` criteria and declaring `target_files.tests` and `target_files.implementation`.
+3. **Specification (`SPEC-NNN`)**: Author `artifacts/specifications/SPEC-NNN.md` (`status: draft`, `traces_to: [REQ-NNN]`), mapping all `REQ-NNN:AC-XX` criteria and declaring `target_files.tests` and `target_files.implementation`, and run `./mt approve SPEC-NNN` (transitions `SPEC-NNN` to `approved`).
 4. **Tasks (`TASK-NNN`)**:
    - Create a `type: test_contract` Task (`write_files` under `tests/**` only) with `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")` tests.
    - Create `type: implementation` Tasks (`depends_on` the `test_contract` Task, `write_files` under `src/**` only, max 3 files per Task).
