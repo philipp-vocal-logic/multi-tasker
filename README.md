@@ -2,7 +2,18 @@
 
 Deterministic multilevel agent `Policy` enforcement, bidirectional `Traceability`, and isolated Git `Worktree` `Orchestrator` CLI.
 
-`multi-tasker` enforces a canonical software engineering pipeline (`Intent` $\rightarrow$ `Requirement` $\rightarrow$ `Specification` $\rightarrow$ `Task` $\rightarrow$ `TestContract` $\rightarrow$ Implementation Commit) where every stage and `Task` executes in an isolated `Worktree` and must pass a deterministic `MergeGate` before merging onto the `BaseBranch`.
+`multi-tasker` enforces a canonical software engineering pipeline where every stage and `Task` executes in an isolated `Worktree` and must pass a deterministic `MergeGate` before merging onto the `BaseBranch`:
+
+```mermaid
+flowchart LR
+    INT["Intent (INT-NNN)"] --> REQ["Requirement (REQ-NNN)"]
+    REQ --> SPEC["Specification (SPEC-NNN)"]
+    SPEC --> TASK["Task (TASK-NNN)"]
+    TASK --> TEST["TestContract (@traces)"]
+    TEST --> IMPL["Implementation Commit"]
+    IMPL --> GATE{"MergeGate (mt check all + pytest)"}
+    GATE --> MAIN["BaseBranch"]
+```
 
 ---
 
@@ -12,6 +23,8 @@ Deterministic multilevel agent `Policy` enforcement, bidirectional `Traceability
 Install `multi-tasker` into your target repository's Python virtual environment so the `mt` CLI is on `PATH` and `multi_tasker` is importable:
 
 ```bash
+pip install git+https://github.com/philipp-vocal-logic/multi-tasker.git
+# Or from a local checkout:
 pip install -e /path/to/multi-tasker
 ```
 
@@ -20,7 +33,7 @@ Or declare it in your target repository's `pyproject.toml`:
 ```toml
 [project.optional-dependencies]
 dev = [
-    "multi-tasker @ file:///path/to/multi-tasker",
+    "multi-tasker @ git+https://github.com/philipp-vocal-logic/multi-tasker.git",
     "pytest>=8.0",
     "ruff>=0.4",
     "mypy>=1.10",
