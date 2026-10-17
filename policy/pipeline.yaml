@@ -5,6 +5,7 @@ version: 1
 execution_bounds:
   max_steps_per_run: 20
   max_auto_reroutes: 1
+  max_review_cycles: 2
 
 stages:
   - id: "intent_to_requirement"
@@ -19,14 +20,14 @@ stages:
     trigger_states: ["approved", "needs_update"]
     downstream_type: "SPEC"
     agent_role: "specification-agent"
-    approval_gate: "human"
+    approval_gate: "review-agent"
 
   - id: "specification_to_tasks"
     trigger_type: "SPEC"
     trigger_states: ["approved", "needs_update"]
     downstream_type: "TASK"
     agent_role: "planner-agent"
-    approval_gate: "auto"
+    approval_gate: "review-agent"
 
   - id: "execute_tasks"
     trigger_type: "TASK"
