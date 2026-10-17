@@ -126,10 +126,13 @@ def _mark_dirty_downstream(repository_root: Path, changed_id: str) -> list[str]:
 
 
 def approve_artifact(repository_root: Path, artifact_id: str) -> list[Finding]:
-    """Approve a Requirement or Decision and mark downstream artifacts dirty."""
+    """Approve a Requirement, Specification, or Decision and mark downstream dirty."""
     document = load_artifacts_by_id(repository_root).get(artifact_id)
-    if document is None or document.artifact_type not in {"REQ", "DEC"}:
-        message = f"Approvable Requirement or Decision '{artifact_id}' not found."
+    if document is None or document.artifact_type not in {"REQ", "SPEC", "DEC"}:
+        message = (
+            f"Approvable Requirement, Specification, or Decision '{artifact_id}' "
+            "not found."
+        )
         return [Finding(artifact_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
     errors = _check_transition(repository_root, document, "approved")
     if errors:
