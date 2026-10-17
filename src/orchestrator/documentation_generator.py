@@ -137,14 +137,25 @@ def _append_artifact_trace_edges(
 ) -> None:
     """Append Mermaid flowchart nodes and edges for repository artifacts."""
     for artifact_id, document in sorted(by_identifier.items()):
-        title = str(document.frontmatter.get("title", document.artifact_type))
-        status = str(document.frontmatter.get("status", "ok"))
+        title = str(
+            document.frontmatter.get(
+                "title", document.frontmatter.get("stage", document.artifact_type)
+            )
+        )
+        status = str(
+            document.frontmatter.get(
+                "status", document.frontmatter.get("verdict", "ok")
+            )
+        )
         safe_id = artifact_id.replace("-", "_")
         lines.append(f'    {safe_id}["{artifact_id}: {title} ({status})"]')
         for upstream in document.frontmatter.get("traces_to", []):
             upstream_safe = str(upstream).replace("-", "_")
             lines.append(f"    {upstream_safe} --> {safe_id}")
-        for dependency in document.frontmatter.get("depends_on", []):
+        for dependency in (
+            *document.frontmatter.get("depends_on", []),
+            *document.frontmatter.get("target_artifacts", []),
+        ):
             dependency_safe = str(dependency).replace("-", "_")
             lines.append(f"    {dependency_safe} -.-> {safe_id}")
 

@@ -170,6 +170,21 @@ def load_state_transitions(
     }
 
 
+def _validate_pipeline_bounds(bounds: dict[str, Any]) -> bool:
+    """Return True if execution_bounds values in policy/pipeline.yaml are valid."""
+    max_steps = bounds.get("max_steps_per_run", 0)
+    max_reroutes = bounds.get("max_auto_reroutes", -1)
+    max_reviews = bounds.get("max_review_cycles", 1)
+    return (
+        isinstance(max_steps, int)
+        and max_steps >= 1
+        and isinstance(max_reroutes, int)
+        and max_reroutes >= 0
+        and isinstance(max_reviews, int)
+        and max_reviews >= 1
+    )
+
+
 def _validate_pipeline_stages(stages: list[Any]) -> list[Finding]:
     """Validate stage definitions in policy/pipeline.yaml."""
     valid_gates = {"human", "review-agent", "auto"}
@@ -207,14 +222,7 @@ def validate_pipeline_policy(repository_root: Path) -> list[Finding]:
     if not pipeline:
         return []
     bounds: dict[str, Any] = pipeline.get("execution_bounds", {})
-    max_steps = bounds.get("max_steps_per_run", 0)
-    max_reroutes = bounds.get("max_auto_reroutes", -1)
-    if (
-        not isinstance(max_steps, int)
-        or max_steps < 1
-        or not isinstance(max_reroutes, int)
-        or max_reroutes < 0
-    ):
+    if not _validate_pipeline_bounds(bounds):
         message = "Invalid execution_bounds in policy/pipeline.yaml."
         return [Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_BOUNDS", message)]
     stage_findings = _validate_pipeline_stages(list(pipeline.get("stages", [])))

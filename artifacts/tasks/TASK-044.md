@@ -2,21 +2,21 @@
 id: TASK-044
 title: Implement Pipeline Bounds Check, Review Traceability, and Mermaid Review Edges
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-015
-  - SPEC-015
+- REQ-015
+- SPEC-015
 depends_on:
-  - TASK-043
+- TASK-043
 required_files:
-  - tests/test_stage_runner.py
-  - src/domain/parser.py
-  - src/checkers/traceability_checker.py
-  - src/orchestrator/documentation_generator.py
+- tests/test_stage_runner.py
+- src/domain/parser.py
+- src/checkers/traceability_checker.py
+- src/orchestrator/documentation_generator.py
 write_files:
-  - src/domain/parser.py
-  - src/checkers/traceability_checker.py
-  - src/orchestrator/documentation_generator.py
+- src/domain/parser.py
+- src/checkers/traceability_checker.py
+- src/orchestrator/documentation_generator.py
 verification_cmd: pytest -q tests/test_checkers.py tests/test_orchestrator.py
 ---
 ## Objective

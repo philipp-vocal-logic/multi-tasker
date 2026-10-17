@@ -13,6 +13,7 @@ LIST_REFERENCE_FIELDS = (
     "depends_on",
     "affected_artifacts",
     "applies_to",
+    "target_artifacts",
 )
 
 
