@@ -12,6 +12,7 @@ target_files:
   tests:
   - tests/test_stage_runner.py
   implementation:
+  - src/domain/parser.py
   - src/checkers/traceability_checker.py
   - src/orchestrator/documentation_generator.py
   - src/orchestrator/lifecycle.py
