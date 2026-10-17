@@ -12,6 +12,7 @@ target_files:
   tests:
   - tests/test_lifecycle.py
   - tests/test_traceability_and_cli.py
+  - tests/test_interaction_logging.py
   implementation:
   - src/orchestrator/lifecycle.py
   - src/orchestrator/prompt_builder.py
@@ -36,5 +37,5 @@ Expose `multi_tasker` (`multi_tasker.domain`, `multi_tasker.checkers`, `multi_ta
   - `PYTHONPATH` formatted as `f"{worktree_path}{os.pathsep}{mt_root}"`
 
 ## Test Contract Mapping
-- `REQ-016:AC-01` $\rightarrow$ `tests/test_lifecycle.py::test_initialize_scaffolds_default_policies_and_gitignore`
-- `REQ-016:AC-02` $\rightarrow$ `tests/test_traceability_and_cli.py::test_architecture_custom_package_and_worktree_pythonpath`
+- `REQ-016:AC-01` $\rightarrow$ `tests/test_interaction_logging.py::test_initialize_scaffolds_default_policies_and_gitignore`
+- `REQ-016:AC-02` $\rightarrow$ `tests/test_interaction_logging.py::test_architecture_custom_package_and_worktree_pythonpath`
