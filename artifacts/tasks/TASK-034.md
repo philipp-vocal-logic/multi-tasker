@@ -2,7 +2,7 @@
 id: TASK-034
 title: Implement Context Mode Policy Validation and Prompt Synthesis Modes
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-012
 - SPEC-012
