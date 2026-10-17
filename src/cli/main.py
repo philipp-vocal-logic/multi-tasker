@@ -23,8 +23,31 @@ from src.orchestrator.lifecycle import (
 from src.orchestrator.lineage import trace_lineage
 from src.orchestrator.prompt_builder import VALID_CONTEXT_MODES, build_agent_prompt
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
-from src.orchestrator.stage_runner import is_worktree_agent_enabled, run_agent_stage
+from src.orchestrator.stage_runner import (
+    is_worktree_agent_enabled,
+    run_agent_stage,
+    run_declarative_pipeline,
+)
 from src.orchestrator.task_runner import run_scheduled_tasks
+
+
+def _add_run_and_prompt_parsers(subparsers: Any) -> None:
+    """Register `run` and `prompt` CLI subcommand parsers."""
+    run_parser = subparsers.add_parser("run")
+    run_parser.add_argument("--max-workers", type=int, default=1)
+    run_parser.add_argument("--pipeline", action="store_true", dest="pipeline")
+    run_parser.add_argument("--agent", default=None, dest="agent_role")
+    run_parser.add_argument("--target", default=None, dest="target_id")
+    run_parser.add_argument("--agent-command", default=None, dest="agent_command")
+    run_parser.add_argument("--model", default=None, dest="model")
+    run_parser.add_argument("--environment", default=None, dest="environment")
+    run_parser.add_argument("--context-mode", default=None, dest="context_mode")
+    run_parser.add_argument("--root", default=".", help="Repository root directory.")
+    prompt_parser = subparsers.add_parser("prompt")
+    prompt_parser.add_argument("agent_role", help="Canonical agent role.")
+    prompt_parser.add_argument("--target", default=None, dest="target_id")
+    prompt_parser.add_argument("--context-mode", default=None, dest="context_mode")
+    prompt_parser.add_argument("--root", default=".", help="Repository root directory.")
 
 
 def _add_lifecycle_parsers(subparsers: Any) -> None:
@@ -46,20 +69,7 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     resolve_parser.add_argument(
         "--root", default=".", help="Repository root directory."
     )
-    run_parser = subparsers.add_parser("run")
-    run_parser.add_argument("--max-workers", type=int, default=1)
-    run_parser.add_argument("--agent", default=None, dest="agent_role")
-    run_parser.add_argument("--target", default=None, dest="target_id")
-    run_parser.add_argument("--agent-command", default=None, dest="agent_command")
-    run_parser.add_argument("--model", default=None, dest="model")
-    run_parser.add_argument("--environment", default=None, dest="environment")
-    run_parser.add_argument("--context-mode", default=None, dest="context_mode")
-    run_parser.add_argument("--root", default=".", help="Repository root directory.")
-    prompt_parser = subparsers.add_parser("prompt")
-    prompt_parser.add_argument("agent_role", help="Canonical agent role.")
-    prompt_parser.add_argument("--target", default=None, dest="target_id")
-    prompt_parser.add_argument("--context-mode", default=None, dest="context_mode")
-    prompt_parser.add_argument("--root", default=".", help="Repository root directory.")
+    _add_run_and_prompt_parsers(subparsers)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -112,9 +122,11 @@ def _run_check_command(arguments: argparse.Namespace) -> int:
 def _dispatch_run_target(
     repository_root: Path, arguments: argparse.Namespace
 ) -> tuple[list[str], list[Finding]]:
-    """Dispatch mt run to run_agent_stage when --agent is set or run_scheduled_tasks."""
-    agent_role = getattr(arguments, "agent_role", None)
+    """Dispatch mt run to pipeline, single agent stage, or scheduled worker tasks."""
     options = (arguments.agent_command, arguments.model, arguments.environment)
+    if getattr(arguments, "pipeline", False):
+        return run_declarative_pipeline(repository_root, options)
+    agent_role = getattr(arguments, "agent_role", None)
     if agent_role is not None:
         return run_agent_stage(
             repository_root,

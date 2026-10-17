@@ -1,4 +1,4 @@
-"""Configurable per-agent Worktree stage runner (`mt run --agent <role>`)."""
+"""Configurable per-agent Worktree stage and declarative pipeline runner."""
 
 import os
 from pathlib import Path
@@ -11,8 +11,10 @@ from src.checkers.common import get_git_changed_files
 from src.domain.models import ArtifactDocument, Finding
 from src.domain.parser import (
     load_artifacts_by_id,
+    load_pipeline_policy,
     load_yaml_file,
     parse_artifact_file,
+    update_artifact_frontmatter,
 )
 from src.orchestrator.documentation_generator import (
     write_repository_documentation,
@@ -21,12 +23,15 @@ from src.orchestrator.interaction_logger import (
     merge_worktree_task_logs,
     record_task_event,
 )
+from src.orchestrator.lifecycle import approve_artifact
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
 from src.orchestrator.prompt_builder import (
     build_agent_prompt,
     resolve_context_mode,
     resolve_task_execution,
 )
+from src.orchestrator.router import CATEGORY_ROUTES, find_actionable_stage_target
+from src.orchestrator.task_runner import run_scheduled_tasks
 from src.orchestrator.worktree import (
     commit_traceable_change,
     create_worktree,
@@ -236,3 +241,103 @@ def run_agent_stage(
         return _finalize_stage_outcome(request, target_id, outcome)
     finally:
         remove_worktree(repository_root, worktree_path)
+
+
+def _dispatch_routed_escalation(
+    repository_root: Path,
+    pipeline: dict[str, Any],
+    options: tuple[str | None, str | None, str | None],
+) -> tuple[list[str], list[Finding]] | None:
+    """Dispatch the first routed_to_agent Escalation in an isolated Worktree."""
+    for esc_id, document in sorted(load_artifacts_by_id(repository_root).items()):
+        if (
+            document.artifact_type != "ESC"
+            or document.frontmatter.get("status") != "routed_to_agent"
+        ):
+            continue
+        category = str(document.frontmatter.get("reason_category", "ambiguity"))
+        routes: dict[str, Any] = pipeline.get("escalation_routes", {})
+        actor = str(
+            routes.get(category, {}).get(
+                "target_actor", CATEGORY_ROUTES.get(category, ("human",))[0]
+            )
+        )
+        if actor == "human":
+            update_artifact_frontmatter(
+                repository_root / document.path, {"status": "awaiting_human"}
+            )
+            return None
+        produced, findings = run_agent_stage(repository_root, actor, esc_id, options)
+        next_state = "awaiting_human" if findings else "resolved"
+        update_artifact_frontmatter(
+            repository_root / document.path,
+            {"status": next_state, "resolved_by": produced[0] if produced else esc_id},
+        )
+        commit_traceable_change(
+            repository_root,
+            [document.path],
+            f"{esc_id}: Resolve escalation via {actor} [traces: {esc_id}]",
+        )
+        return produced, findings
+    return None
+
+
+def _step_declarative_stage(
+    repository_root: Path,
+    stage: dict[str, Any],
+    target_id: str,
+    options: tuple[str | None, str | None, str | None],
+) -> tuple[list[str], list[Finding]]:
+    """Execute one matched stage and apply its configured approval_gate."""
+    role = str(stage.get("agent_role", ""))
+    gate = str(stage.get("approval_gate", "human"))
+    if role == "worker-agent":
+        return run_scheduled_tasks(
+            repository_root, 1, options[0], options[1], options[2]
+        )
+    produced, findings = run_agent_stage(repository_root, role, target_id, options)
+    if findings or gate == "human":
+        return produced, findings
+    for artifact_id in produced:
+        if gate == "review-agent":
+            run_agent_stage(repository_root, "review-agent", artifact_id, options)
+        approve_artifact(repository_root, artifact_id)
+    return produced, []
+
+
+def run_declarative_pipeline(
+    repository_root: Path,
+    options: tuple[str | None, str | None, str | None] = (None, None, None),
+) -> tuple[list[str], list[Finding]]:
+    """Step through policy/pipeline.yaml stages and auto-routed Escalations."""
+    pipeline = load_pipeline_policy(repository_root)
+    max_steps = int(pipeline.get("execution_bounds", {}).get("max_steps_per_run", 20))
+    stages: list[dict[str, Any]] = list(pipeline.get("stages", []))
+    completed: list[str] = []
+    for _ in range(max(1, max_steps)):
+        matched = next(
+            (
+                (stage, target)
+                for stage in stages
+                if (target := find_actionable_stage_target(repository_root, stage))
+                is not None
+            ),
+            None,
+        )
+        if matched is None or matched[0].get("trigger_type") in {"SPEC", "TASK"}:
+            esc_result = _dispatch_routed_escalation(repository_root, pipeline, options)
+            if esc_result is not None:
+                produced, findings = esc_result
+                if findings:
+                    return completed, findings
+                completed.extend(produced)
+                continue
+        if matched is None:
+            break
+        produced, findings = _step_declarative_stage(
+            repository_root, matched[0], matched[1], options
+        )
+        if findings or not produced:
+            return completed, findings
+        completed.extend(produced)
+    return completed, []

@@ -2,22 +2,22 @@
 id: TASK-041
 title: Implement Declarative Pipeline Stepper and CLI Pipeline Flag
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-014
-  - SPEC-014
+- REQ-014
+- SPEC-014
 depends_on:
-  - TASK-039
-  - TASK-040
-  - TASK-042
+- TASK-039
+- TASK-040
+- TASK-042
 required_files:
-  - tests/test_stage_runner.py
-  - src/domain/parser.py
-  - src/orchestrator/router.py
+- tests/test_stage_runner.py
+- src/domain/parser.py
+- src/orchestrator/router.py
 write_files:
-  - src/checkers/schemas_checker.py
-  - src/orchestrator/stage_runner.py
-  - src/cli/main.py
+- src/checkers/schemas_checker.py
+- src/orchestrator/stage_runner.py
+- src/cli/main.py
 verification_cmd: pytest -q tests/test_checkers.py tests/test_stage_runner.py tests/test_orchestrator.py
 ---
 ## Objective
