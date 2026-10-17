@@ -151,27 +151,23 @@ def test_pipeline_policy_validation_and_configurable_escalation_routing(
 
 def _seed_pipeline_escalation_fixture(tmp_path: Path) -> str:
     """Seed INT-001 and write a multi-stage agent dispatcher script in tmp_path."""
-    (tmp_path / "artifacts" / "intents" / "INT-001.md").write_text(
-        "---\nid: INT-001\nstatus: open\ncreated_at: '2026-10-17T00:00:00Z'\n"
-        "---\nBuild pipeline feature.\n",
-        encoding="utf-8",
-    )
+    assert main(["intent", "Goal.", "--root", str(tmp_path)]) == 0
     script_path = tmp_path / "pipeline_agent_helper.py"
     script_path.write_text(
-        "import os\nfrom pathlib import Path\n"
-        "role = os.environ['MT_AGENT_ROLE']\n"
+        "import os\nfrom pathlib import Path\nrole = os.environ['MT_AGENT_ROLE']\n"
         "if role == 'requirement-agent':\n"
         "    Path('artifacts/requirements/REQ-001.md').write_text("
         "'---\\nid: REQ-001\\ntitle: Pipeline Requirement\\nstatus: draft\\n"
         "traces_to: [INT-001]\\ndecisions: []\\nacceptance_criteria:\\n"
-        "  - id: AC-01\\n    given: A\\n    when: B\\n    then: C\\n"
-        "version: 1\\n---\\n## Statement\\nS.\\n\\n## Impact Analysis\\nI.\\n')\n"
+        "  - id: AC-01\\n    given: Intent\\n    when: Run\\n    then: Done\\n"
+        "version: 1\\n---\\n## Statement\\nStmt.\\n\\n## Impact Analysis\\nImp.\\n')\n"
         "elif role == 'specification-agent':\n"
         "    Path('artifacts/specifications/SPEC-001.md').write_text("
         "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
         "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
-        "target_files:\\n  tests: [tests/test_p.py]\\n  implementation: []\\n"
-        "---\\n## Design Overview\\nD.\\n\\n## Public Interfaces\\nP.\\n\\n"
+        "target_files:\\n  tests: [tests/test_p.py]\\n"
+        "  implementation: [src/domain/p.py]\\n"
+        "---\\n## Design Overview\\nDesign.\\n\\n## Public Interfaces\\nPublic.\\n\\n"
         "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
         "elif role == 'planner-agent':\n"
         "    Path('artifacts/tasks/TASK-001.md').write_text("
@@ -181,6 +177,7 @@ def _seed_pipeline_escalation_fixture(tmp_path: Path) -> str:
         "verification_cmd: python3 -c pass\\n---\\n"
         "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')\n"
         "elif role == 'worker-agent':\n"
+        "    Path('tests').mkdir(exist_ok=True)\n"
         "    Path('tests/test_p.py').write_text("
         "'from src.domain.models import traces\\n\\n"
         '@traces("REQ-001", "AC-01", "SPEC-001")\\n'
@@ -192,6 +189,12 @@ def _seed_pipeline_escalation_fixture(tmp_path: Path) -> str:
 
 def _enable_auto_gates_and_seed_escalation(tmp_path: Path) -> None:
     """Switch pipeline approval_gate to auto, approve REQ-001, and seed ESC-001."""
+    trace_path = tmp_path / "policy" / "traceability.yaml"
+    trace_policy = load_yaml_file(trace_path)
+    trace_policy["traceability_rules"]["require_spec_target_files_covered_by_tasks"] = (
+        False
+    )
+    trace_path.write_text(yaml.safe_dump(trace_policy), encoding="utf-8")
     pipeline_path = tmp_path / "policy" / "pipeline.yaml"
     pipeline = load_yaml_file(pipeline_path)
     for stage in pipeline["stages"]:
@@ -213,6 +216,7 @@ def test_declarative_pipeline_execution_gates_and_auto_escalation(
     """Verify mt run --pipeline pauses on human gate and self-heals escalations."""
     _seed_test_repository(tmp_path)
     agent_cmd = _seed_pipeline_escalation_fixture(tmp_path)
+    capsys.readouterr()
     run_args = [
         "run",
         "--pipeline",

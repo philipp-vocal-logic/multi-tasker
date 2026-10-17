@@ -2,17 +2,17 @@
 id: TASK-042
 title: Refine Pipeline TestContract Fixture Schema Fields
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-014
-  - SPEC-014
+- REQ-014
+- SPEC-014
 depends_on:
-  - TASK-039
-  - TASK-040
+- TASK-039
+- TASK-040
 required_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 write_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 verification_cmd: pytest -q tests/test_interaction_logging.py
 ---
 ## Objective
