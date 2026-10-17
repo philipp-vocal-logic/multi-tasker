@@ -13,8 +13,7 @@ from src.checkers.runner import run_single_check
 from src.checkers.schemas_checker import check_schemas, validate_schema_node
 from src.checkers.traceability_checker import check_traceability
 from src.cli.main import main
-from src.domain.models import ArtifactDocument, traces
-from src.orchestrator.prompt_builder import prepare_worker_invocation
+from src.domain.models import traces
 from src.orchestrator.worktree import commit_traceable_change
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
@@ -344,44 +343,3 @@ def test_git_commit_scope_and_intent_traceability(tmp_path: Path) -> None:
     )
     rules = {finding.rule_id for finding in check_traceability(tmp_path)}
     assert {"TRACE_COMMIT_UNSCOPED_FILE", "TRACE_UNPROCESSED_INTENT"}.issubset(rules)
-
-
-@traces("REQ-016", "AC-02", "SPEC-016")
-def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> None:
-    """Verify custom package prefixes in check_architecture and worktree PYTHONPATH."""
-    architecture_policy = {
-        "dependency_rules": {"forbid_circular_imports": True},
-        "allowed_third_party_packages": ["multi_tasker"],
-        "layers": [
-            {
-                "name": "core",
-                "paths": ["app/core/**"],
-                "allowed_internal_imports": ["app.core"],
-                "forbidden_internal_imports": ["app.api"],
-            },
-            {
-                "name": "api",
-                "paths": ["app/api/**"],
-                "allowed_internal_imports": ["app.core", "app.api"],
-            },
-        ],
-    }
-    _write_document(
-        tmp_path / "policy/architecture.yaml", yaml.safe_dump(architecture_policy)
-    )
-    _write_document(
-        tmp_path / "app/core/first.py",
-        "from multi_tasker.domain.models import traces\n"
-        "from app.api import routes\nfrom app.core import second\n",
-    )
-    _write_document(tmp_path / "app/core/second.py", "from app.core import first\n")
-    _write_document(tmp_path / "app/api/routes.py", "VALUE = 1\n")
-    rules = {finding.rule_id for finding in check_architecture(tmp_path)}
-    assert rules == {"ARCH_FORBIDDEN_IMPORT", "ARCH_CIRCULAR_IMPORT"}
-    document = ArtifactDocument(
-        "artifacts/tasks/TASK-001.md", "TASK", {"id": "TASK-001"}, "", 1, {}
-    )
-    _, env = prepare_worker_invocation(
-        tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
-    )
-    assert env["PYTHONPATH"].startswith(str(tmp_path))

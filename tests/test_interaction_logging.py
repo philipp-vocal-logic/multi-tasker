@@ -7,11 +7,15 @@ from typing import Any
 
 import yaml
 
+from src.checkers.architecture_checker import check_architecture
 from src.checkers.permissions_checker import check_permissions
 from src.cli.main import main
-from src.domain.models import traces
+from src.domain.models import ArtifactDocument, traces
 from src.domain.parser import load_yaml_file, parse_artifact_file
-from src.orchestrator.documentation_generator import write_repository_documentation
+from src.orchestrator.documentation_generator import (
+    write_repository_documentation,
+)
+from src.orchestrator.prompt_builder import prepare_worker_invocation
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
@@ -223,3 +227,65 @@ def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> N
     )
     run_args = ["run", "--context-mode", "paths", "--agent-command", worker_cmd]
     assert main([*run_args, "--root", str(tmp_path)]) == 0
+
+
+def _write_file(path: Path, text: str) -> None:
+    """Create parent folders and write text content."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+@traces("REQ-016", "AC-01", "SPEC-016")
+def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> None:
+    """Verify mt initialize scaffolds missing policy/*.yaml and .gitignore entries."""
+    custom_limits = "source_code:\n  max_file_lines: 777\n"
+    _write_file(tmp_path / "policy/limits.yaml", custom_limits)
+    _write_file(tmp_path / ".gitignore", "__pycache__/\n")
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    assert (tmp_path / "policy/limits.yaml").read_text("utf-8") == custom_limits
+    architecture = load_yaml_file(tmp_path / "policy/architecture.yaml")
+    assert "multi_tasker" in architecture.get("allowed_third_party_packages", [])
+    gitignore_lines = (tmp_path / ".gitignore").read_text("utf-8").splitlines()
+    for entry in ("__pycache__/", ".worktrees/", ".report/", ".mt_prompt.md"):
+        assert entry in gitignore_lines
+
+
+@traces("REQ-016", "AC-02", "SPEC-016")
+def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> None:
+    """Verify custom package prefixes in check_architecture and worktree PYTHONPATH."""
+    architecture_policy = {
+        "dependency_rules": {"forbid_circular_imports": True},
+        "allowed_third_party_packages": ["multi_tasker"],
+        "layers": [
+            {
+                "name": "core",
+                "paths": ["app/core/**"],
+                "allowed_internal_imports": ["app.core"],
+                "forbidden_internal_imports": ["app.api"],
+            },
+            {
+                "name": "api",
+                "paths": ["app/api/**"],
+                "allowed_internal_imports": ["app.core", "app.api"],
+            },
+        ],
+    }
+    _write_file(
+        tmp_path / "policy/architecture.yaml", yaml.safe_dump(architecture_policy)
+    )
+    _write_file(
+        tmp_path / "app/core/first.py",
+        "from multi_tasker.domain.models import traces\n"
+        "from app.api import routes\nfrom app.core import second\n",
+    )
+    _write_file(tmp_path / "app/core/second.py", "from app.core import first\n")
+    _write_file(tmp_path / "app/api/routes.py", "VALUE = 1\n")
+    rules = {finding.rule_id for finding in check_architecture(tmp_path)}
+    assert rules == {"ARCH_FORBIDDEN_IMPORT", "ARCH_CIRCULAR_IMPORT"}
+    document = ArtifactDocument(
+        "artifacts/tasks/TASK-001.md", "TASK", {"id": "TASK-001"}, "", 1, {}
+    )
+    _, env = prepare_worker_invocation(
+        tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
+    )
+    assert env["PYTHONPATH"].startswith(str(tmp_path))

@@ -1,8 +1,9 @@
 ---
 id: TASK-050
-title: Relocate REQ-016 TestContracts to test_interaction_logging to Respect 360-Line Ceiling
+title: Relocate REQ-016 TestContracts to test_interaction_logging to Respect 360-Line
+  Ceiling
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-016
 - SPEC-016
@@ -18,7 +19,8 @@ write_files:
 - tests/test_lifecycle.py
 - tests/test_traceability_and_cli.py
 - tests/test_interaction_logging.py
-verification_cmd: pytest -q tests/test_interaction_logging.py tests/test_lifecycle.py tests/test_traceability_and_cli.py
+verification_cmd: pytest -q tests/test_interaction_logging.py tests/test_lifecycle.py
+  tests/test_traceability_and_cli.py
 ---
 ## Objective
 Move `REQ-016` test contracts into `tests/test_interaction_logging.py` so `tests/test_lifecycle.py` and `tests/test_traceability_and_cli.py` remain within 360 lines.

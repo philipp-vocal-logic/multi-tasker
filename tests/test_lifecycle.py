@@ -357,18 +357,3 @@ def test_multi_wave_run_and_approval_traceability_diagnostics(
         )
     assert main(["run", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip().splitlines() == ["TASK-001", "TASK-002"]
-
-
-@traces("REQ-016", "AC-01", "SPEC-016")
-def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> None:
-    """Verify mt initialize scaffolds missing policy/*.yaml and .gitignore entries."""
-    custom_limits = "source_code:\n  max_file_lines: 777\n"
-    _write_document(tmp_path / "policy/limits.yaml", custom_limits)
-    _write_document(tmp_path / ".gitignore", "__pycache__/\n")
-    assert main(["initialize", "--root", str(tmp_path)]) == 0
-    assert (tmp_path / "policy/limits.yaml").read_text("utf-8") == custom_limits
-    architecture = load_yaml_file(tmp_path / "policy/architecture.yaml")
-    assert "multi_tasker" in architecture.get("allowed_third_party_packages", [])
-    gitignore_lines = (tmp_path / ".gitignore").read_text("utf-8").splitlines()
-    for entry in ("__pycache__/", ".worktrees/", ".report/", ".mt_prompt.md"):
-        assert entry in gitignore_lines
