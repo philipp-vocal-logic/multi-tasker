@@ -1,8 +1,9 @@
 ---
 id: TASK-047
-title: Add TestContracts for Policy Scaffolding, Custom Architecture Packages, and Worktree PYTHONPATH
+title: Add TestContracts for Policy Scaffolding, Custom Architecture Packages, and
+  Worktree PYTHONPATH
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-016
 - SPEC-016
