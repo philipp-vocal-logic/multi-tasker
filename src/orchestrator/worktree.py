@@ -109,7 +109,7 @@ def create_worktree(
         )
     else:
         ignored = shutil.ignore_patterns(
-            ".worktrees", "__pycache__", ".pytest_cache", ".git"
+            ".worktrees", "__pycache__", ".pytest_cache", ".git", ".report"
         )
         shutil.copytree(repository_root, worktree_path, ignore=ignored)
     for folder in ARTIFACT_DIRECTORY_TO_TYPE:

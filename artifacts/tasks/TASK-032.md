@@ -2,7 +2,7 @@
 id: TASK-032
 title: Integrate Worktree Task Execution and MergeGate Logging
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-011
 - SPEC-011

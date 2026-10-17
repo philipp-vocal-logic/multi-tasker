@@ -1,18 +1,22 @@
 """Parallel Worktree Task execution runner (`mt run`)."""
 
 from concurrent.futures import ThreadPoolExecutor
-import contextlib
 import os
 from pathlib import Path
 import shlex
 import subprocess
 import threading
+import time
 
 from src.checkers.common import get_git_changed_files
 from src.domain.models import ArtifactDocument, Finding
 from src.domain.parser import load_artifacts_by_id, update_artifact_frontmatter
 from src.orchestrator.documentation_generator import (
     write_repository_documentation,
+)
+from src.orchestrator.interaction_logger import (
+    merge_worktree_task_logs,
+    record_task_event,
 )
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
 from src.orchestrator.prompt_builder import build_agent_prompt, resolve_task_execution
@@ -79,6 +83,7 @@ def _prepare_worker_invocation(
     )
     environment = {
         **os.environ,
+        "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
         "MT_AGENT_ROLE": "worker-agent",
         "MT_TASK_ID": task_id,
         "MT_WRITE_FILES": ",".join(write_files),
@@ -87,6 +92,40 @@ def _prepare_worker_invocation(
         "MT_EXECUTION_ENVIRONMENT": environment_name,
     }
     return rendered_command, environment
+
+
+def _run_worker_subprocess(
+    worktree_path: Path,
+    rendered_command: str,
+    environment: dict[str, str],
+    timeout_seconds: float,
+) -> dict[str, object]:
+    """Execute worker subprocess and return structured outcome details."""
+    started = time.monotonic()
+    try:
+        process = subprocess.run(
+            shlex.split(rendered_command),
+            cwd=worktree_path,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+        elapsed = int((time.monotonic() - started) * 1000)
+        stdout_text, stderr_text = process.stdout.strip(), process.stderr.strip()
+        return_code, timed_out = process.returncode, False
+    except subprocess.TimeoutExpired:
+        elapsed = int((time.monotonic() - started) * 1000)
+        stdout_text, stderr_text, return_code, timed_out = "", "", -1, True
+    return {
+        "command": rendered_command,
+        "return_code": return_code,
+        "timed_out": timed_out,
+        "duration_ms": elapsed,
+        "stdout": stdout_text,
+        "stderr": stderr_text,
+    }
 
 
 def _invoke_agent_in_worktree(
@@ -103,16 +142,12 @@ def _invoke_agent_in_worktree(
         task_id, write_files, prompt_file, execution_context
     )
     try:
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            subprocess.run(
-                shlex.split(rendered_command),
-                cwd=worktree_path,
-                env=environment,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=timeout_seconds,
-            )
+        details = _run_worker_subprocess(
+            worktree_path, rendered_command, environment, timeout_seconds
+        )
+        record_task_event(
+            worktree_path, task_id, "agent_invocation", details, execution_context
+        )
     finally:
         prompt_file.unlink(missing_ok=True)
     return _collect_worktree_changes(
@@ -184,22 +219,43 @@ def _resolve_and_invoke_worktree(
     worktree_path: Path,
     document: ArtifactDocument,
     execution_options: tuple[str | None, str | None, str | None],
-) -> list[str]:
+) -> tuple[list[str], tuple[str | None, str, str]]:
     """Resolve execution context and invoke worker command when configured."""
     task_id = str(document.frontmatter["id"])
     write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
-    execution_context = resolve_task_execution(
-        worktree_path, document, execution_options
-    )
-    if (
+    context = resolve_task_execution(worktree_path, document, execution_options)
+    if context[0] and (
         execution_options[0]
         or execution_options[2]
         or document.frontmatter.get("execution_environment")
     ):
-        return _invoke_agent_in_worktree(
-            worktree_path, task_id, write_files, execution_context
+        changed = _invoke_agent_in_worktree(
+            worktree_path, task_id, write_files, (context[0], context[1], context[2])
         )
-    return write_files
+        return changed, context
+    return write_files, context
+
+
+def _record_gate_and_merge_logs(
+    repository_root: Path,
+    worktree_path: Path,
+    task_id: str,
+    outcome: GateOutcome,
+    execution_data: tuple[list[str], tuple[str | None, str, str]],
+) -> None:
+    """Merge Worktree Task logs and append MergeGate outcome event on BaseBranch."""
+    changed, execution_context = execution_data
+    merge_worktree_task_logs(repository_root, worktree_path, task_id)
+    details = {
+        "passed": outcome.passed,
+        "escalated": outcome.escalated,
+        "escalation_path": outcome.escalation_path,
+        "changed_files": list(changed),
+        "findings": [item.format() for item in outcome.findings],
+    }
+    record_task_event(
+        repository_root, task_id, "merge_gate", details, execution_context
+    )
 
 
 def _execute_single_task(
@@ -213,7 +269,7 @@ def _execute_single_task(
     task_id = str(document.frontmatter["id"])
     verification = str(document.frontmatter.get("verification_cmd", "")) or None
     try:
-        changed = _resolve_and_invoke_worktree(
+        changed, execution_context = _resolve_and_invoke_worktree(
             worktree_path, document, execution_options
         )
         outcome = evaluate_merge_gate(
@@ -227,6 +283,13 @@ def _execute_single_task(
             )
         )
         with merge_lock:
+            _record_gate_and_merge_logs(
+                repository_root,
+                worktree_path,
+                task_id,
+                outcome,
+                (changed, execution_context),
+            )
             return _finalize_task_outcome(
                 repository_root, worktree_path, document, outcome, changed
             )
