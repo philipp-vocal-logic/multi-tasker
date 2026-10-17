@@ -16,14 +16,12 @@ from src.domain.parser import (
     parse_artifact_file,
     update_artifact_frontmatter,
 )
-from src.orchestrator.documentation_generator import (
-    write_repository_documentation,
-)
+from src.orchestrator.documentation_generator import write_repository_documentation
 from src.orchestrator.interaction_logger import (
     merge_worktree_task_logs,
     record_task_event,
 )
-from src.orchestrator.lifecycle import approve_artifact
+from src.orchestrator.lifecycle import approve_stage_artifact, evaluate_review_verdict
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
 from src.orchestrator.prompt_builder import (
     build_agent_prompt,
@@ -47,9 +45,11 @@ def is_worktree_agent_enabled(repository_root: Path, agent_role: str) -> bool:
         return True
     agents: dict[str, Any] = load_yaml_file(permissions_path).get("agents", {})
     role_config = agents.get(agent_role)
-    if not isinstance(role_config, dict):
-        return False
-    return bool(role_config.get("worktree_execution", True))
+    return (
+        bool(role_config.get("worktree_execution", True))
+        if isinstance(role_config, dict)
+        else False
+    )
 
 
 def _snapshot_artifacts(root: Path) -> dict[str, str]:
@@ -71,10 +71,9 @@ def _detect_stage_changes(
     git_changed = get_git_changed_files(worktree_path)
     if git_changed:
         return git_changed
-    after_snapshot = _snapshot_artifacts(worktree_path)
     return [
         path
-        for path, content in sorted(after_snapshot.items())
+        for path, content in sorted(_snapshot_artifacts(worktree_path).items())
         if before_snapshot.get(path) != content
     ]
 
@@ -185,8 +184,7 @@ def _validate_stage_request(
     """Validate agent_role, worktree_execution flag, and target_id existence."""
     permissions_path = repository_root / "policy" / "permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
-    agents: dict[str, Any] = permissions.get("agents", {})
-    if agent_role not in agents:
+    if agent_role not in permissions.get("agents", {}):
         message = f"Unknown agent role '{agent_role}'."
         return None, [
             Finding("policy/permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message)
@@ -219,17 +217,13 @@ def run_agent_stage(
         return [], findings
     worktree_path = create_worktree(repository_root, f"{agent_role}-{target_id}")
     try:
-        context = resolve_task_execution(
+        ctx = resolve_task_execution(
             worktree_path, target_document, options, agent_role
         )
+        exec_ctx = (ctx[0] or "", ctx[1], ctx[2])
         changed = (
-            _run_stage_subprocess(
-                worktree_path,
-                agent_role,
-                target_document,
-                (context[0], context[1], context[2]),
-            )
-            if context[0]
+            _run_stage_subprocess(worktree_path, agent_role, target_document, exec_ctx)
+            if ctx[0]
             else []
         )
         task_arg = target_id if agent_role == "worker-agent" else None
@@ -238,6 +232,13 @@ def run_agent_stage(
         )
         outcome = evaluate_merge_gate(request)
         merge_worktree_task_logs(repository_root, worktree_path, target_id)
+        record_task_event(
+            repository_root,
+            target_id,
+            "merge_gate",
+            {"passed": outcome.passed, "changed_files": list(changed)},
+            exec_ctx,
+        )
         return _finalize_stage_outcome(request, target_id, outcome)
     finally:
         remove_worktree(repository_root, worktree_path)
@@ -298,10 +299,20 @@ def _step_declarative_stage(
     produced, findings = run_agent_stage(repository_root, role, target_id, options)
     if findings or gate == "human":
         return produced, findings
-    for artifact_id in produced:
+    for artifact_id in list(produced):
         if gate == "review-agent":
-            run_agent_stage(repository_root, "review-agent", artifact_id, options)
-        approve_artifact(repository_root, artifact_id)
+            rev_ids, rev_findings = run_agent_stage(
+                repository_root, "review-agent", artifact_id, options
+            )
+            if rev_findings or not rev_ids:
+                return produced, rev_findings
+            verdict_findings = evaluate_review_verdict(
+                repository_root, artifact_id, rev_ids[0]
+            )
+            if verdict_findings:
+                return produced, verdict_findings
+            produced.extend(rev_ids)
+        approve_stage_artifact(repository_root, artifact_id)
     return produced, []
 
 

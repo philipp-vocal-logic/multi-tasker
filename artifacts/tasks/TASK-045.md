@@ -1,22 +1,23 @@
 ---
 id: TASK-045
-title: Wire Review Gate Verdicts, Review Exhaustion Escalation, and Stage MergeGate Logging
+title: Wire Review Gate Verdicts, Review Exhaustion Escalation, and Stage MergeGate
+  Logging
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-015
-  - SPEC-015
+- REQ-015
+- SPEC-015
 depends_on:
-  - TASK-043
-  - TASK-044
-  - TASK-046
+- TASK-043
+- TASK-044
+- TASK-046
 required_files:
-  - tests/test_stage_runner.py
-  - src/orchestrator/lifecycle.py
-  - src/orchestrator/stage_runner.py
+- tests/test_stage_runner.py
+- src/orchestrator/lifecycle.py
+- src/orchestrator/stage_runner.py
 write_files:
-  - src/orchestrator/lifecycle.py
-  - src/orchestrator/stage_runner.py
+- src/orchestrator/lifecycle.py
+- src/orchestrator/stage_runner.py
 verification_cmd: pytest -q tests/test_stage_runner.py tests/test_checkers.py tests/test_orchestrator.py
 ---
 ## Objective

@@ -10,6 +10,7 @@ from src.domain.models import ArtifactDocument, Finding
 from src.domain.parser import (
     ARTIFACT_DIRECTORY_TO_TYPE,
     load_artifacts_by_id,
+    load_pipeline_policy,
     load_state_transitions,
     update_artifact_frontmatter,
 )
@@ -131,6 +132,69 @@ def approve_artifact(repository_root: Path, artifact_id: str) -> list[Finding]:
     update_artifact_frontmatter(repository_root / document.path, {"status": "approved"})
     _mark_dirty_downstream(repository_root, artifact_id)
     return []
+
+
+def approve_stage_artifact(repository_root: Path, artifact_id: str) -> None:
+    """Transition REQ/SPEC/DEC to approved or TASK to ready after stage gate."""
+    document = load_artifacts_by_id(repository_root).get(artifact_id)
+    if document is not None and document.artifact_type == "TASK":
+        update_artifact_frontmatter(
+            repository_root / document.path, {"status": "ready"}
+        )
+    else:
+        approve_artifact(repository_root, artifact_id)
+
+
+def _create_review_escalation(
+    repository_root: Path, artifact_id: str, rev_path: str
+) -> list[Finding]:
+    """Create an awaiting_human review_exhausted Escalation and block artifact_id."""
+    by_id = load_artifacts_by_id(repository_root)
+    esc_nums = [
+        int(key.split("-")[1])
+        for key in by_id
+        if key.startswith("ESC-") and key.split("-")[1].isdigit()
+    ]
+    esc_id = f"ESC-{max(esc_nums, default=0) + 1:03d}"
+    esc_rel = f"artifacts/escalations/{esc_id}.md"
+    (repository_root / esc_rel).write_text(
+        f"---\nid: {esc_id}\nsource_agent: orchestrator\n"
+        f"task_or_stage: {artifact_id}\naffected_artifacts: [{artifact_id}]\n"
+        "reason_category: review_exhausted\nstatus: awaiting_human\n"
+        "resolved_by: null\n---\n"
+        f"## Blocking Problem\nReview cycles exhausted for {artifact_id}.\n",
+        encoding="utf-8",
+    )
+    target_doc = by_id.get(artifact_id)
+    if target_doc is not None:
+        update_artifact_frontmatter(
+            repository_root / target_doc.path, {"status": "blocked"}
+        )
+    message = f"Review cycles exhausted for '{artifact_id}' ({esc_id})."
+    return [Finding(rev_path, 1, "STAGE_REVIEW_EXHAUSTED", message)]
+
+
+def evaluate_review_verdict(
+    repository_root: Path, artifact_id: str, rev_id: str
+) -> list[Finding]:
+    """Check REV verdict for artifact_id and emit Finding or escalation on fail."""
+    by_id = load_artifacts_by_id(repository_root)
+    rev_doc = by_id.get(rev_id)
+    if rev_doc is None or rev_doc.frontmatter.get("verdict") == "pass":
+        return []
+    fail_count = sum(
+        1
+        for doc in by_id.values()
+        if doc.artifact_type == "REV"
+        and doc.frontmatter.get("verdict") == "fail"
+        and artifact_id
+        in {str(item) for item in doc.frontmatter.get("target_artifacts", [])}
+    )
+    bounds = load_pipeline_policy(repository_root).get("execution_bounds", {})
+    if fail_count >= int(bounds.get("max_review_cycles", 2)):
+        return _create_review_escalation(repository_root, artifact_id, rev_doc.path)
+    message = f"Review '{rev_id}' rejected '{artifact_id}'."
+    return [Finding(rev_doc.path, 1, "STAGE_REVIEW_REJECTED", message)]
 
 
 def resolve_escalation(
