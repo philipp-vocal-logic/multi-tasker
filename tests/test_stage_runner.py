@@ -1,4 +1,4 @@
-"""Executable TestContracts for REQ-013 and SPEC-013 per-agent Worktree & models."""
+"""Executable TestContracts for REQ-013/SPEC-013 and REQ-014/SPEC-014."""
 
 import importlib
 from pathlib import Path
@@ -7,9 +7,11 @@ from typing import Any
 import yaml
 
 from src.checkers.permissions_checker import check_permissions
+from src.checkers.schemas_checker import check_schemas
 from src.cli.main import main
 from src.domain.models import traces
 from src.domain.parser import load_yaml_file, parse_artifact_file
+from src.orchestrator.router import route_escalation
 from tests.test_interaction_logging import REPOSITORY_ROOT, _seed_test_repository
 
 
@@ -110,3 +112,129 @@ def test_configurable_worktree_stage_execution_and_toggle(
     assert main(run_args) == 1
     assert "[CLI_AGENT_WORKTREE_DISABLED]" in capsys.readouterr().out
     assert REPOSITORY_ROOT.is_dir()
+
+
+@traces("REQ-014", "AC-01", "SPEC-014")
+def test_pipeline_policy_validation_and_configurable_escalation_routing(
+    tmp_path: Path,
+) -> None:
+    """Verify check_schemas validates pipeline.yaml and router uses policy routes."""
+    _seed_test_repository(tmp_path)
+    assert check_schemas(tmp_path) == []
+    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline = load_yaml_file(pipeline_path)
+    pipeline["stages"][0]["approval_gate"] = "invalid-gate"
+    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    findings = check_schemas(tmp_path)
+    assert any(item.rule_id == "PIPELINE_INVALID_STAGE" for item in findings)
+    pipeline["stages"][0]["approval_gate"] = "human"
+    pipeline["escalation_routes"]["ambiguity"] = {
+        "target_actor": "requirement-agent",
+        "next_status": "routed_to_agent",
+        "action": "clarify_requirement",
+    }
+    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    escalation_rel = "artifacts/escalations/ESC-001.md"
+    (tmp_path / escalation_rel).write_text(
+        "---\nid: ESC-001\nsource_agent: worker-agent\ntask_or_stage: TASK-001\n"
+        "affected_artifacts: [REQ-001]\nreason_category: ambiguity\n"
+        "status: open\n---\n## Blocking Problem\nAmbiguous requirement.\n",
+        encoding="utf-8",
+    )
+    decision = route_escalation(tmp_path, escalation_rel)
+    assert decision.target_actor == "requirement-agent"
+    assert decision.next_status == "routed_to_agent"
+    capped = route_escalation(tmp_path, escalation_rel, prior_reroutes=1)
+    assert capped.target_actor == "human"
+    assert capped.next_status == "awaiting_human"
+
+
+def _seed_pipeline_escalation_fixture(tmp_path: Path) -> str:
+    """Seed INT-001 and write a multi-stage agent dispatcher script in tmp_path."""
+    (tmp_path / "artifacts" / "intents" / "INT-001.md").write_text(
+        "---\nid: INT-001\nstatus: open\ncreated_at: '2026-10-17T00:00:00Z'\n"
+        "---\nBuild pipeline feature.\n",
+        encoding="utf-8",
+    )
+    script_path = tmp_path / "pipeline_agent_helper.py"
+    script_path.write_text(
+        "import os\nfrom pathlib import Path\n"
+        "role = os.environ['MT_AGENT_ROLE']\n"
+        "if role == 'requirement-agent':\n"
+        "    Path('artifacts/requirements/REQ-001.md').write_text("
+        "'---\\nid: REQ-001\\ntitle: Pipeline Requirement\\nstatus: draft\\n"
+        "traces_to: [INT-001]\\ndecisions: []\\nacceptance_criteria:\\n"
+        "  - id: AC-01\\n    given: A\\n    when: B\\n    then: C\\n"
+        "version: 1\\n---\\n## Statement\\nS.\\n\\n## Impact Analysis\\nI.\\n')\n"
+        "elif role == 'specification-agent':\n"
+        "    Path('artifacts/specifications/SPEC-001.md').write_text("
+        "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
+        "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
+        "target_files:\\n  tests: [tests/test_p.py]\\n  implementation: []\\n"
+        "---\\n## Design Overview\\nD.\\n\\n## Public Interfaces\\nP.\\n\\n"
+        "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
+        "elif role == 'planner-agent':\n"
+        "    Path('artifacts/tasks/TASK-001.md').write_text("
+        "'---\\nid: TASK-001\\ntitle: Rescoped Pipeline TestContract\\n"
+        "type: test_contract\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
+        "depends_on: []\\nrequired_files: []\\nwrite_files: [tests/test_p.py]\\n"
+        "verification_cmd: python3 -c pass\\n---\\n"
+        "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')\n"
+        "elif role == 'worker-agent':\n"
+        "    Path('tests/test_p.py').write_text("
+        "'from src.domain.models import traces\\n\\n"
+        '@traces("REQ-001", "AC-01", "SPEC-001")\\n'
+        "def test_p() -> None:\\n    assert True\\n')\n",
+        encoding="utf-8",
+    )
+    return f"python3 {script_path}"
+
+
+def _enable_auto_gates_and_seed_escalation(tmp_path: Path) -> None:
+    """Switch pipeline approval_gate to auto, approve REQ-001, and seed ESC-001."""
+    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline = load_yaml_file(pipeline_path)
+    for stage in pipeline["stages"]:
+        stage["approval_gate"] = "auto"
+    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 0
+    (tmp_path / "artifacts" / "escalations" / "ESC-001.md").write_text(
+        "---\nid: ESC-001\nsource_agent: worker-agent\ntask_or_stage: TASK-001\n"
+        "affected_artifacts: [REQ-001]\nreason_category: infeasible_scope\n"
+        "status: routed_to_agent\n---\n## Blocking Problem\nNeeds rescope.\n",
+        encoding="utf-8",
+    )
+
+
+@traces("REQ-014", "AC-02", "SPEC-014")
+def test_declarative_pipeline_execution_gates_and_auto_escalation(
+    tmp_path: Path, capsys: Any
+) -> None:
+    """Verify mt run --pipeline pauses on human gate and self-heals escalations."""
+    _seed_test_repository(tmp_path)
+    agent_cmd = _seed_pipeline_escalation_fixture(tmp_path)
+    run_args = [
+        "run",
+        "--pipeline",
+        "--agent-command",
+        agent_cmd,
+        "--root",
+        str(tmp_path),
+    ]
+    assert main(run_args) == 0
+    assert capsys.readouterr().out.strip() == "REQ-001"
+    assert not (tmp_path / "artifacts" / "specifications" / "SPEC-001.md").exists()
+    _enable_auto_gates_and_seed_escalation(tmp_path)
+    assert main(run_args) == 0
+    output_lines = capsys.readouterr().out.strip().splitlines()
+    assert "SPEC-001" in output_lines and "TASK-001" in output_lines
+    esc_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts" / "escalations" / "ESC-001.md",
+        "artifacts/escalations/ESC-001.md",
+    )
+    task_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts" / "tasks" / "TASK-001.md",
+        "artifacts/tasks/TASK-001.md",
+    )
+    assert esc_doc is not None and esc_doc.frontmatter["status"] == "resolved"
+    assert task_doc is not None and task_doc.frontmatter["status"] == "done"

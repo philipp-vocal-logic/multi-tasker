@@ -2,15 +2,15 @@
 id: TASK-039
 title: Create TestContract for Declarative Pipeline Policy and Execution
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-014
-  - SPEC-014
+- REQ-014
+- SPEC-014
 depends_on: []
 required_files:
-  - policy/pipeline.yaml
+- policy/pipeline.yaml
 write_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective
