@@ -2,18 +2,18 @@
 id: TASK-040
 title: Implement Pipeline Policy Loader, Schema Validation, and Escalation Router
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-014
-  - SPEC-014
+- REQ-014
+- SPEC-014
 depends_on:
-  - TASK-039
+- TASK-039
 required_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 write_files:
-  - src/domain/parser.py
-  - src/checkers/schemas_checker.py
-  - src/orchestrator/router.py
+- src/domain/parser.py
+- src/checkers/schemas_checker.py
+- src/orchestrator/router.py
 verification_cmd: pytest -q tests/test_orchestrator.py
 ---
 ## Objective

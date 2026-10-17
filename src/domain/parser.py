@@ -26,6 +26,14 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     return {}
 
 
+def load_pipeline_policy(repository_root: Path) -> dict[str, Any]:
+    """Load policy/pipeline.yaml if present, otherwise return an empty dictionary."""
+    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    if not pipeline_path.exists():
+        return {}
+    return load_yaml_file(pipeline_path)
+
+
 def infer_artifact_type(relative_path: str) -> str:
     """Infer artifact type code (INT, REQ, etc.) from relative path."""
     parts = Path(relative_path).parts
@@ -160,3 +168,68 @@ def load_state_transitions(
         for artifact_type, mapping in raw_transitions.items()
         if isinstance(mapping, dict)
     }
+
+
+def _validate_pipeline_stages(stages: list[Any]) -> list[Finding]:
+    """Validate stage definitions in policy/pipeline.yaml."""
+    valid_gates = {"human", "review-agent", "auto"}
+    for entry in stages:
+        if not isinstance(entry, dict):
+            message = "Invalid stage entry in policy/pipeline.yaml."
+            return [
+                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_STAGE", message)
+            ]
+        stage_id = str(entry.get("id", ""))
+        trigger = str(entry.get("trigger_type", ""))
+        states = entry.get("trigger_states", [])
+        downstream = str(entry.get("downstream_type", ""))
+        role = str(entry.get("agent_role", ""))
+        gate = str(entry.get("approval_gate", ""))
+        valid_states = isinstance(states, list) and bool(states)
+        if not (
+            stage_id
+            and trigger
+            and valid_states
+            and downstream
+            and role
+            and gate in valid_gates
+        ):
+            message = f"Invalid pipeline stage '{stage_id}' in policy/pipeline.yaml."
+            return [
+                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_STAGE", message)
+            ]
+    return []
+
+
+def validate_pipeline_policy(repository_root: Path) -> list[Finding]:
+    """Validate execution_bounds, stages, and escalation_routes in pipeline.yaml."""
+    pipeline = load_pipeline_policy(repository_root)
+    if not pipeline:
+        return []
+    bounds: dict[str, Any] = pipeline.get("execution_bounds", {})
+    max_steps = bounds.get("max_steps_per_run", 0)
+    max_reroutes = bounds.get("max_auto_reroutes", -1)
+    if (
+        not isinstance(max_steps, int)
+        or max_steps < 1
+        or not isinstance(max_reroutes, int)
+        or max_reroutes < 0
+    ):
+        message = "Invalid execution_bounds in policy/pipeline.yaml."
+        return [Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_BOUNDS", message)]
+    stage_findings = _validate_pipeline_stages(list(pipeline.get("stages", [])))
+    if stage_findings:
+        return stage_findings
+    routes: dict[str, Any] = pipeline.get("escalation_routes", {})
+    for category, route in routes.items():
+        if not isinstance(route, dict) or not (
+            category
+            and route.get("target_actor")
+            and route.get("next_status")
+            and route.get("action")
+        ):
+            message = f"Invalid escalation route '{category}' in policy/pipeline.yaml."
+            return [
+                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_ROUTE", message)
+            ]
+    return []
