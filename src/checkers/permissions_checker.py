@@ -262,8 +262,28 @@ def _evaluate_role_permissions(
     return findings
 
 
+def _validate_agent_execution_settings(policy: dict[str, Any]) -> bool:
+    """Return True if all agents have valid model and worktree_execution values."""
+    agents: dict[str, Any] = policy.get("agents", {})
+    for agent_config in agents.values():
+        if not isinstance(agent_config, dict):
+            continue
+        model_val = agent_config.get("model", "default")
+        worktree_flag = agent_config.get("worktree_execution", True)
+        if (
+            not isinstance(model_val, str)
+            or not model_val.strip()
+            or not isinstance(worktree_flag, bool)
+        ):
+            return False
+    return True
+
+
 def _validate_execution_environments(policy: dict[str, Any]) -> list[Finding]:
-    """Validate execution_environments configuration in policy/permissions.yaml."""
+    """Validate execution_environments and per-agent settings in permissions.yaml."""
+    if not _validate_agent_execution_settings(policy):
+        message = "Invalid agent execution settings in policy/permissions.yaml."
+        return [Finding("policy/permissions.yaml", 1, "PERM_INVALID_EXEC_ENV", message)]
     execution_config: dict[str, Any] = policy.get("execution_environments", {})
     if not execution_config:
         return []

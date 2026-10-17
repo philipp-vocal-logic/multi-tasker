@@ -301,19 +301,22 @@ def resolve_task_execution(
     repository_root: Path,
     document: ArtifactDocument,
     options: tuple[str | None, str | None, str | None] = (None, None, None),
+    agent_role: str = "worker-agent",
 ) -> tuple[str | None, str, str]:
-    """Resolve (command_template, environment_name, model_name) for a Task."""
+    """Resolve (command_template, environment_name, model_name) for an agent run."""
     agent_command, model_override, environment_override = options
     permissions_path = repository_root / "policy" / "permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     execution_config: dict[str, Any] = permissions.get("execution_environments", {})
+    role_config: dict[str, Any] = permissions.get("agents", {}).get(agent_role, {})
     default_env = str(execution_config.get("default_environment", "agy"))
     default_model = str(execution_config.get("default_model", "gemini-3.8-flash-high"))
+    role_model = str(role_config.get("model", "")).strip()
     environments: dict[str, Any] = execution_config.get("environments", {})
     task_env = str(document.frontmatter.get("execution_environment", "")).strip()
     task_model = str(document.frontmatter.get("model", "")).strip()
     environment_name = environment_override or task_env or default_env
-    model_name = model_override or task_model or default_model
+    model_name = model_override or task_model or role_model or default_model
     if agent_command:
         return agent_command, environment_name, model_name
     if environment_override or task_env:

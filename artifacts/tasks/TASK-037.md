@@ -2,7 +2,7 @@
 id: TASK-037
 title: Implement Per-Agent Policy Validation and Four-Tier Model Resolution
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-013
 - SPEC-013
