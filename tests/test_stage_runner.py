@@ -1,4 +1,4 @@
-"""Executable TestContracts for REQ-013/SPEC-013 and REQ-014/SPEC-014."""
+"""Executable TestContracts for REQ-013..015 and SPEC-013..015."""
 
 import importlib
 from pathlib import Path
@@ -8,10 +8,12 @@ import yaml
 
 from src.checkers.permissions_checker import check_permissions
 from src.checkers.schemas_checker import check_schemas
+from src.checkers.traceability_checker import check_traceability
 from src.cli.main import main
 from src.domain.models import traces
 from src.domain.parser import load_yaml_file, parse_artifact_file
 from src.orchestrator.router import route_escalation
+from src.orchestrator.stage_runner import run_agent_stage
 from tests.test_interaction_logging import REPOSITORY_ROOT, _seed_test_repository
 
 
@@ -149,41 +151,49 @@ def test_pipeline_policy_validation_and_configurable_escalation_routing(
     assert capped.next_status == "awaiting_human"
 
 
+_PIPELINE_HELPER_SCRIPT = (
+    "import os\nfrom pathlib import Path\n"
+    "role, target = os.environ['MT_AGENT_ROLE'], os.environ.get('MT_TASK_ID', '')\n"
+    "if role == 'requirement-agent':\n"
+    "    Path('artifacts/requirements/REQ-001.md').write_text("
+    "'---\\nid: REQ-001\\ntitle: Pipeline Requirement\\nstatus: draft\\n"
+    "traces_to: [INT-001]\\ndecisions: []\\nacceptance_criteria:\\n"
+    "  - id: AC-01\\n    given: Intent\\n    when: Run\\n    then: Done\\n"
+    "version: 1\\n---\\n## Statement\\nStmt.\\n\\n## Impact Analysis\\nImp.\\n')\n"
+    "elif role == 'specification-agent':\n"
+    "    Path('artifacts/specifications/SPEC-001.md').write_text("
+    "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
+    "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
+    "target_files:\\n  tests: [tests/test_p.py]\\n"
+    "  implementation: [src/domain/p.py]\\n"
+    "---\\n## Design Overview\\nDesign.\\n\\n## Public Interfaces\\nPublic.\\n\\n"
+    "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
+    "elif role == 'planner-agent':\n"
+    "    Path('artifacts/tasks/TASK-001.md').write_text("
+    "'---\\nid: TASK-001\\ntitle: Rescoped Pipeline TestContract\\n"
+    "type: test_contract\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
+    "depends_on: []\\nrequired_files: []\\nwrite_files: [tests/test_p.py]\\n"
+    "verification_cmd: python3 -c pass\\n---\\n"
+    "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')\n"
+    "elif role == 'review-agent':\n"
+    "    v = 'fail' if target == 'TASK-001' else 'pass'\n"
+    "    Path(f'artifacts/reviews/REV-{target}.md').write_text("
+    "f'---\\nid: REV-{target}\\ntarget_artifacts: [{target}]\\n"
+    "stage: specification\\nverdict: {v}\\nfindings: []\\n---\\nReview.\\n')\n"
+    "elif role == 'worker-agent':\n"
+    "    Path('tests').mkdir(exist_ok=True)\n"
+    '    Path("tests/test_p.py").write_text('
+    '"from src.domain.models import traces\\n\\n'
+    '@traces("REQ-001", "AC-01", "SPEC-001")\\n'
+    'def test_p() -> None:\\n    assert True\\n")\n'
+)
+
+
 def _seed_pipeline_escalation_fixture(tmp_path: Path) -> str:
     """Seed INT-001 and write a multi-stage agent dispatcher script in tmp_path."""
     assert main(["intent", "Goal.", "--root", str(tmp_path)]) == 0
     script_path = tmp_path / "pipeline_agent_helper.py"
-    script_path.write_text(
-        "import os\nfrom pathlib import Path\nrole = os.environ['MT_AGENT_ROLE']\n"
-        "if role == 'requirement-agent':\n"
-        "    Path('artifacts/requirements/REQ-001.md').write_text("
-        "'---\\nid: REQ-001\\ntitle: Pipeline Requirement\\nstatus: draft\\n"
-        "traces_to: [INT-001]\\ndecisions: []\\nacceptance_criteria:\\n"
-        "  - id: AC-01\\n    given: Intent\\n    when: Run\\n    then: Done\\n"
-        "version: 1\\n---\\n## Statement\\nStmt.\\n\\n## Impact Analysis\\nImp.\\n')\n"
-        "elif role == 'specification-agent':\n"
-        "    Path('artifacts/specifications/SPEC-001.md').write_text("
-        "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
-        "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
-        "target_files:\\n  tests: [tests/test_p.py]\\n"
-        "  implementation: [src/domain/p.py]\\n"
-        "---\\n## Design Overview\\nDesign.\\n\\n## Public Interfaces\\nPublic.\\n\\n"
-        "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
-        "elif role == 'planner-agent':\n"
-        "    Path('artifacts/tasks/TASK-001.md').write_text("
-        "'---\\nid: TASK-001\\ntitle: Rescoped Pipeline TestContract\\n"
-        "type: test_contract\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
-        "depends_on: []\\nrequired_files: []\\nwrite_files: [tests/test_p.py]\\n"
-        "verification_cmd: python3 -c pass\\n---\\n"
-        "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')\n"
-        "elif role == 'worker-agent':\n"
-        "    Path('tests').mkdir(exist_ok=True)\n"
-        "    Path('tests/test_p.py').write_text("
-        "'from src.domain.models import traces\\n\\n"
-        '@traces("REQ-001", "AC-01", "SPEC-001")\\n'
-        "def test_p() -> None:\\n    assert True\\n')\n",
-        encoding="utf-8",
-    )
+    script_path.write_text(_PIPELINE_HELPER_SCRIPT, encoding="utf-8")
     return f"python3 {script_path}"
 
 
@@ -242,3 +252,89 @@ def test_declarative_pipeline_execution_gates_and_auto_escalation(
     )
     assert esc_doc is not None and esc_doc.frontmatter["status"] == "resolved"
     assert task_doc is not None and task_doc.frontmatter["status"] == "done"
+
+
+def _configure_single_cycle_review_pipeline(tmp_path: Path) -> None:
+    """Disable target_files task coverage check and set max_review_cycles to 1."""
+    trace_path = tmp_path / "policy" / "traceability.yaml"
+    trace_policy = load_yaml_file(trace_path)
+    trace_policy["traceability_rules"]["require_spec_target_files_covered_by_tasks"] = (
+        False
+    )
+    trace_path.write_text(yaml.safe_dump(trace_policy), encoding="utf-8")
+    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline = load_yaml_file(pipeline_path)
+    assert pipeline["stages"][1]["approval_gate"] == "review-agent"
+    assert pipeline["stages"][2]["approval_gate"] == "review-agent"
+    pipeline["execution_bounds"]["max_review_cycles"] = 1
+    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+
+
+@traces("REQ-015", "AC-01", "SPEC-015")
+def test_pipeline_review_gate_verdict_and_exhaustion_escalation(
+    tmp_path: Path, capsys: Any
+) -> None:
+    """Verify review-agent gate approves on pass and escalates on fail exhaustion."""
+    _seed_test_repository(tmp_path)
+    agent_cmd = _seed_pipeline_escalation_fixture(tmp_path)
+    _configure_single_cycle_review_pipeline(tmp_path)
+    run_args = [
+        "run",
+        "--pipeline",
+        "--agent-command",
+        agent_cmd,
+        "--root",
+        str(tmp_path),
+    ]
+    assert main(run_args) == 0
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert main(run_args) == 1
+    assert "[STAGE_REVIEW_EXHAUSTED]" in capsys.readouterr().out
+    spec_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts" / "specifications" / "SPEC-001.md",
+        "artifacts/specifications/SPEC-001.md",
+    )
+    esc_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts" / "escalations" / "ESC-001.md",
+        "artifacts/escalations/ESC-001.md",
+    )
+    assert spec_doc is not None and spec_doc.frontmatter["status"] == "approved"
+    assert esc_doc is not None
+    assert esc_doc.frontmatter["reason_category"] == "review_exhausted"
+    assert esc_doc.frontmatter["status"] == "awaiting_human"
+
+
+@traces("REQ-015", "AC-02", "SPEC-015")
+def test_review_record_traceability_documentation_and_stage_gate_log(
+    tmp_path: Path,
+) -> None:
+    """Verify REV target_artifacts traceability, Mermaid edges, and merge_gate logs."""
+    _seed_test_repository(tmp_path)
+    _seed_approved_requirement(tmp_path)
+    rev_cmd = (
+        'python3 -c "from pathlib import Path; '
+        "Path('artifacts/reviews/REV-001.md').write_text("
+        "'---\\nid: REV-001\\ntarget_artifacts: [REQ-001]\\n"
+        "stage: requirement\\nverdict: pass\\nfindings: []\\n---\\nPassed.\\n')\""
+    )
+    produced, findings = run_agent_stage(
+        tmp_path, "review-agent", "REQ-001", (rev_cmd, None, None)
+    )
+    assert findings == [] and produced == ["REV-001"]
+    log_text = (tmp_path / ".report" / "logs" / "tasks" / "REQ-001.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert '"agent_invocation"' in log_text and '"merge_gate"' in log_text
+    spec_report = (tmp_path / ".report" / "specification.md").read_text(
+        encoding="utf-8"
+    )
+    assert 'REV_001["REV-001: requirement (pass)"]' in spec_report
+    assert "REQ_001 -.-> REV_001" in spec_report
+    (tmp_path / "artifacts" / "reviews" / "REV-002.md").write_text(
+        "---\nid: REV-002\ntarget_artifacts: [REQ-999]\n"
+        "stage: requirement\nverdict: fail\nfindings: []\n---\nMissing ref.\n",
+        encoding="utf-8",
+    )
+    trace_findings = check_traceability(tmp_path)
+    assert any(item.rule_id == "TRACE_MISSING_REF" for item in trace_findings)

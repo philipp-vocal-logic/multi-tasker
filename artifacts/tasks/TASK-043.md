@@ -2,15 +2,15 @@
 id: TASK-043
 title: Add TestContract for Pipeline Review Gate Verdicts and Review Traceability
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-015
-  - SPEC-015
+- REQ-015
+- SPEC-015
 depends_on: []
 required_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 write_files:
-  - tests/test_stage_runner.py
+- tests/test_stage_runner.py
 verification_cmd: pytest -q tests/test_interaction_logging.py
 ---
 ## Objective
