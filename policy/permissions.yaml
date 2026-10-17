@@ -29,6 +29,8 @@ execution_environments:
 
 agents:
   requirement-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
     read_scope:
       - "**/*"
     allowed_write:
@@ -43,6 +45,8 @@ agents:
         allowed_target_states: ["open"]
 
   specification-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
     read_scope:
       - "**/*"
     allowed_write:
@@ -57,6 +61,8 @@ agents:
         allowed_target_states: ["open"]
 
   planner-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
     read_scope:
       - "**/*"
     allowed_write:
@@ -71,6 +77,8 @@ agents:
         allowed_target_states: ["open"]
 
   worker-agent:
+    model: "gemini-3.8-flash-high"
+    worktree_execution: true
     read_scope:
       - "**/*"
     allowed_write:
@@ -88,6 +96,8 @@ agents:
         allowed_target_states: ["open"]
 
   review-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
     read_scope:
       - "**/*"
     allowed_write:
