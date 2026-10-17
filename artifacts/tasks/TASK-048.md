@@ -1,8 +1,9 @@
 ---
 id: TASK-048
-title: Implement Default Policy and Gitignore Scaffolding and Worktree PYTHONPATH Ordering
+title: Implement Default Policy and Gitignore Scaffolding and Worktree PYTHONPATH
+  Ordering
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-016
 - SPEC-016

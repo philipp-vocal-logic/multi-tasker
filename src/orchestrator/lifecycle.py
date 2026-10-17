@@ -20,11 +20,45 @@ from src.orchestrator.documentation_generator import (
 from src.orchestrator.scheduler import compute_dirty_subgraph
 
 
+DEFAULT_GITIGNORE_ENTRIES = (".worktrees/", ".report/", ".mt_prompt.md")
+
+
+def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
+    """Copy missing default policy/*.yaml templates and ensure .gitignore entries."""
+    template_directory = Path(__file__).resolve().parents[2] / "policy"
+    target_policy_directory = repository_root / "policy"
+    if template_directory.is_dir():
+        for template_path in sorted(template_directory.glob("*.yaml")):
+            destination = target_policy_directory / template_path.name
+            if not destination.exists():
+                destination.write_text(
+                    template_path.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+    gitignore_path = repository_root / ".gitignore"
+    existing_text = (
+        gitignore_path.read_text(encoding="utf-8") if gitignore_path.is_file() else ""
+    )
+    existing_lines = {line.strip() for line in existing_text.splitlines()}
+    missing = [
+        entry for entry in DEFAULT_GITIGNORE_ENTRIES if entry not in existing_lines
+    ]
+    if missing:
+        prefix = (
+            existing_text
+            if not existing_text or existing_text.endswith("\n")
+            else f"{existing_text}\n"
+        )
+        gitignore_path.write_text(
+            f"{prefix}" + "\n".join(missing) + "\n", encoding="utf-8"
+        )
+
+
 def initialize_repository(repository_root: Path) -> list[Finding]:
     """Initialize policy/, artifacts/ subdirectories, and a Git repository."""
     (repository_root / "policy").mkdir(parents=True, exist_ok=True)
     for folder in ARTIFACT_DIRECTORY_TO_TYPE:
         (repository_root / "artifacts" / folder).mkdir(parents=True, exist_ok=True)
+    _scaffold_default_policies_and_gitignore(repository_root)
     if not (repository_root / ".git").exists() and shutil.which("git"):
         subprocess.run(
             ["git", "init", "-q"], cwd=repository_root, capture_output=True, check=False

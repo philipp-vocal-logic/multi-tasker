@@ -347,7 +347,9 @@ def prepare_worker_invocation(
     )
     environment = {
         **os.environ,
-        "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+        "PYTHONPATH": os.pathsep.join(
+            (str(worktree_path), str(Path(__file__).resolve().parents[2]))
+        ),
         "MT_AGENT_ROLE": "worker-agent",
         "MT_TASK_ID": task_id,
         "MT_WRITE_FILES": ",".join(write_files),
