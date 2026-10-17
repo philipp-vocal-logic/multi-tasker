@@ -147,6 +147,50 @@ def _stage_active(target_paths: list[str] | None, prefixes: tuple[str, ...]) -> 
     return not target_paths or any(path.startswith(prefixes) for path in target_paths)
 
 
+def _select_target_documents(
+    by_identifier: dict[str, ArtifactDocument], target_paths: list[str] | None
+) -> list[ArtifactDocument]:
+    """Return all documents or only those matching target_paths when specified."""
+    if not target_paths:
+        return list(by_identifier.values())
+    target_set = set(target_paths)
+    return [doc for doc in by_identifier.values() if doc.path in target_set]
+
+
+def _check_task_and_code_stages(
+    repository_root: Path,
+    by_identifier: dict[str, ArtifactDocument],
+    target_paths: list[str] | None,
+    rules: dict[str, Any],
+) -> list[Finding]:
+    """Run TestContract, Task cycle, target_files, and Git history checks."""
+    findings: list[Finding] = []
+    if _stage_active(target_paths, ("tests/", "src/")):
+        findings.extend(
+            code_and_git_traceability.check_test_contract_coverage(
+                repository_root, by_identifier, rules
+            )
+        )
+    task_prefixes = ("artifacts/tasks/", "tests/", "src/")
+    if rules.get("forbid_dependency_cycles_in_tasks", True) and _stage_active(
+        target_paths, task_prefixes
+    ):
+        findings.extend(_check_task_cycles_and_dependencies(by_identifier))
+    if _stage_active(target_paths, task_prefixes):
+        findings.extend(
+            code_and_git_traceability.check_specification_target_files(
+                repository_root, by_identifier, target_paths, rules
+            )
+        )
+    if not target_paths:
+        findings.extend(
+            code_and_git_traceability.check_git_commit_history(
+                repository_root, by_identifier, rules
+            )
+        )
+    return findings
+
+
 def check_traceability(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
@@ -157,30 +201,14 @@ def check_traceability(
         return [Finding("policy/traceability.yaml", 1, "TRACE_POLICY_MISSING", message)]
     rules = load_yaml_file(traceability_path).get("traceability_rules", {})
     by_identifier, findings = load_all_artifacts(repository_root)
-    for document in by_identifier.values():
+    for document in _select_target_documents(by_identifier, target_paths):
         findings.extend(_check_document_references(document, by_identifier, rules))
     spec_prefixes = ("artifacts/specifications/", "artifacts/tasks/", "tests/", "src/")
     if rules.get("require_100_percent_req_ac_covered_by_spec", True) and _stage_active(
         target_paths, spec_prefixes
     ):
         findings.extend(_check_requirement_to_specification_coverage(by_identifier))
-    if _stage_active(target_paths, ("tests/", "src/")):
-        findings.extend(
-            code_and_git_traceability.check_test_contract_coverage(
-                repository_root, by_identifier, rules
-            )
-        )
-    if rules.get("forbid_dependency_cycles_in_tasks", True):
-        findings.extend(_check_task_cycles_and_dependencies(by_identifier))
-    if _stage_active(target_paths, ("artifacts/tasks/", "tests/", "src/")):
-        findings.extend(
-            code_and_git_traceability.check_specification_target_files(
-                repository_root, by_identifier, target_paths, rules
-            )
-        )
     findings.extend(
-        code_and_git_traceability.check_git_commit_history(
-            repository_root, by_identifier, rules
-        )
+        _check_task_and_code_stages(repository_root, by_identifier, target_paths, rules)
     )
     return sorted(set(findings))

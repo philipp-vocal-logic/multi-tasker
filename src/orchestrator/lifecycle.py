@@ -122,7 +122,9 @@ def approve_artifact(repository_root: Path, artifact_id: str) -> list[Finding]:
     if errors:
         return errors
     findings = run_checks(
-        repository_root, ["glossary", "schemas"], target_paths=[document.path]
+        repository_root,
+        ["glossary", "schemas", "traceability"],
+        target_paths=[document.path],
     )
     if findings:
         return findings
@@ -153,7 +155,9 @@ def resolve_escalation(
     if errors:
         return errors
     findings = run_checks(
-        repository_root, ["glossary", "schemas"], target_paths=[resolution.path]
+        repository_root,
+        ["glossary", "schemas", "traceability"],
+        target_paths=[resolution.path],
     )
     if findings:
         return findings

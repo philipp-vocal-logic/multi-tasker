@@ -2,19 +2,19 @@
 id: TASK-029
 title: Implement Target-Scoped Traceability Validation on Artifact Approval
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-010
-  - SPEC-010
+- REQ-010
+- SPEC-010
 depends_on:
-  - TASK-027
-  - TASK-028
+- TASK-027
+- TASK-028
 required_files:
-  - tests/test_lifecycle.py
-  - src/orchestrator/task_runner.py
+- tests/test_lifecycle.py
+- src/orchestrator/task_runner.py
 write_files:
-  - src/checkers/traceability_checker.py
-  - src/orchestrator/lifecycle.py
+- src/checkers/traceability_checker.py
+- src/orchestrator/lifecycle.py
 verification_cmd: pytest -q
 ---
 ## Objective
