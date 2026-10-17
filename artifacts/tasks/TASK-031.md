@@ -2,7 +2,7 @@
 id: TASK-031
 title: Implement Interaction Logger and CLI Invocation Logging
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-011
 - SPEC-011

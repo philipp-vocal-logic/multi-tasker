@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import sys
+import time
 from typing import Any
 
 from src.checkers.runner import ALL_CHECKS, run_checks
@@ -10,6 +11,7 @@ from src.cli.output import emit_findings
 from src.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
+from src.orchestrator.interaction_logger import record_cli_invocation
 from src.orchestrator.lifecycle import (
     approve_artifact,
     create_intent,
@@ -160,12 +162,10 @@ def _dispatch_lifecycle(
     return 0
 
 
-def main(argument_values: list[str] | None = None) -> int:
-    """Execute CLI command and emit low-noise output."""
-    arguments = build_parser().parse_args(argument_values)
+def _execute_command(arguments: argparse.Namespace, repository_root: Path) -> int:
+    """Dispatch parsed CLI arguments and return process exit code."""
     if arguments.command == "check":
         return _run_check_command(arguments)
-    repository_root = Path(arguments.root).resolve()
     if arguments.command == "prompt":
         return _run_prompt_command(repository_root, arguments)
     if arguments.command == "schedule":
@@ -180,6 +180,26 @@ def main(argument_values: list[str] | None = None) -> int:
             sys.stdout.write(f"{artifact_id}\n")
         return 0
     return _dispatch_lifecycle(str(arguments.command), arguments, repository_root)
+
+
+def main(argument_values: list[str] | None = None) -> int:
+    """Execute CLI command, record interaction log, and emit low-noise output."""
+    raw_arguments = (
+        list(argument_values) if argument_values is not None else sys.argv[1:]
+    )
+    arguments = build_parser().parse_args(raw_arguments)
+    repository_root = Path(arguments.root).resolve()
+    started_at = time.monotonic()
+    exit_code = _execute_command(arguments, repository_root)
+    duration_ms = int((time.monotonic() - started_at) * 1000)
+    record_cli_invocation(
+        repository_root,
+        str(arguments.command),
+        raw_arguments,
+        exit_code,
+        duration_ms,
+    )
+    return exit_code
 
 
 if __name__ == "__main__":
