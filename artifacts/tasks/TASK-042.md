@@ -13,7 +13,7 @@ required_files:
   - tests/test_stage_runner.py
 write_files:
   - tests/test_stage_runner.py
-verification_cmd: pytest -q tests/test_checkers.py
+verification_cmd: pytest -q tests/test_interaction_logging.py
 ---
 ## Objective
 Update synthetic `REQ-001` and `SPEC-001` fixture fields in `tests/test_stage_runner.py` to satisfy `minLength` and `minItems` schema rules.

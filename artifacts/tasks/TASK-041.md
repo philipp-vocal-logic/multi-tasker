@@ -15,9 +15,10 @@ required_files:
   - src/domain/parser.py
   - src/orchestrator/router.py
 write_files:
+  - src/checkers/schemas_checker.py
   - src/orchestrator/stage_runner.py
   - src/cli/main.py
-verification_cmd: pytest -q tests/test_stage_runner.py tests/test_orchestrator.py
+verification_cmd: pytest -q tests/test_checkers.py tests/test_stage_runner.py tests/test_orchestrator.py
 ---
 ## Objective
 Implement `run_declarative_pipeline` in `src/orchestrator/stage_runner.py` and wire `--pipeline` into `mt run` in `src/cli/main.py`.
