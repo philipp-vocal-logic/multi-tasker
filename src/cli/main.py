@@ -1,6 +1,7 @@
 """Zero-noise CLI entrypoint for `mt`."""
 
 import argparse
+import os
 from pathlib import Path
 import sys
 import time
@@ -8,6 +9,7 @@ from typing import Any
 
 from src.checkers.runner import ALL_CHECKS, run_checks
 from src.cli.output import emit_findings
+from src.domain.models import Finding
 from src.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
@@ -19,7 +21,7 @@ from src.orchestrator.lifecycle import (
     resolve_escalation,
 )
 from src.orchestrator.lineage import trace_lineage
-from src.orchestrator.prompt_builder import build_agent_prompt
+from src.orchestrator.prompt_builder import VALID_CONTEXT_MODES, build_agent_prompt
 from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
 from src.orchestrator.task_runner import run_scheduled_tasks
 
@@ -48,10 +50,12 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
     run_parser.add_argument("--model", default=None, dest="model")
     run_parser.add_argument("--environment", default=None, dest="environment")
+    run_parser.add_argument("--context-mode", default=None, dest="context_mode")
     run_parser.add_argument("--root", default=".", help="Repository root directory.")
     prompt_parser = subparsers.add_parser("prompt")
     prompt_parser.add_argument("agent_role", help="Canonical agent role.")
     prompt_parser.add_argument("--target", default=None, dest="target_id")
+    prompt_parser.add_argument("--context-mode", default=None, dest="context_mode")
     prompt_parser.add_argument("--root", default=".", help="Repository root directory.")
 
 
@@ -102,15 +106,40 @@ def _run_check_command(arguments: argparse.Namespace) -> int:
     return emit_findings(repository_root, findings)
 
 
+def _invoke_with_context_mode(
+    repository_root: Path, arguments: argparse.Namespace
+) -> tuple[list[str], list[Finding]]:
+    """Run scheduled tasks with temporary MT_CONTEXT_MODE override when provided."""
+    context_mode = getattr(arguments, "context_mode", None)
+    previous_mode = os.environ.get("MT_CONTEXT_MODE")
+    if context_mode is not None:
+        os.environ["MT_CONTEXT_MODE"] = str(context_mode)
+    try:
+        return run_scheduled_tasks(
+            repository_root,
+            int(arguments.max_workers),
+            arguments.agent_command,
+            arguments.model,
+            arguments.environment,
+        )
+    finally:
+        if context_mode is not None:
+            if previous_mode is None:
+                os.environ.pop("MT_CONTEXT_MODE", None)
+            else:
+                os.environ["MT_CONTEXT_MODE"] = previous_mode
+
+
 def _run_tasks_command(repository_root: Path, arguments: argparse.Namespace) -> int:
     """Execute `mt run` and output completed Task IDs or Findings."""
-    done_ids, findings = run_scheduled_tasks(
-        repository_root,
-        int(arguments.max_workers),
-        arguments.agent_command,
-        arguments.model,
-        arguments.environment,
-    )
+    context_mode = getattr(arguments, "context_mode", None)
+    if context_mode is not None and str(context_mode) not in VALID_CONTEXT_MODES:
+        message = f"Invalid context_mode '{context_mode}'."
+        finding = Finding(
+            "policy/permissions.yaml", 1, "CLI_INVALID_CONTEXT_MODE", message
+        )
+        return emit_findings(repository_root, [finding])
+    done_ids, findings = _invoke_with_context_mode(repository_root, arguments)
     if findings:
         return emit_findings(repository_root, findings)
     for task_id in done_ids:
@@ -121,7 +150,10 @@ def _run_tasks_command(repository_root: Path, arguments: argparse.Namespace) -> 
 def _run_prompt_command(repository_root: Path, arguments: argparse.Namespace) -> int:
     """Execute `mt prompt` and write synthesized role prompt or Findings."""
     prompt_text, findings = build_agent_prompt(
-        repository_root, str(arguments.agent_role), arguments.target_id
+        repository_root,
+        str(arguments.agent_role),
+        arguments.target_id,
+        getattr(arguments, "context_mode", None),
     )
     if findings:
         return emit_findings(repository_root, findings)

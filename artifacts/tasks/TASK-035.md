@@ -2,7 +2,7 @@
 id: TASK-035
 title: Wire CLI Context Mode Flag into Prompt Subcommand and Worktree Task Runner
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-012
 - SPEC-012

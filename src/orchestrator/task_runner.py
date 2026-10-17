@@ -1,7 +1,6 @@
 """Parallel Worktree Task execution runner (`mt run`)."""
 
 from concurrent.futures import ThreadPoolExecutor
-import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -19,7 +18,10 @@ from src.orchestrator.interaction_logger import (
     record_task_event,
 )
 from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
-from src.orchestrator.prompt_builder import build_agent_prompt, resolve_task_execution
+from src.orchestrator.prompt_builder import (
+    prepare_worker_invocation,
+    resolve_task_execution,
+)
 from src.orchestrator.router import route_escalation
 from src.orchestrator.scheduler import select_parallel_batch
 from src.orchestrator.worktree import (
@@ -42,14 +44,6 @@ def _list_escalations(worktree_path: Path) -> set[str]:
     }
 
 
-def _write_worktree_prompt_file(worktree_path: Path, task_id: str) -> Path:
-    """Write synthesized worker-agent prompt into worktree_path/.mt_prompt.md."""
-    prompt_text, _ = build_agent_prompt(worktree_path, "worker-agent", task_id)
-    prompt_file = worktree_path / ".mt_prompt.md"
-    prompt_file.write_text(prompt_text, encoding="utf-8")
-    return prompt_file
-
-
 def _collect_worktree_changes(
     worktree_path: Path,
     task_id: str,
@@ -66,32 +60,6 @@ def _collect_worktree_changes(
         ]
     new_escalations = sorted(_list_escalations(worktree_path) - existing_escalations)
     return new_escalations if new_escalations else write_files
-
-
-def _prepare_worker_invocation(
-    task_id: str,
-    write_files: list[str],
-    prompt_file: Path,
-    execution_context: tuple[str, str, str],
-) -> tuple[str, dict[str, str]]:
-    """Build rendered command string and subprocess environment for worker execution."""
-    command_template, environment_name, model_name = execution_context
-    rendered_command = (
-        command_template.replace("{model}", model_name)
-        .replace("{task_id}", task_id)
-        .replace("{prompt_file}", str(prompt_file))
-    )
-    environment = {
-        **os.environ,
-        "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
-        "MT_AGENT_ROLE": "worker-agent",
-        "MT_TASK_ID": task_id,
-        "MT_WRITE_FILES": ",".join(write_files),
-        "MT_PROMPT_FILE": str(prompt_file),
-        "MT_AGENT_MODEL": model_name,
-        "MT_EXECUTION_ENVIRONMENT": environment_name,
-    }
-    return rendered_command, environment
 
 
 def _run_worker_subprocess(
@@ -130,16 +98,17 @@ def _run_worker_subprocess(
 
 def _invoke_agent_in_worktree(
     worktree_path: Path,
-    task_id: str,
-    write_files: list[str],
+    document: ArtifactDocument,
     execution_context: tuple[str, str, str],
     timeout_seconds: float = 300.0,
 ) -> list[str]:
     """Execute resolved command inside worktree_path and return modified paths."""
+    task_id = str(document.frontmatter["id"])
+    write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
     existing_escalations = _list_escalations(worktree_path)
-    prompt_file = _write_worktree_prompt_file(worktree_path, task_id)
-    rendered_command, environment = _prepare_worker_invocation(
-        task_id, write_files, prompt_file, execution_context
+    prompt_file = worktree_path / ".mt_prompt.md"
+    rendered_command, environment = prepare_worker_invocation(
+        worktree_path, document, prompt_file, execution_context
     )
     try:
         details = _run_worker_subprocess(
@@ -221,7 +190,6 @@ def _resolve_and_invoke_worktree(
     execution_options: tuple[str | None, str | None, str | None],
 ) -> tuple[list[str], tuple[str | None, str, str]]:
     """Resolve execution context and invoke worker command when configured."""
-    task_id = str(document.frontmatter["id"])
     write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
     context = resolve_task_execution(worktree_path, document, execution_options)
     if context[0] and (
@@ -230,7 +198,7 @@ def _resolve_and_invoke_worktree(
         or document.frontmatter.get("execution_environment")
     ):
         changed = _invoke_agent_in_worktree(
-            worktree_path, task_id, write_files, (context[0], context[1], context[2])
+            worktree_path, document, (context[0], context[1], context[2])
         )
         return changed, context
     return write_files, context
