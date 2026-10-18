@@ -1,25 +1,27 @@
 ---
 id: TASK-061
-title: Implement BaseBranch Stage Approval Commits, Verification PYTHONPATH, and Default Environment
+title: Implement BaseBranch Stage Approval Commits, Verification PYTHONPATH, and Default
+  Environment
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-021
-  - SPEC-021
+- REQ-021
+- SPEC-021
 depends_on:
-  - TASK-060
+- TASK-060
 required_files:
-  - tests/test_stage_runner.py
-  - src/orchestrator/lifecycle.py
-  - src/orchestrator/stage_runner.py
-  - src/orchestrator/merge_gate.py
-  - src/orchestrator/prompt_builder.py
+- tests/test_stage_runner.py
+- src/orchestrator/lifecycle.py
+- src/orchestrator/stage_runner.py
+- src/orchestrator/merge_gate.py
+- src/orchestrator/prompt_builder.py
 write_files:
-  - src/orchestrator/lifecycle.py
-  - src/orchestrator/stage_runner.py
-  - src/orchestrator/merge_gate.py
-  - src/orchestrator/prompt_builder.py
-verification_cmd: "python3 -m py_compile src/orchestrator/lifecycle.py src/orchestrator/stage_runner.py src/orchestrator/merge_gate.py src/orchestrator/prompt_builder.py"
+- src/orchestrator/lifecycle.py
+- src/orchestrator/stage_runner.py
+- src/orchestrator/merge_gate.py
+- src/orchestrator/prompt_builder.py
+verification_cmd: python3 -m py_compile src/orchestrator/lifecycle.py src/orchestrator/stage_runner.py
+  src/orchestrator/merge_gate.py src/orchestrator/prompt_builder.py
 ---
 ## Objective
 Commit `BaseBranch` stage approval and `Escalation` status transitions, pass `Worktree` `PYTHONPATH` into `MergeGate` verification subprocesses, and resolve `default_environment` templates in `resolve_task_execution`.

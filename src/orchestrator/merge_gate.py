@@ -1,5 +1,6 @@
 """Deterministic MergeGate verification engine."""
 
+import os
 import shlex
 import subprocess
 from dataclasses import dataclass
@@ -64,10 +65,13 @@ def _run_verification_command(
 ) -> list[Finding]:
     """Execute deterministic verification_command and emit a Finding on failure."""
     arguments = shlex.split(command_string)
+    python_path = f"{worktree_path}{os.pathsep}{Path(__file__).parents[2]}"
+    environment = {**os.environ, "PYTHONPATH": python_path}
     try:
         process = subprocess.run(
             arguments,
             cwd=worktree_path,
+            env=environment,
             capture_output=True,
             text=True,
             check=False,

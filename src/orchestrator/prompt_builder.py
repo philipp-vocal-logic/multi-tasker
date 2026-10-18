@@ -336,10 +336,8 @@ def resolve_task_execution(
     model_name = model_override or task_model or role_model or default_model
     if agent_command:
         return agent_command, environment_name, model_name
-    if environment_override or task_env:
-        template = environments.get(environment_name)
-        return (str(template) if template else None), environment_name, model_name
-    return None, environment_name, model_name
+    template = environments.get(environment_name)
+    return (str(template) if template else None), environment_name, model_name
 
 
 def prepare_worker_invocation(

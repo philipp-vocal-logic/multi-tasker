@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from src.checkers.common import get_git_changed_files
 from src.checkers.runner import run_checks
 from src.domain.models import ArtifactDocument, Finding
 from src.domain.parser import (
@@ -19,6 +20,7 @@ from src.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
 from src.orchestrator.scheduler import compute_dirty_subgraph
+from src.orchestrator.worktree import commit_traceable_change
 
 
 DEFAULT_GITIGNORE_ENTRIES = (".worktrees/", ".report/", ".mt_prompt.md")
@@ -181,6 +183,11 @@ def approve_stage_artifact(repository_root: Path, artifact_id: str) -> None:
         )
     else:
         approve_artifact(repository_root, artifact_id)
+    changed = get_git_changed_files(repository_root)
+    subject = (
+        f"{artifact_id}: Approve stage artifact {artifact_id} [traces: {artifact_id}]"
+    )
+    commit_traceable_change(repository_root, changed, subject)
 
 
 def _create_review_escalation(
@@ -208,6 +215,14 @@ def _create_review_escalation(
         update_artifact_frontmatter(
             repository_root / target_doc.path, {"status": "blocked"}
         )
+    changed = [
+        esc_rel,
+        *([target_doc.path] if target_doc is not None else []),
+    ]
+    subject = (
+        f"{esc_id}: Escalate {artifact_id} review [traces: {artifact_id}, {esc_id}]"
+    )
+    commit_traceable_change(repository_root, changed, subject)
     message = f"Review cycles exhausted for '{artifact_id}' ({esc_id})."
     return [Finding(rev_path, 1, "STAGE_REVIEW_EXHAUSTED", message)]
 

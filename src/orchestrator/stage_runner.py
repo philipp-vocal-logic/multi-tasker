@@ -267,6 +267,11 @@ def _dispatch_routed_escalation(
             update_artifact_frontmatter(
                 repository_root / document.path, {"status": "awaiting_human"}
             )
+            commit_traceable_change(
+                repository_root,
+                [document.path],
+                f"{esc_id}: Route escalation to human [traces: {esc_id}]",
+            )
             return None
         produced, findings = run_agent_stage(repository_root, actor, esc_id, options)
         next_state = "awaiting_human" if findings else "resolved"
