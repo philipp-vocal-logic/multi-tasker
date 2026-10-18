@@ -241,3 +241,111 @@ def validate_pipeline_policy(repository_root: Path) -> list[Finding]:
                 Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_ROUTE", message)
             ]
     return []
+
+
+ARTIFACT_TYPE_TO_DIRECTORY: dict[str, str] = {
+    value: key for key, value in ARTIFACT_DIRECTORY_TO_TYPE.items()
+}
+
+
+def next_artifact_id(
+    repository_root: Path,
+    artifact_type: str,
+    reserved_ids: set[str] | None = None,
+) -> str:
+    """Compute the next sequential PREFIX-NNN identifier for artifact_type."""
+    existing = set(load_artifacts_by_id(repository_root)) | (reserved_ids or set())
+    folder = ARTIFACT_TYPE_TO_DIRECTORY.get(artifact_type)
+    if folder and (repository_root / "artifacts" / folder).is_dir():
+        for file_path in (repository_root / "artifacts" / folder).glob(
+            f"{artifact_type}-*.md"
+        ):
+            existing.add(file_path.stem)
+    numbers = [
+        int(identifier.split("-", maxsplit=1)[1])
+        for identifier in existing
+        if identifier.startswith(f"{artifact_type}-")
+        and identifier.split("-", maxsplit=1)[1].isdigit()
+    ]
+    return f"{artifact_type}-{max(numbers, default=0) + 1:03d}"
+
+
+def _rewrite_normalized_artifact(
+    worktree_path: Path,
+    relative_path: str,
+    document: ArtifactDocument,
+    id_mapping: dict[str, str],
+) -> str:
+    """Write renumbered artifact frontmatter and return its new relative path."""
+    old_id = str(document.frontmatter.get("id", Path(relative_path).stem))
+    new_id = id_mapping.get(old_id, old_id)
+    updated_frontmatter = dict(document.frontmatter)
+    updated_frontmatter["id"] = new_id
+    for list_key in (
+        "depends_on",
+        "traces_to",
+        "target_artifacts",
+        "affected_artifacts",
+    ):
+        raw_list = updated_frontmatter.get(list_key)
+        if isinstance(raw_list, list):
+            updated_frontmatter[list_key] = [
+                id_mapping.get(str(item), str(item)) for item in raw_list
+            ]
+    new_relative = Path(relative_path).with_name(f"{new_id}.md").as_posix()
+    frontmatter_yaml = yaml.safe_dump(updated_frontmatter, sort_keys=False).strip()
+    body = document.body.lstrip("\n")
+    suffix = f"\n{body}\n" if body else "\n"
+    (worktree_path / new_relative).write_text(
+        f"---\n{frontmatter_yaml}\n---{suffix}", encoding="utf-8"
+    )
+    return new_relative
+
+
+def normalize_new_stage_artifacts(
+    worktree_path: Path, existing_ids: set[str], changed_files: list[str]
+) -> list[str]:
+    """Renumber newly created stage artifacts that collide with existing_ids."""
+    batch: list[tuple[str, ArtifactDocument | None]] = [
+        (
+            rel,
+            parse_artifact_file(worktree_path / rel, rel)[0]
+            if (worktree_path / rel).is_file()
+            else None,
+        )
+        for rel in changed_files
+    ]
+    occupied = set(existing_ids) | {
+        doc_id
+        for doc_id, doc in load_artifacts_by_id(worktree_path).items()
+        if doc.path not in set(changed_files)
+    }
+    id_mapping: dict[str, str] = {}
+    for rel, document in batch:
+        if document is None or document.artifact_type == "UNKNOWN":
+            continue
+        raw_id = str(document.frontmatter.get("id", Path(rel).stem))
+        if raw_id in occupied or raw_id.endswith(("-NEW", "-000")):
+            numbers = [
+                int(item.split("-", maxsplit=1)[1])
+                for item in occupied
+                if item.startswith(f"{document.artifact_type}-")
+                and item.split("-", maxsplit=1)[1].isdigit()
+            ]
+            allocated = f"{document.artifact_type}-{max(numbers, default=0) + 1:03d}"
+            id_mapping[raw_id] = allocated
+            occupied.add(allocated)
+        else:
+            id_mapping[raw_id] = raw_id
+            occupied.add(raw_id)
+    if all(old == new for old, new in id_mapping.items()):
+        return changed_files
+    for rel, document in batch:
+        if document is not None and document.artifact_type != "UNKNOWN":
+            (worktree_path / rel).unlink(missing_ok=True)
+    return [
+        _rewrite_normalized_artifact(worktree_path, rel, document, id_mapping)
+        if document is not None and document.artifact_type != "UNKNOWN"
+        else rel
+        for rel, document in batch
+    ]

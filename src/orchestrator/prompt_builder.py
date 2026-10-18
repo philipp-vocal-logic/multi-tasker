@@ -8,7 +8,11 @@ import yaml
 
 from src.checkers.limits_checker import collect_refactoring_targets
 from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import load_artifacts_by_id, load_yaml_file
+from src.domain.parser import (
+    load_artifacts_by_id,
+    load_yaml_file,
+    next_artifact_id,
+)
 from src.orchestrator.router import CATEGORY_ROUTES
 
 ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
@@ -242,11 +246,24 @@ def _assemble_prompt_sections(
     schemas_path = repository_root / "policy" / "schemas.yaml"
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "REQ")
+    next_id = next_artifact_id(repository_root, primary_type)
+    planner_hint = (
+        f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
+        f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`) and "
+        f"`type: implementation` Task(s) (`depends_on: [{next_id}]`, `write_files` "
+        "covering `SPEC` `target_files.implementation`)."
+    )
     lines = [
         *_render_permissions_section(
             agent_role, role_configuration, global_forbidden, context_mode
         ),
         f"**Mission**: {_find_role_definition(repository_root, agent_role)}",
+        f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)",
+        (
+            f"- **Stage Verification**: Run `./mt check all --agent {agent_role} "
+            "--paths <written_files>` once; `MergeGate` runs on exit."
+        ),
+        *([planner_hint] if agent_role == "planner-agent" else []),
         "",
         "## 2. Output Schemas & Section Budgets",
         *_render_artifact_schema_block(primary_type, schemas_policy, context_mode),

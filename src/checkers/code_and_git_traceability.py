@@ -78,6 +78,34 @@ def _scan_test_contracts(
     return covered_pairs, findings
 
 
+def _is_spec_awaiting_test_contract(
+    repository_root: Path,
+    spec_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> bool:
+    """Return True if an approved SPEC still has a planned/ready TestContract Task."""
+    spec_id = str(spec_document.frontmatter.get("id", ""))
+    linked_tasks = [
+        doc
+        for doc in by_identifier.values()
+        if doc.artifact_type == "TASK"
+        and spec_id in {str(item) for item in doc.frontmatter.get("traces_to", [])}
+    ]
+    if any(
+        doc.frontmatter.get("type") == "test_contract"
+        and doc.frontmatter.get("status") in {"planned", "ready"}
+        for doc in linked_tasks
+    ):
+        return True
+    target_files = spec_document.frontmatter.get("target_files", {})
+    test_paths = target_files.get("tests", []) if isinstance(target_files, dict) else []
+    return (
+        not linked_tasks
+        and bool(test_paths)
+        and not any((repository_root / str(path)).is_file() for path in test_paths)
+    )
+
+
 def check_test_contract_coverage(
     repository_root: Path,
     by_identifier: dict[str, ArtifactDocument],
@@ -91,6 +119,9 @@ def check_test_contract_coverage(
             for document in by_identifier.values()
             if document.artifact_type == "SPEC"
             and document.frontmatter.get("status") == "approved"
+            and not _is_spec_awaiting_test_contract(
+                repository_root, document, by_identifier
+            )
             for item in document.frontmatter.get("covers_criteria", [])
             if (str(item), str(document.frontmatter.get("id", ""))) not in covered
         )
