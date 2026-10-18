@@ -12,6 +12,7 @@ from src.checkers.permissions_checker import check_permissions
 from src.checkers.schemas_checker import check_schemas
 from src.domain.models import traces
 from src.domain.parser import infer_artifact_type, load_yaml_file, parse_artifact_file
+from src.orchestrator.prompt_builder import build_agent_prompt
 
 SYNTHETIC_PERMISSIONS: dict[str, Any] = {
     "global_forbidden_write": ["policy/**"],
@@ -265,3 +266,30 @@ def test_real_policy_permissions_glossary_limits_sensitivity(tmp_path: Path) -> 
     real_schemas["artifacts"]["REQ"]["max_criterion_words"] = 5
     _write_yaml(tmp_path / "policy/schemas.yaml", real_schemas)
     assert check_schemas(tmp_path)[0].rule_id == "LIMIT_CRITERION_WORDS"
+
+
+@traces("REQ-019", "AC-01", "SPEC-019")
+@traces("REQ-019", "AC-02", "SPEC-019")
+def test_aligned_policy_limits_and_prompt_artifact_constraints() -> None:
+    """Verify aligned policy limits and role prompt artifact constraint rendering."""
+    repository_root = Path(__file__).resolve().parent.parent
+    limits_cfg = load_yaml_file(repository_root / "policy/limits.yaml")["source_code"]
+    assert limits_cfg["max_function_lines"] == 50
+    assert limits_cfg["max_function_args"] == 6
+    schemas_cfg = load_yaml_file(repository_root / "policy/schemas.yaml")
+    artifacts_cfg = schemas_cfg["artifacts"]
+    assert artifacts_cfg["REQ"]["max_criterion_words"] == 45
+    assert artifacts_cfg["TASK"]["max_write_files"] == 4
+    assert artifacts_cfg["TASK"]["max_required_files"] == 6
+    task_props = schemas_cfg["schemas"]["TASK"]["json_schema"]["properties"]
+    assert task_props["write_files"]["maxItems"] == 4
+    assert task_props["required_files"]["maxItems"] == 6
+    req_prompt, req_errors = build_agent_prompt(repository_root, "requirement-agent")
+    assert not req_errors
+    assert "- **Artifact Limit `max_criterion_words`**: `45`" in req_prompt
+    assert "- **Artifact Limit `max_acceptance_criteria`**: `5`" in req_prompt
+    assert ", single paragraph only" in req_prompt
+    plan_prompt, plan_errors = build_agent_prompt(repository_root, "planner-agent")
+    assert not plan_errors
+    assert "- **Artifact Limit `max_write_files`**: `4`" in plan_prompt
+    assert "- **Artifact Limit `max_required_files`**: `6`" in plan_prompt

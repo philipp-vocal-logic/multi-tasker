@@ -2,7 +2,7 @@
 id: TASK-056
 title: Add TestContract for Aligned Policy Limits and Prompt Artifact Limit Rendering
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-019
 - SPEC-019
