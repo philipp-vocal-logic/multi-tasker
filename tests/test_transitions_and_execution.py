@@ -316,12 +316,16 @@ def test_atomic_approve_and_failed_run_preserve_clean_base(tmp_path: Path) -> No
 
 @traces("REQ-009", "AC-01", "SPEC-009")
 @traces("REQ-009", "AC-02", "SPEC-009")
-def test_modular_refactoring_and_file_size_ceilings() -> None:
-    """Verify module decomposition, zero re-exports, and <=360 line ceilings."""
+@traces("REQ-018", "AC-01", "SPEC-018")
+@traces("REQ-018", "AC-02", "SPEC-018")
+def test_modular_refactoring_and_file_size_ceilings(tmp_path: Path) -> None:
+    """Verify module decomposition, 500-line ceiling, and 400-line refactor hints."""
     task_runner = importlib.import_module("src.orchestrator.task_runner")
     lifecycle = importlib.import_module("src.orchestrator.lifecycle")
     code_git_trace = importlib.import_module("src.checkers.code_and_git_traceability")
     traceability_module = importlib.import_module("src.checkers.traceability_checker")
+    limits_module = importlib.import_module("src.checkers.limits_checker")
+    prompt_module = importlib.import_module("src.orchestrator.prompt_builder")
     assert callable(getattr(task_runner, "run_scheduled_tasks", None))
     assert not hasattr(lifecycle, "run_scheduled_tasks")
     for func_name in (
@@ -332,7 +336,22 @@ def test_modular_refactoring_and_file_size_ceilings() -> None:
         assert callable(getattr(code_git_trace, func_name, None))
         assert not hasattr(traceability_module, func_name)
     root = Path(__file__).resolve().parent.parent
+    limits_policy = load_yaml_file(root / "policy" / "limits.yaml")["source_code"]
+    max_lines = int(limits_policy["max_file_lines"])
+    assert max_lines == 500 and int(limits_policy["refactor_target_file_lines"]) == 400
     for folder in ("src", "tests"):
         for py_file in (root / folder).rglob("*.py"):
             line_count = len(py_file.read_text(encoding="utf-8").splitlines())
-            assert line_count <= 360, f"{py_file} has {line_count} lines (>360)"
+            assert line_count <= max_lines, f"{py_file} has {line_count} lines"
+    _seed_policies(tmp_path)
+    _write_document(
+        tmp_path / "src" / "large_module.py",
+        '"""Large module."""\n' + "\n".join(f"VAL_{idx} = {idx}" for idx in range(405)),
+    )
+    assert limits_module.check_limits(tmp_path) == []
+    hints = limits_module.collect_refactoring_targets(tmp_path)
+    assert len(hints) == 1 and hints[0].rule_id == "LIMIT_REFACTOR_HINT"
+    for role in ("specification-agent", "planner-agent"):
+        prompt_text, errors = prompt_module.build_agent_prompt(tmp_path, role)
+        assert not errors and "Refactoring Targets (Warning)" in prompt_text
+        assert "src/large_module.py" in prompt_text

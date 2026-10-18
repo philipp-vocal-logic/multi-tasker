@@ -2,7 +2,7 @@
 id: TASK-054
 title: Add TestContract for 500-Line Hard Limit and 400-Line Refactoring Target Warnings
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-018
 - SPEC-018
