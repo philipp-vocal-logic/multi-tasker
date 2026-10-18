@@ -2,19 +2,19 @@
 id: TASK-062
 title: Support REV-* Identifiers in Git Commit Traceability Validation
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-021
-  - SPEC-021
+- REQ-021
+- SPEC-021
 depends_on:
-  - TASK-060
-  - TASK-061
+- TASK-060
+- TASK-061
 required_files:
-  - tests/test_stage_runner.py
-  - src/checkers/code_and_git_traceability.py
+- tests/test_stage_runner.py
+- src/checkers/code_and_git_traceability.py
 write_files:
-  - src/checkers/code_and_git_traceability.py
-verification_cmd: "pytest -q tests/test_stage_runner.py"
+- src/checkers/code_and_git_traceability.py
+verification_cmd: pytest -q tests/test_stage_runner.py
 ---
 ## Objective
 Update `DEFAULT_COMMIT_PATTERN` and `ARTIFACT_ID_REGEX` in `src/checkers/code_and_git_traceability.py` to support `REV-[A-Z0-9-]+` commit identifiers and verify `tests/test_stage_runner.py` passes.

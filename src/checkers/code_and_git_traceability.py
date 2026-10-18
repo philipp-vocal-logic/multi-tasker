@@ -15,10 +15,13 @@ from src.checkers.common import (
 from src.domain.models import ArtifactDocument, Finding
 
 DEFAULT_COMMIT_PATTERN = (
-    r"^(INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}: .+ "
-    r"\[traces: [A-Z]+-[0-9]{3,}(?:, [A-Z]+-[0-9]{3,})*\]$"
+    r"^(?:(INT|REQ|SPEC|TASK|ESC|DEC)-[0-9]{3,}|REV-[A-Z0-9-]+): .+ "
+    r"\[traces: (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+)"
+    r"(?:, (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+))*\]$"
 )
-ARTIFACT_ID_REGEX = re.compile(r"\b(?:INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}\b")
+ARTIFACT_ID_REGEX = re.compile(
+    r"\b(?:(?:INT|REQ|SPEC|TASK|ESC|DEC)-[0-9]{3,}|REV-[A-Z0-9-]+)\b"
+)
 
 
 def _check_test_function(
