@@ -14,4 +14,4 @@ traceability_rules:
   test_decorator_signature: ["req_id", "ac_id", "spec_id"]
   forbid_dependency_cycles_in_tasks: true
   verify_git_commit_traceability: true
-  commit_message_pattern: "^(INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}: .+ \\[traces: [A-Z]+-[0-9]{3,}(?:, [A-Z]+-[0-9]{3,})*\\]$"
+  commit_message_pattern: "^(?:(INT|REQ|SPEC|TASK|ESC|DEC)-[0-9]{3,}|REV-[A-Z0-9-]+): .+ \\[traces: (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+)(?:, (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+))*\\]$"
