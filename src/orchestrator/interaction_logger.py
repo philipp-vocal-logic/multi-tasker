@@ -97,6 +97,7 @@ def record_task_event(
     event_type: str,
     details: dict[str, Any],
     execution_context: tuple[str | None, str, str] | None = None,
+    agent_role: str = "worker-agent",
 ) -> Path:
     """Append a Task execution or MergeGate event to Task and repository logs."""
     logs_directory = _ensure_logs_directory(repository_root)
@@ -114,7 +115,7 @@ def record_task_event(
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "event_type": event_type,
         "task_id": task_id,
-        "agent_role": "worker-agent",
+        "agent_role": agent_role,
         "model": model_name or None,
         "environment": environment_name or None,
         "details": details,
@@ -177,3 +178,38 @@ def merge_worktree_task_logs(
         task_handle.write(joined)
     with base_events_log.open("a", encoding="utf-8") as events_handle:
         events_handle.write(joined)
+
+
+def summarize_pipeline_suitability(
+    repository_root: Path,
+    completed_ids: list[str] | None = None,
+    passed: bool = True,
+) -> dict[str, Any]:
+    """Aggregate MergeGate pass rate and per-role invocation counts and latencies."""
+    events = read_event_log(repository_root)
+    invocations = [
+        item for item in events if item.get("event_type") == "agent_invocation"
+    ]
+    gates = [item for item in events if item.get("event_type") == "merge_gate"]
+    role_counts: dict[str, int] = {}
+    role_durations: dict[str, int] = {}
+    for entry in invocations:
+        role = str(entry.get("agent_role", "worker-agent"))
+        duration = int(entry.get("details", {}).get("duration_ms", 0))
+        role_counts[role] = role_counts.get(role, 0) + 1
+        role_durations[role] = role_durations.get(role, 0) + duration
+    passed_gates = sum(
+        1 for entry in gates if entry.get("details", {}).get("passed") is True
+    )
+    total_gates = len(gates)
+    rate = round(passed_gates / total_gates, 4) if total_gates else 0.0
+    return {
+        "passed": passed,
+        "completed_artifacts": list(completed_ids or []),
+        "agent_invocations": len(invocations),
+        "merge_gate_total": total_gates,
+        "merge_gate_passed": passed_gates,
+        "gate_pass_rate": rate,
+        "role_invocations": role_counts,
+        "role_durations_ms": role_durations,
+    }

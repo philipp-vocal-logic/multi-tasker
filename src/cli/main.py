@@ -1,6 +1,7 @@
 """Zero-noise CLI entrypoint for `mt`."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import sys
@@ -13,9 +14,13 @@ from src.domain.models import Finding
 from src.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
-from src.orchestrator.interaction_logger import record_cli_invocation
+from src.orchestrator.interaction_logger import (
+    record_cli_invocation,
+    summarize_pipeline_suitability,
+)
 from src.orchestrator.lifecycle import (
     approve_artifact,
+    bootstrap_evaluation_repository,
     create_intent,
     initialize_repository,
     resolve_escalation,
@@ -36,6 +41,7 @@ def _add_run_and_prompt_parsers(subparsers: Any) -> None:
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--max-workers", type=int, default=1)
     run_parser.add_argument("--pipeline", action="store_true", dest="pipeline")
+    run_parser.add_argument("--evaluate", default=None, dest="evaluate")
     run_parser.add_argument("--agent", default=None, dest="agent_role")
     run_parser.add_argument("--target", default=None, dest="target_id")
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
@@ -127,7 +133,7 @@ def _dispatch_run_target(
 ) -> tuple[list[str], list[Finding]]:
     """Dispatch mt run to pipeline, single agent stage, or scheduled worker tasks."""
     options = (arguments.agent_command, arguments.model, arguments.environment)
-    if getattr(arguments, "pipeline", False):
+    if getattr(arguments, "pipeline", False) or getattr(arguments, "evaluate", None):
         return run_declarative_pipeline(repository_root, options)
     agent_role = getattr(arguments, "agent_role", None)
     if agent_role is not None:
@@ -180,7 +186,18 @@ def _run_tasks_command(repository_root: Path, arguments: argparse.Namespace) -> 
             "policy/permissions.yaml", 1, "CLI_INVALID_CONTEXT_MODE", message
         )
         return emit_findings(repository_root, [finding])
+    eval_intent = getattr(arguments, "evaluate", None)
+    if eval_intent:
+        bootstrap_evaluation_repository(repository_root, str(eval_intent))
     done_ids, findings = _invoke_with_context_mode(repository_root, arguments)
+    if eval_intent:
+        check_errors = run_checks(repository_root, ["all"])
+        passed = not findings and not check_errors and bool(done_ids)
+        summary = summarize_pipeline_suitability(repository_root, done_ids, passed)
+        sys.stdout.write(f"{json.dumps(summary, sort_keys=True)}\n")
+        return (
+            0 if passed else emit_findings(repository_root, [*findings, *check_errors])
+        )
     if findings:
         return emit_findings(repository_root, findings)
     for task_id in done_ids:

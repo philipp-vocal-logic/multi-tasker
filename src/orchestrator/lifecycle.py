@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
+import yaml
+
 from src.checkers.common import get_git_changed_files
 from src.checkers.runner import run_checks
 from src.domain.models import ArtifactDocument, Finding
@@ -13,6 +15,7 @@ from src.domain.parser import (
     load_artifacts_by_id,
     load_pipeline_policy,
     load_state_transitions,
+    load_yaml_file,
     update_artifact_frontmatter,
 )
 from src.orchestrator.documentation_generator import (
@@ -288,3 +291,30 @@ def resolve_escalation(
     )
     _mark_dirty_downstream(repository_root, resolved_by)
     return []
+
+
+def bootstrap_evaluation_repository(repository_root: Path, intent_text: str) -> str:
+    """Initialize a Git repository with auto INT gate and commit baseline INT-001."""
+    initialize_repository(repository_root)
+    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    if pipeline_path.is_file():
+        pipeline = load_yaml_file(pipeline_path)
+        if pipeline.get("stages"):
+            pipeline["stages"][0]["approval_gate"] = "auto"
+        pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    clean_path = repository_root / "policy" / "clean_code.yaml"
+    if clean_path.is_file() and not (repository_root / "pyproject.toml").is_file():
+        clean_policy = load_yaml_file(clean_path)
+        clean_policy["linters"]["ruff"]["enabled"] = False
+        clean_policy["linters"]["mypy"]["enabled"] = False
+        clean_path.write_text(yaml.safe_dump(clean_policy), encoding="utf-8")
+    intent_id = create_intent(repository_root, intent_text)
+    commit_msg = f"{intent_id}: Bootstrap evaluation repo [traces: {intent_id}]"
+    for git_cmd in (
+        ["git", "config", "user.email", "mt@local"],
+        ["git", "config", "user.name", "mt"],
+        ["git", "add", "."],
+        ["git", "commit", "-q", "-m", commit_msg],
+    ):
+        subprocess.run(git_cmd, cwd=repository_root, capture_output=True, check=False)
+    return intent_id

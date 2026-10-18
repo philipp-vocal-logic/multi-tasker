@@ -143,7 +143,12 @@ def _run_stage_subprocess(
             "stderr": process.stderr.strip(),
         }
         record_task_event(
-            worktree_path, target_id, "agent_invocation", details, execution_context
+            worktree_path,
+            target_id,
+            "agent_invocation",
+            details,
+            execution_context,
+            agent_role,
         )
     finally:
         prompt_file.unlink(missing_ok=True)
@@ -238,6 +243,7 @@ def run_agent_stage(
             "merge_gate",
             {"passed": outcome.passed, "changed_files": list(changed)},
             exec_ctx,
+            agent_role,
         )
         return _finalize_stage_outcome(request, target_id, outcome)
     finally:
