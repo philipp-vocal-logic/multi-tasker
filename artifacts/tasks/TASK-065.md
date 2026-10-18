@@ -2,16 +2,16 @@
 id: TASK-065
 title: Add TestContract for Programmatic ID Normalization and Streamlined Pipeline
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-023
-  - SPEC-023
+- REQ-023
+- SPEC-023
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-023.md
-  - artifacts/specifications/SPEC-023.md
+- artifacts/requirements/REQ-023.md
+- artifacts/specifications/SPEC-023.md
 write_files:
-  - tests/test_checkers.py
+- tests/test_checkers.py
 verification_cmd: python3 -m py_compile tests/test_checkers.py
 ---
 ## Objective

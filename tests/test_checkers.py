@@ -293,3 +293,68 @@ def test_aligned_policy_limits_and_prompt_artifact_constraints() -> None:
     assert not plan_errors
     assert "- **Artifact Limit `max_write_files`**: `4`" in plan_prompt
     assert "- **Artifact Limit `max_required_files`**: `6`" in plan_prompt
+
+
+def _seed_colliding_tasks_and_spec(eval_root: Path) -> None:
+    """Seed TASK-001, TASK-002, and approved SPEC-001 in eval_root."""
+    _write_text(
+        eval_root / "artifacts/tasks/TASK-001.md",
+        "---\nid: TASK-001\ntitle: T1\ntype: test_contract\nstatus: planned\n"
+        "traces_to: [REQ-001, SPEC-001]\ndepends_on: []\nrequired_files: []\n"
+        "write_files: [tests/test_a.py]\nverification_cmd: pytest\n---\n"
+        "## Objective\nO.\n\n## Scoped Instructions\nI.\n",
+    )
+    _write_text(
+        eval_root / "artifacts/tasks/TASK-002.md",
+        "---\nid: TASK-002\ntitle: T2\ntype: implementation\nstatus: planned\n"
+        "traces_to: [REQ-001, SPEC-001]\ndepends_on: [TASK-001]\n"
+        "required_files: [tests/test_a.py]\nwrite_files: [src/a.py]\n"
+        "verification_cmd: pytest\n---\n"
+        "## Objective\nO.\n\n## Scoped Instructions\nI.\n",
+    )
+    _write_text(
+        eval_root / "artifacts/specifications/SPEC-001.md",
+        "---\nid: SPEC-001\ntitle: Spec\nstatus: approved\n"
+        "traces_to: [REQ-001]\ncovers_criteria: [REQ-001:AC-01]\ndecisions: []\n"
+        "target_files: {tests: [tests/test_a.py], implementation: [src/a.py]}\n---\n",
+    )
+
+
+@traces("REQ-023", "AC-01", "SPEC-023")
+@traces("REQ-023", "AC-02", "SPEC-023")
+def test_programmatic_id_normalization_and_streamlined_pipeline_checks(
+    tmp_path: Path,
+) -> None:
+    """Verify next_artifact_id, normalize_new_stage_artifacts, and deferred AC check."""
+    from src.checkers.code_and_git_traceability import check_test_contract_coverage
+    from src.domain.parser import (
+        load_artifacts_by_id,
+        next_artifact_id,
+        normalize_new_stage_artifacts,
+    )
+    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
+
+    eval_root = tmp_path / "eval_repo"
+    bootstrap_evaluation_repository(eval_root, "Add helper.")
+    pipeline_cfg = load_yaml_file(eval_root / "policy/pipeline.yaml")
+    assert pipeline_cfg["stages"][2]["approval_gate"] == "auto"
+    assert next_artifact_id(eval_root, "INT") == "INT-002"
+    assert next_artifact_id(eval_root, "TASK") == "TASK-001"
+    _seed_colliding_tasks_and_spec(eval_root)
+    renamed = normalize_new_stage_artifacts(
+        eval_root,
+        {"TASK-001"},
+        ["artifacts/tasks/TASK-001.md", "artifacts/tasks/TASK-002.md"],
+    )
+    assert renamed == ["artifacts/tasks/TASK-002.md", "artifacts/tasks/TASK-003.md"]
+    doc_three, _ = parse_artifact_file(
+        eval_root / "artifacts/tasks/TASK-003.md", "artifacts/tasks/TASK-003.md"
+    )
+    assert doc_three is not None and doc_three.frontmatter["id"] == "TASK-003"
+    assert doc_three.frontmatter["depends_on"] == ["TASK-002"]
+    by_id = load_artifacts_by_id(eval_root)
+    assert check_test_contract_coverage(eval_root, by_id, {}) == []
+    repository_root = Path(__file__).resolve().parent.parent
+    plan_prompt, _ = build_agent_prompt(repository_root, "planner-agent")
+    assert "Assigned Next Artifact ID" in plan_prompt
+    assert "Planner Decomposition Contract" in plan_prompt
