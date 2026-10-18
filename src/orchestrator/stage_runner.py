@@ -13,6 +13,7 @@ from src.domain.parser import (
     load_artifacts_by_id,
     load_pipeline_policy,
     load_yaml_file,
+    normalize_new_stage_artifacts,
     parse_artifact_file,
     update_artifact_frontmatter,
 )
@@ -65,17 +66,22 @@ def _snapshot_artifacts(root: Path) -> dict[str, str]:
 
 
 def _detect_stage_changes(
-    worktree_path: Path, before_snapshot: dict[str, str]
+    worktree_path: Path, before_snapshot: dict[str, str], target_id: str = ""
 ) -> list[str]:
     """Return modified or created relative paths inside worktree_path."""
     git_changed = get_git_changed_files(worktree_path)
-    if git_changed:
-        return git_changed
-    return [
+    changed = git_changed or [
         path
         for path, content in sorted(_snapshot_artifacts(worktree_path).items())
         if before_snapshot.get(path) != content
     ]
+    editable = ("status: draft", "status: needs_update", "status: blocked")
+    locked_ids = {
+        Path(path).stem
+        for path, text in before_snapshot.items()
+        if Path(path).stem != target_id and not any(tag in text for tag in editable)
+    }
+    return normalize_new_stage_artifacts(worktree_path, locked_ids, changed)
 
 
 def _prepare_stage_invocation(
@@ -125,22 +131,29 @@ def _run_stage_subprocess(
     )
     started = time.monotonic()
     try:
-        process = subprocess.run(
-            shlex.split(rendered),
-            cwd=worktree_path,
-            env=environment,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=300.0,
-        )
+        try:
+            process = subprocess.run(
+                shlex.split(rendered),
+                cwd=worktree_path,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=300.0,
+            )
+            code, timed_out = process.returncode, False
+            out, err = process.stdout.strip(), process.stderr.strip()
+        except subprocess.TimeoutExpired as exc:
+            code, timed_out = -1, True
+            out = (exc.stdout or b"").decode("utf-8", errors="replace").strip()
+            err = (exc.stderr or b"").decode("utf-8", errors="replace").strip()
         details = {
             "command": rendered,
-            "return_code": process.returncode,
-            "timed_out": False,
+            "return_code": code,
+            "timed_out": timed_out,
             "duration_ms": int((time.monotonic() - started) * 1000),
-            "stdout": process.stdout.strip(),
-            "stderr": process.stderr.strip(),
+            "stdout": out,
+            "stderr": err,
         }
         record_task_event(
             worktree_path,
@@ -152,7 +165,7 @@ def _run_stage_subprocess(
         )
     finally:
         prompt_file.unlink(missing_ok=True)
-    return _detect_stage_changes(worktree_path, before)
+    return _detect_stage_changes(worktree_path, before, target_id)
 
 
 def _finalize_stage_outcome(
@@ -310,8 +323,8 @@ def _step_declarative_stage(
     produced, findings = run_agent_stage(repository_root, role, target_id, options)
     if findings or gate == "human":
         return produced, findings
-    for artifact_id in list(produced):
-        if gate == "review-agent":
+    for index, artifact_id in enumerate(list(produced)):
+        if gate == "review-agent" and index == 0:
             rev_ids, rev_findings = run_agent_stage(
                 repository_root, "review-agent", artifact_id, options
             )

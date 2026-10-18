@@ -299,8 +299,9 @@ def bootstrap_evaluation_repository(repository_root: Path, intent_text: str) -> 
     pipeline_path = repository_root / "policy" / "pipeline.yaml"
     if pipeline_path.is_file():
         pipeline = load_yaml_file(pipeline_path)
-        if pipeline.get("stages"):
-            pipeline["stages"][0]["approval_gate"] = "auto"
+        for stage in pipeline.get("stages", []):
+            if stage.get("id") in {"intent_to_requirement", "specification_to_tasks"}:
+                stage["approval_gate"] = "auto"
         pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
     clean_path = repository_root / "policy" / "clean_code.yaml"
     if clean_path.is_file() and not (repository_root / "pyproject.toml").is_file():
