@@ -46,7 +46,7 @@ artifacts:
 
   REQ:
     max_acceptance_criteria: 5
-    max_criterion_words: 35
+    max_criterion_words: 45
     required_sections:
       - "Statement"
       - "Impact Analysis"
@@ -74,8 +74,8 @@ artifacts:
         max_lines: 20
 
   TASK:
-    max_write_files: 3
-    max_required_files: 5
+    max_write_files: 4
+    max_required_files: 6
     required_sections:
       - "Objective"
       - "Scoped Instructions"
@@ -222,11 +222,12 @@ schemas:
           items: { type: "string", pattern: "^TASK-[0-9]{3,}$" }
         required_files:
           type: "array"
+          maxItems: 6
           items: { type: "string" }
         write_files:
           type: "array"
           minItems: 1
-          maxItems: 3
+          maxItems: 4
           items: { type: "string" }
         verification_cmd: { type: "string", minLength: 3 }
         model: { type: "string", minLength: 3 }
