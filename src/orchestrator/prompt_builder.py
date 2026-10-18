@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml
 
+from src.checkers.limits_checker import collect_refactoring_targets
 from src.domain.models import ArtifactDocument, Finding
 from src.domain.parser import load_artifacts_by_id, load_yaml_file
 from src.orchestrator.router import CATEGORY_ROUTES
@@ -154,6 +155,11 @@ def _render_code_and_glossary_section(
             ast_rules = load_yaml_file(clean_path).get("ast_rules", {})
             pairs = ", ".join(f"`{key}={val}`" for key, val in ast_rules.items())
             lines.append(f"- **Clean Code AST Rules**: {pairs}")
+    if agent_role in {"specification-agent", "planner-agent"}:
+        hints = collect_refactoring_targets(repository_root)
+        if hints:
+            items = ", ".join(f"`{item.path}` ({item.line} lines)" for item in hints)
+            lines.append(f"- **Refactoring Targets (Warning)**: {items}")
     return [*lines, *_render_glossary_constraints(repository_root, context_mode), ""]
 
 

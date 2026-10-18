@@ -1,8 +1,9 @@
 ---
 id: TASK-055
-title: Implement Non-Blocking 400-Line Refactoring Target Collector and Planning Prompt Warnings
+title: Implement Non-Blocking 400-Line Refactoring Target Collector and Planning Prompt
+  Warnings
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-018
 - SPEC-018

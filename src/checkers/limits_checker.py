@@ -119,6 +119,7 @@ def _check_python_file_limits(
     source_code = absolute_path.read_text(encoding="utf-8")
     lines = source_code.splitlines()
     max_file_lines = int(source_configuration.get("max_file_lines", 500))
+    _ = int(source_configuration.get("refactor_target_file_lines", 400))
     findings: list[Finding] = []
     if len(lines) > max_file_lines:
         message = f"File has {len(lines)} lines (max: {max_file_lines})."
@@ -160,3 +161,30 @@ def check_limits(
             )
         )
     return sorted(set(findings))
+
+
+def collect_refactoring_targets(
+    repository_root: Path, target_paths: list[str] | None = None
+) -> list[Finding]:
+    """Emit non-blocking LIMIT_REFACTOR_HINT Findings for files >400 lines."""
+    limits_path = repository_root / "policy" / "limits.yaml"
+    if not limits_path.exists():
+        return []
+    source_config: dict[str, Any] = load_yaml_file(limits_path).get("source_code", {})
+    refactor_target = int(source_config.get("refactor_target_file_lines", 400))
+    max_file_lines = int(source_config.get("max_file_lines", 500))
+    hints: list[Finding] = []
+    for absolute_path in collect_repository_files(
+        repository_root, target_paths, ("src", "tests"), {".py"}
+    ):
+        relative_path = absolute_path.relative_to(repository_root).as_posix()
+        line_count = len(absolute_path.read_text(encoding="utf-8").splitlines())
+        if refactor_target < line_count <= max_file_lines:
+            message = (
+                f"File has {line_count} lines "
+                f"(refactor target: {refactor_target}, max: {max_file_lines})."
+            )
+            hints.append(
+                Finding(relative_path, line_count, "LIMIT_REFACTOR_HINT", message)
+            )
+    return sorted(set(hints))
