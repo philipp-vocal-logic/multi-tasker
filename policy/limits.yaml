@@ -4,6 +4,7 @@ version: 1
 
 source_code:
   max_file_lines: 500
+  refactor_target_file_lines: 400
   max_function_lines: 40
   max_function_args: 5
   max_class_methods: 10
@@ -14,6 +15,7 @@ source_code:
 
 remediation:
   LIMIT_FILE_LINES: "Extract cohesive functions or classes into a separate module and register it in SPEC target_files and TASK write_files; never compact formatting."
+  LIMIT_REFACTOR_HINT: "Module exceeds refactor_target_file_lines; declare a submodule in SPEC target_files and schedule a refactoring Task during the next planning cycle."
   LIMIT_FUNC_LINES: "Extract cohesive helper functions; never compact multi-line expressions (ruff format will re-expand them)."
   LIMIT_FUNC_ARGS: "Group related parameters into a frozen @dataclass in src/domain/models.py."
   LIMIT_CLASS_METHODS: "Split responsibilities into smaller classes or module-level helper functions."
