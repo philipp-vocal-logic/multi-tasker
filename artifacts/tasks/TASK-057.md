@@ -2,7 +2,7 @@
 id: TASK-057
 title: Implement Aligned Function Limit Defaults and Prompt Artifact Constraint Rendering
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-019
 - SPEC-019

@@ -90,6 +90,23 @@ def _render_permissions_section(
     return [*lines, ""]
 
 
+def _render_section_budgets(artifact_rules: dict[str, Any]) -> list[str]:
+    """Render top-level artifact limits and per-section word and line budgets."""
+    lines = [
+        f"- **Artifact Limit `{key}`**: `{val}`"
+        for key, val in artifact_rules.items()
+        if key not in {"required_sections", "sections"}
+    ]
+    for name, lim in artifact_rules.get("sections", {}).items():
+        words = lim.get("max_words", "unlimited")
+        max_ln = lim.get("max_lines", "unlimited")
+        extra = ", single paragraph only" if lim.get("single_paragraph_only") else ""
+        lines.append(
+            f"- Section `## {name}`: max `{words}` words, max `{max_ln}` lines{extra}"
+        )
+    return lines
+
+
 def _render_artifact_schema_block(
     artifact_type: str, schemas_policy: dict[str, Any], context_mode: str = "inline"
 ) -> list[str]:
@@ -106,13 +123,7 @@ def _render_artifact_schema_block(
         lines.append(
             f"- **Schema Reference**: `policy/schemas.yaml` (`schemas.{artifact_type}`)"
         )
-    for name, lim in artifact_rules.get("sections", {}).items():
-        words = lim.get("max_words", "unlimited")
-        max_ln = lim.get("max_lines", "unlimited")
-        lines.append(
-            f"- Section `## {name}`: max `{words}` words, max `{max_ln}` lines"
-        )
-    return [*lines, ""]
+    return [*lines, *_render_section_budgets(artifact_rules), ""]
 
 
 def _render_glossary_constraints(repository_root: Path, context_mode: str) -> list[str]:

@@ -47,7 +47,7 @@ def _check_ast_node_limits(
     findings = _check_docstring_limits(node, relative_path, source_configuration)
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         span = getattr(node, "end_lineno", node.lineno) - node.lineno + 1
-        max_lines = int(source_configuration.get("max_function_lines", 40))
+        max_lines = int(source_configuration.get("max_function_lines", 50))
         if span > max_lines:
             message = f"Function '{node.name}' is {span} lines (max: {max_lines})."
             findings.append(
@@ -56,7 +56,7 @@ def _check_ast_node_limits(
         arguments = [
             item.arg for item in node.args.args if item.arg not in {"self", "cls"}
         ]
-        max_arguments = int(source_configuration.get("max_function_args", 5))
+        max_arguments = int(source_configuration.get("max_function_args", 6))
         if len(arguments) > max_arguments:
             message = (
                 f"Function '{node.name}' has {len(arguments)} "
