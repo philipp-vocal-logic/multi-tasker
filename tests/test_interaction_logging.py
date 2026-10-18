@@ -328,3 +328,41 @@ def test_intent_why_guidance_in_prompt_cli_and_agents_guide(
         "Intent statement describing what to change and why (or file path)."
         in intent_help
     )
+
+
+@traces("REQ-022", "AC-01", "SPEC-022")
+@traces("REQ-022", "AC-02", "SPEC-022")
+def test_pipeline_suitability_evaluation_and_per_role_telemetry(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify mt run --evaluate bootstraps repo and emits role suitability JSON."""
+    import json
+
+    stage_test_mod = importlib.import_module("tests.test_stage_runner")
+    eval_root = tmp_path / "eval_repo"
+    script_path = tmp_path / "eval_agent.py"
+    script_path.write_text(stage_test_mod._GIT_PIPELINE_SCRIPT, encoding="utf-8")
+    eval_args = [
+        "run",
+        "--evaluate",
+        "Add calculation helper to measure pipeline suitability.",
+        "--agent-command",
+        f"{sys.executable} {script_path.as_posix()}",
+        "--root",
+        str(eval_root),
+    ]
+    assert main(eval_args) == 0
+    summary = json.loads(capsys.readouterr().out.strip())
+    assert summary["passed"] is True
+    assert summary["gate_pass_rate"] == 1.0
+    assert "TASK-001" in summary["completed_artifacts"]
+    assert "TASK-002" in summary["completed_artifacts"]
+    expected_roles = {
+        "requirement-agent",
+        "specification-agent",
+        "planner-agent",
+        "review-agent",
+        "worker-agent",
+    }
+    assert set(summary["role_invocations"]) == expected_roles
+    assert set(summary["role_durations_ms"]) == expected_roles

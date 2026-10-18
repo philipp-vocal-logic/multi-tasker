@@ -365,24 +365,11 @@ _GIT_PIPELINE_SCRIPT = _PIPELINE_HELPER_SCRIPT.replace(
 
 
 def _seed_real_git_pipeline_repo(tmp_path: Path) -> str:
-    """Initialize a committed real-Git repo with auto INT gate and 2-task planner."""
-    import subprocess
-
-    _seed_test_repository(tmp_path)
-    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
-    pipeline = load_yaml_file(pipeline_path)
-    pipeline["stages"][0]["approval_gate"] = "auto"
-    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
-    assert main(["intent", "Add calculation helper.", "--root", str(tmp_path)]) == 0
+    """Bootstrap a committed real-Git repo with auto INT gate and 2-task planner."""
+    lifecycle = importlib.import_module("src.orchestrator.lifecycle")
+    lifecycle.bootstrap_evaluation_repository(tmp_path, "Add calculation helper.")
     script_path = tmp_path / ".report" / "real_git_agent.py"
     script_path.write_text(_GIT_PIPELINE_SCRIPT, encoding="utf-8")
-    for git_cmd in (
-        ["git", "config", "user.email", "mt@local"],
-        ["git", "config", "user.name", "mt"],
-        ["git", "add", "."],
-        ["git", "commit", "-q", "-m", "INT-001: Bootstrap repo [traces: INT-001]"],
-    ):
-        subprocess.run(git_cmd, cwd=tmp_path, check=True)
     return f"python3 {script_path}"
 
 
