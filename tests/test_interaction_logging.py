@@ -9,13 +9,19 @@ import yaml
 
 from src.checkers.architecture_checker import check_architecture
 from src.checkers.permissions_checker import check_permissions
-from src.cli.main import main
+import pytest
+
+from src.cli.main import build_parser, main
 from src.domain.models import ArtifactDocument, traces
 from src.domain.parser import load_yaml_file, parse_artifact_file
 from src.orchestrator.documentation_generator import (
+    generate_external_agents_guide,
     write_repository_documentation,
 )
-from src.orchestrator.prompt_builder import prepare_worker_invocation
+from src.orchestrator.prompt_builder import (
+    build_agent_prompt,
+    prepare_worker_invocation,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
@@ -300,3 +306,25 @@ def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> 
         tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
     )
     assert env["PYTHONPATH"].startswith(str(tmp_path))
+
+
+@traces("REQ-020", "AC-01", "SPEC-020")
+@traces("REQ-020", "AC-02", "SPEC-020")
+def test_intent_why_guidance_in_prompt_cli_and_agents_guide(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify Intent why guidance in RequirementAgent prompt, CLI help, and guide."""
+    prompt_text, findings = build_agent_prompt(REPOSITORY_ROOT, "requirement-agent")
+    assert findings == []
+    assert (
+        "translating its requested change and motivating reason into testable "
+        "AcceptanceCriteria and ImpactAnalysis" in prompt_text
+    )
+    assert "mt intent '<what to change and why>'" in generate_external_agents_guide()
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["intent", "--help"])
+    intent_help = capsys.readouterr().out
+    assert (
+        "Intent statement describing what to change and why (or file path)."
+        in intent_help
+    )

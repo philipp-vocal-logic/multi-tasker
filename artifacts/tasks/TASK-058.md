@@ -2,17 +2,17 @@
 id: TASK-058
 title: Add TestContract for Intent What-and-Why Guidance and RequirementAgent Mission
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-020
-  - SPEC-020
+- REQ-020
+- SPEC-020
 depends_on: []
 required_files:
-  - tests/test_interaction_logging.py
-  - src/cli/main.py
-  - src/orchestrator/documentation_generator.py
+- tests/test_interaction_logging.py
+- src/cli/main.py
+- src/orchestrator/documentation_generator.py
 write_files:
-  - tests/test_interaction_logging.py
+- tests/test_interaction_logging.py
 verification_cmd: pytest -q tests/test_lifecycle.py
 ---
 ## Objective
