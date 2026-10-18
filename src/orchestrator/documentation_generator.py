@@ -238,7 +238,7 @@ def generate_external_agents_guide() -> str:
         "## 2. Mandatory Artifact Lifecycle Workflow",
         "Never edit `src/**`, `tests/**`, `policy/**`, or `done` `TASK-NNN.md` files "
         "ad-hoc:",
-        "1. `mt intent '<goal>'` -> `artifacts/intents/INT-NNN.md`.",
+        "1. `mt intent '<what to change and why>'` -> `artifacts/intents/INT-NNN.md`.",
         "2. Author `artifacts/requirements/REQ-NNN.md` -> `mt approve REQ-NNN`.",
         "3. Author `artifacts/specifications/SPEC-NNN.md` -> `mt approve SPEC-NNN`.",
         "4. Author `artifacts/tasks/TASK-NNN.md`: `test_contract` importing "

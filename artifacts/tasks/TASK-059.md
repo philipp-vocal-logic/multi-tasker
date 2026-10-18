@@ -2,19 +2,19 @@
 id: TASK-059
 title: Implement Intent What-and-Why Guidance in CLI Parser and External Agents Guide
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-020
-  - SPEC-020
+- REQ-020
+- SPEC-020
 depends_on:
-  - TASK-058
+- TASK-058
 required_files:
-  - tests/test_interaction_logging.py
-  - src/cli/main.py
-  - src/orchestrator/documentation_generator.py
+- tests/test_interaction_logging.py
+- src/cli/main.py
+- src/orchestrator/documentation_generator.py
 write_files:
-  - src/cli/main.py
-  - src/orchestrator/documentation_generator.py
+- src/cli/main.py
+- src/orchestrator/documentation_generator.py
 verification_cmd: pytest -q tests/test_interaction_logging.py
 ---
 ## Objective

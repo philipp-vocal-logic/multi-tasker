@@ -55,8 +55,11 @@ def _add_lifecycle_parsers(subparsers: Any) -> None:
     for name in ("initialize", "documentation"):
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--root", default=".", help="Repository root directory.")
+    intent_help = "Intent statement describing what to change and why (or file path)."
+    intent_parser = subparsers.add_parser("intent", description=intent_help)
+    intent_parser.add_argument("text", help=intent_help)
+    intent_parser.add_argument("--root", default=".", help="Repository root directory.")
     for name, argument_name in (
-        ("intent", "text"),
         ("approve", "artifact_id"),
         ("trace", "target"),
     ):
