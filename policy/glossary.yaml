@@ -18,7 +18,8 @@ terms:
     category: "artifact"
     definition: >
       An immutable record (artifacts/intents/INT-NNN.md) authored by the Human
-      capturing a raw feature request, change request, or goal.
+      capturing what should be created or modified and why (the motivating reason
+      or goal).
     allowed_forms: ["Intent", "Intents", "intent", "intents", "INT"]
     code_identifiers: ["Intent", "intent", "intent_id"]
     forbidden_synonyms:
@@ -210,7 +211,8 @@ terms:
     category: "actor"
     definition: >
       The scoped LLM agent (`requirement-agent`) permitted only to create or update
-      draft/needs_update Requirement files from an Intent.
+      draft/needs_update Requirement files from an Intent, translating its requested
+      change and motivating reason into testable AcceptanceCriteria and ImpactAnalysis.
     allowed_forms: ["RequirementAgent", "Requirement Agent", "requirement-agent"]
     code_identifiers: ["RequirementAgent", "requirement_agent"]
     forbidden_synonyms:
