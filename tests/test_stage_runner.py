@@ -340,3 +340,71 @@ def test_review_record_traceability_documentation_and_stage_gate_log(
     )
     trace_findings = check_traceability(tmp_path)
     assert any(item.rule_id == "TRACE_MISSING_REF" for item in trace_findings)
+
+
+_GIT_TASK_TWO_BLOCK = (
+    "verification_cmd: python3 -c pass\\n---\\n"
+    "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')\n"
+    "    Path('artifacts/tasks/TASK-002.md').write_text("
+    "'---\\nid: TASK-002\\ntitle: Pipeline Implementation\\n"
+    "type: implementation\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
+    "depends_on: [TASK-001]\\nrequired_files: [tests/test_p.py]\\n"
+    "write_files: [src/domain/p.py]\\n"
+    "verification_cmd: pytest -q tests/test_p.py\\n"
+    "---\\n## Objective\\nImpl.\\n\\n## Scoped Instructions\\nImpl.\\n')\n"
+    "elif role == 'worker-agent' and target == 'TASK-002':\n"
+    "    Path('src/domain').mkdir(parents=True, exist_ok=True)\n"
+    '    Path(\'src/domain/p.py\').write_text(\'"""Mod."""\\n\\nVALUE = 1\\n\')'
+)
+
+_GIT_PIPELINE_SCRIPT = _PIPELINE_HELPER_SCRIPT.replace(
+    "verification_cmd: python3 -c pass\\n---\\n"
+    "## Objective\\nObj.\\n\\n## Scoped Instructions\\nInst.\\n')",
+    _GIT_TASK_TWO_BLOCK,
+).replace("v = 'fail' if target == 'TASK-001' else 'pass'", "v = 'pass'")
+
+
+def _seed_real_git_pipeline_repo(tmp_path: Path) -> str:
+    """Initialize a committed real-Git repo with auto INT gate and 2-task planner."""
+    import subprocess
+
+    _seed_test_repository(tmp_path)
+    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline = load_yaml_file(pipeline_path)
+    pipeline["stages"][0]["approval_gate"] = "auto"
+    pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    assert main(["intent", "Add calculation helper.", "--root", str(tmp_path)]) == 0
+    script_path = tmp_path / ".report" / "real_git_agent.py"
+    script_path.write_text(_GIT_PIPELINE_SCRIPT, encoding="utf-8")
+    for git_cmd in (
+        ["git", "config", "user.email", "mt@local"],
+        ["git", "config", "user.name", "mt"],
+        ["git", "add", "."],
+        ["git", "commit", "-q", "-m", "INT-001: Bootstrap repo [traces: INT-001]"],
+    ):
+        subprocess.run(git_cmd, cwd=tmp_path, check=True)
+    return f"python3 {script_path}"
+
+
+@traces("REQ-021", "AC-01", "SPEC-021")
+@traces("REQ-021", "AC-02", "SPEC-021")
+def test_real_git_pipeline_commits_verification_pythonpath_and_rev_traceability(
+    tmp_path: Path, capsys: Any
+) -> None:
+    """Verify full E2E pipeline in a real Git repo passes MergeGate and check all."""
+    from src.orchestrator.prompt_builder import resolve_task_execution
+
+    agent_cmd = _seed_real_git_pipeline_repo(tmp_path)
+    intent_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/intents/INT-001.md", "artifacts/intents/INT-001.md"
+    )
+    assert intent_doc is not None
+    default_resolved = resolve_task_execution(tmp_path, intent_doc)
+    assert default_resolved[0] is not None and "agy" in default_resolved[0]
+    capsys.readouterr()
+    run_args = ["run", "--pipeline", "--agent-command", agent_cmd, "--root"]
+    assert main([*run_args, str(tmp_path)]) == 0
+    completed = capsys.readouterr().out.strip().splitlines()
+    for expected_id in ("REQ-001", "SPEC-001", "REV-SPEC-001", "TASK-001", "TASK-002"):
+        assert expected_id in completed
+    assert main(["check", "all", "--root", str(tmp_path)]) == 0
