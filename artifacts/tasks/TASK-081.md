@@ -2,7 +2,7 @@
 id: TASK-081
 title: TestContracts for Decorator Guidance and Pipeline Worker Default
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-030
 - SPEC-030
