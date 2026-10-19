@@ -9,7 +9,11 @@ from multi_tasker.domain.parser import (
     load_state_transitions,
     load_yaml_file,
 )
-from multi_tasker.orchestrator.lineage import collect_test_trace_links
+from multi_tasker.orchestrator.lineage import (
+    group_artifacts_by_intent,
+    render_test_and_coverage_section,
+)
+from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 
 
 def _render_architecture_section(repository_root: Path) -> list[str]:
@@ -135,7 +139,7 @@ def _render_limits_and_glossary_section(repository_root: Path) -> list[str]:
 def _append_artifact_trace_edges(
     by_identifier: dict[str, ArtifactDocument], lines: list[str]
 ) -> None:
-    """Append Mermaid flowchart nodes and edges for repository artifacts."""
+    """Append Mermaid flowchart nodes and edges for a subgraph of artifacts."""
     for artifact_id, document in sorted(by_identifier.items()):
         title = str(
             document.frontmatter.get(
@@ -150,36 +154,96 @@ def _append_artifact_trace_edges(
         safe_id = artifact_id.replace("-", "_")
         lines.append(f'    {safe_id}["{artifact_id}: {title} ({status})"]')
         for upstream in document.frontmatter.get("traces_to", []):
-            upstream_safe = str(upstream).replace("-", "_")
-            lines.append(f"    {upstream_safe} --> {safe_id}")
+            if str(upstream) in by_identifier:
+                upstream_safe = str(upstream).replace("-", "_")
+                lines.append(f"    {upstream_safe} --> {safe_id}")
         for dependency in (
             *document.frontmatter.get("depends_on", []),
             *document.frontmatter.get("target_artifacts", []),
         ):
-            dependency_safe = str(dependency).replace("-", "_")
-            lines.append(f"    {dependency_safe} -.-> {safe_id}")
+            if str(dependency) in by_identifier:
+                dependency_safe = str(dependency).replace("-", "_")
+                lines.append(f"    {dependency_safe} -.-> {safe_id}")
 
 
 def _render_traceability_section(repository_root: Path) -> list[str]:
-    """Render live artifact inventory, Mermaid traceability graph, and test links."""
+    """Render per-Intent Mermaid traceability subgraphs and unlinked fallback."""
     by_identifier = load_artifacts_by_id(repository_root)
+    groups = group_artifacts_by_intent(by_identifier)
+    lines = ["## 5. Live Repository Traceability Graph", ""]
+    if not groups:
+        lines.extend(["```mermaid", "flowchart TD", "```", ""])
+        return lines
+    for heading, subgraph_docs in groups:
+        lines.extend([f"### {heading}", "", "```mermaid", "flowchart TD"])
+        _append_artifact_trace_edges(subgraph_docs, lines)
+        lines.extend(["```", ""])
+    return lines
+
+
+def _render_pipeline_section(repository_root: Path) -> list[str]:
+    """Render Declarative Agent Pipeline & Escalation Routing Mermaid flowchart."""
+    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    policy = load_yaml_file(pipeline_path) if pipeline_path.exists() else {}
+    bounds: dict[str, Any] = policy.get("execution_bounds", {})
+    stages: list[dict[str, Any]] = policy.get("stages", [])
+    routes: dict[str, Any] = policy.get("escalation_routes", {})
+    bounds_summary = ", ".join(f"`{key}={val}`" for key, val in sorted(bounds.items()))
     lines = [
-        "## 5. Live Repository Traceability Graph",
+        "## 6. Declarative Agent Pipeline & Escalation Routing",
+        "",
+        f"- **Execution Bounds**: {bounds_summary or 'default'}",
         "",
         "```mermaid",
         "flowchart TD",
     ]
-    _append_artifact_trace_edges(by_identifier, lines)
-    lines.extend(["```", "", "### Verified TestContract Links", ""])
-    for (
-        requirement_id,
-        criterion_id,
-        specification_id,
-        location,
-    ) in collect_test_trace_links(repository_root):
-        pair = f"`{requirement_id}:{criterion_id}` (`{specification_id}`)"
-        lines.append(f"- `{location}` $\\rightarrow$ {pair}")
-    lines.append("")
+    for stage in stages:
+        stage_id = str(stage.get("id", ""))
+        trigger = str(stage.get("trigger_type", ""))
+        states = ", ".join(str(item) for item in stage.get("trigger_states", []))
+        role = str(stage.get("agent_role", ""))
+        gate = str(stage.get("approval_gate", ""))
+        downstream = str(stage.get("downstream_type", ""))
+        role_id = role.replace("-", "_")
+        role_node = f'{role_id}["{role} (gate: {gate})"]'
+        lines.append(
+            f'    {trigger}["{trigger} ({states})"] -->|"{stage_id}"| {role_node}'
+        )
+        lines.append(f'    {role_id} --> {downstream}["{downstream}"]')
+    for category, route in sorted(routes.items()):
+        actor = str(route.get("target_actor", ""))
+        action = str(route.get("action", ""))
+        next_status = str(route.get("next_status", ""))
+        actor_id = actor.replace("-", "_")
+        lines.append(
+            f'    ESC_{category}["ESC: {category}"] '
+            f'-.->|"{action} ({next_status})"| {actor_id}["{actor}"]'
+        )
+    lines.extend(["```", ""])
+    return lines
+
+
+def _render_example_prompts_section(repository_root: Path) -> list[str]:
+    """Render collapsible 4-backtick role prompt examples for all configured roles."""
+    permissions_path = repository_root / "policy" / "permissions.yaml"
+    permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
+    role_names = list(permissions.get("agents", {}).keys())
+    lines = ["## 7. Generated Example Agent Instructions", ""]
+    for role_name in role_names:
+        prompt_text, _ = build_agent_prompt(repository_root, str(role_name))
+        lines.extend(
+            [
+                "<details>",
+                f"<summary>Role Prompt: <code>{role_name}</code></summary>",
+                "",
+                "````markdown",
+                prompt_text.strip(),
+                "````",
+                "",
+                "</details>",
+                "",
+            ]
+        )
     return lines
 
 
@@ -193,6 +257,9 @@ def generate_repository_documentation(repository_root: Path) -> str:
         *_render_state_lifecycles_section(repository_root),
         *_render_limits_and_glossary_section(repository_root),
         *_render_traceability_section(repository_root),
+        *_render_pipeline_section(repository_root),
+        *_render_example_prompts_section(repository_root),
+        *render_test_and_coverage_section(repository_root),
     ]
     return "\n".join(sections).strip() + "\n"
 
@@ -221,7 +288,7 @@ def generate_external_agents_guide() -> str:
         "`policy/glossary.yaml`)**:",
         "   - Replace `layers` (`paths`, `allowed_internal_imports`, "
         "`forbidden_internal_imports`) and `allowed_third_party_packages` (keep "
-        '`"multi_tasker"` and `"pytest"`).',
+        "'\"multi_tasker\"' and '\"pytest\"').",
         "   - Keep core `mt` orchestration terms and agent roles in "
         "`policy/glossary.yaml` and append project domain terms.",
         "3. **Tune Use-Case Policies (`policy/pipeline.yaml`, "

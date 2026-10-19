@@ -1,8 +1,9 @@
 ---
 id: TASK-086
-title: Implement Per-Intent Graphs, Pipeline Diagram, Example Prompts, and Coverage Report
+title: Implement Per-Intent Graphs, Pipeline Diagram, Example Prompts, and Coverage
+  Report
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-032
 - SPEC-032
