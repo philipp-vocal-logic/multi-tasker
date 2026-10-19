@@ -358,3 +358,30 @@ def test_programmatic_id_normalization_and_streamlined_pipeline_checks(
     plan_prompt, _ = build_agent_prompt(repository_root, "planner-agent")
     assert "Assigned Next Artifact ID" in plan_prompt
     assert "Planner Decomposition Contract" in plan_prompt
+
+
+@traces("REQ-024", "AC-01", "SPEC-024")
+def test_gitignore_scaffolding_and_changed_files_exclude_python_caches(
+    tmp_path: Path,
+) -> None:
+    """Verify .gitignore and get_git_changed_files exclude Python cache files."""
+    import subprocess
+    from src.checkers.common import get_git_changed_files
+    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
+
+    eval_root = tmp_path / "cache_repo"
+    bootstrap_evaluation_repository(eval_root, "Verify cache ignore.")
+    gitignore = (eval_root / ".gitignore").read_text(encoding="utf-8")
+    for pattern in ("__pycache__/", "*.py[cod]", ".pytest_cache/"):
+        assert pattern in gitignore
+    (eval_root / ".gitignore").write_text(".worktrees/\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "commit", "-am", "INT-001: Trim gitignore [traces: INT-001]"],
+        cwd=eval_root,
+        capture_output=True,
+        check=True,
+    )
+    _write_text(eval_root / "tests/__pycache__/test_x.cpython-312.pyc", "bytecode")
+    _write_text(eval_root / ".pytest_cache/v/cache/nodeids", "[]")
+    _write_text(eval_root / "tests/test_x.py", "def test_x() -> None:\n    pass\n")
+    assert get_git_changed_files(eval_root) == ["tests/test_x.py"]

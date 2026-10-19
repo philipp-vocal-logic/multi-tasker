@@ -2,16 +2,16 @@
 id: TASK-068
 title: Add TestContract for Ephemeral Python and Pytest Cache Filtering
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-024
-  - SPEC-024
+- REQ-024
+- SPEC-024
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-024.md
-  - artifacts/specifications/SPEC-024.md
+- artifacts/requirements/REQ-024.md
+- artifacts/specifications/SPEC-024.md
 write_files:
-  - tests/test_checkers.py
+- tests/test_checkers.py
 verification_cmd: python3 -m py_compile tests/test_checkers.py
 ---
 ## Objective
