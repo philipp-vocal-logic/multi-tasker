@@ -9,6 +9,16 @@ from typing import Any
 from src.domain.models import Finding
 
 
+def _is_ephemeral_git_entry(entry: str) -> bool:
+    """Return True if a git status path is an ephemeral worktree or cache file."""
+    parts = Path(entry).parts
+    return (
+        entry.startswith((".worktrees/", ".pytest_cache/"))
+        or "__pycache__" in parts
+        or entry.endswith((".pyc", ".pyo", ".pyd"))
+    )
+
+
 def get_git_changed_files(repository_root: Path) -> list[str]:
     """Return modified and untracked relative file paths from git status."""
     if not (repository_root / ".git").exists():
@@ -37,7 +47,7 @@ def get_git_changed_files(repository_root: Path) -> list[str]:
             entry = raw_line[3:].strip()
             if " -> " in entry:
                 entry = entry.split(" -> ", maxsplit=1)[1].strip()
-            if not entry.startswith(".worktrees/"):
+            if not _is_ephemeral_git_entry(entry):
                 paths.append(entry)
     return sorted(set(paths))
 

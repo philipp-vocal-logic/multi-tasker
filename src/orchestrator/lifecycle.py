@@ -26,7 +26,14 @@ from src.orchestrator.scheduler import compute_dirty_subgraph
 from src.orchestrator.worktree import commit_traceable_change
 
 
-DEFAULT_GITIGNORE_ENTRIES = (".worktrees/", ".report/", ".mt_prompt.md")
+DEFAULT_GITIGNORE_ENTRIES = (
+    ".worktrees/",
+    ".report/",
+    ".mt_prompt.md",
+    "__pycache__/",
+    "*.py[cod]",
+    ".pytest_cache/",
+)
 
 
 def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:

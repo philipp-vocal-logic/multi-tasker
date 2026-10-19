@@ -2,18 +2,18 @@
 id: TASK-069
 title: Implement Ephemeral Cache Filtering in Lifecycle Gitignore and Git Status
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-024
-  - SPEC-024
+- REQ-024
+- SPEC-024
 depends_on:
-  - TASK-068
+- TASK-068
 required_files:
-  - artifacts/specifications/SPEC-024.md
-  - tests/test_checkers.py
+- artifacts/specifications/SPEC-024.md
+- tests/test_checkers.py
 write_files:
-  - src/orchestrator/lifecycle.py
-  - src/checkers/common.py
+- src/orchestrator/lifecycle.py
+- src/checkers/common.py
 verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective
