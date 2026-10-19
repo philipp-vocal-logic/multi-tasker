@@ -19,7 +19,6 @@ ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
     "requirement-agent": "REQ",
     "specification-agent": "SPEC",
     "planner-agent": "TASK",
-    "worker-agent": "TASK",
     "review-agent": "REV",
 }
 
@@ -37,10 +36,23 @@ def _find_role_definition(repository_root: Path, agent_role: str) -> str:
     return f"Scoped agent role `{agent_role}`."
 
 
+def _resolve_rule_write_path(
+    rule: dict[str, Any], target_doc: ArtifactDocument | None
+) -> str:
+    """Expand $TASK_WRITE_FILES to target_doc write_files when available."""
+    raw_path = str(rule.get("path", ""))
+    if raw_path == "$TASK_WRITE_FILES" and target_doc is not None:
+        writes = [str(item) for item in target_doc.frontmatter.get("write_files", [])]
+        if writes:
+            return ", ".join(writes)
+    return raw_path
+
+
 def _render_permissions_section(
     agent_role: str,
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
+    target_doc: ArtifactDocument | None = None,
 ) -> list[str]:
     """Render WriteScope, state transitions, and escalation rules for agent_role."""
     lines = [
@@ -50,6 +62,7 @@ def _render_permissions_section(
         f"- **Global Forbidden Writes**: `{', '.join(global_forbidden) or 'none'}`",
     ]
     for rule in role_configuration.get("allowed_write", []):
+        path = _resolve_rule_write_path(rule, target_doc)
         existing = ", ".join(
             str(state) for state in rule.get("allowed_existing_states", [])
         )
@@ -57,7 +70,7 @@ def _render_permissions_section(
             str(state) for state in rule.get("allowed_target_states", [])
         )
         lines.append(
-            f"- **Allowed Write**: `{rule.get('path', '')}` "
+            f"- **Allowed Write**: `{path}` "
             f"(existing: `{existing or 'task-scoped'}` -> target: `{targets or 'any'}`)"
         )
     escalation_rules = role_configuration.get("escalation_write", [])
@@ -220,22 +233,56 @@ def _render_target_context_section(
     return lines
 
 
+def _build_execution_steps(
+    agent_role: str,
+    target_doc: ArtifactDocument | None,
+    next_id: str | None,
+) -> list[str]:
+    """Build concrete 3-step Execution Steps for agent_role and target_doc."""
+    target_id = str(target_doc.frontmatter.get("id", "")) if target_doc else "<task_id>"
+    write_paths = (
+        " ".join(str(item) for item in target_doc.frontmatter.get("write_files", []))
+        if target_doc and target_doc.frontmatter.get("write_files")
+        else "<written_files>"
+    )
+    ver_cmd = (
+        str(target_doc.frontmatter.get("verification_cmd", "")).strip()
+        if target_doc
+        else ""
+    )
+    task_flag = f"--task {target_id} " if agent_role == "worker-agent" else ""
+    suffix = f" && {ver_cmd}" if agent_role == "worker-agent" and ver_cmd else ""
+    verify_cmd = (
+        f"mt check all --agent {agent_role} {task_flag}--paths {write_paths}{suffix}"
+    )
+    status_hint = (
+        " (`status: in_review` for `REQ`/`SPEC`, `status: ready` for `TASK`, "
+        "`verdict: pass|fail` for `REV`)"
+        if next_id is not None
+        else ""
+    )
+    return [
+        "- **Execution Steps**:",
+        f"  1. Author the target file(s) in `Allowed Write`{status_hint} directly "
+        "from the schemas, constraints, and inlined context below.",
+        f"  2. Verify once by running `{verify_cmd}`.",
+        "  3. Finish and return a brief summary immediately once Step 2 exits with "
+        "code `0` and empty `mt check` stdout (`MergeGate` commits on exit).",
+    ]
+
+
 def _assemble_prompt_sections(
     repository_root: Path,
     agent_role: str,
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
-    target_id: str | None = None,
+    target_doc: ArtifactDocument | None = None,
 ) -> list[str]:
     """Assemble permissions, mission, execution steps, schemas, and vocabulary."""
     schemas_path = repository_root / "policy" / "schemas.yaml"
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
-    primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "REQ")
-    next_id = next_artifact_id(repository_root, primary_type)
-    task_flag = (
-        f"--task {target_id or '<task_id>'} " if agent_role == "worker-agent" else ""
-    )
-    verify_cmd = f"mt check all --agent {agent_role} {task_flag}--paths <written_files>"
+    primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role)
+    next_id = next_artifact_id(repository_root, primary_type) if primary_type else None
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
         f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
@@ -246,23 +293,27 @@ def _assemble_prompt_sections(
         "`verification_cmd: pytest -q <test_file>`)."
     )
     lines = [
-        *_render_permissions_section(agent_role, role_configuration, global_forbidden),
+        *_render_permissions_section(
+            agent_role, role_configuration, global_forbidden, target_doc
+        ),
         f"**Mission**: {_find_role_definition(repository_root, agent_role)}",
-        f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)",
+        *(
+            [f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)"]
+            if next_id
+            else []
+        ),
         "- **Self-Contained Context**: All required Policy schemas, section budgets, "
         "Architecture layers, Glossary terms, and upstream artifacts are provided "
         "below in this document.",
-        "- **Execution Steps**:",
-        "  1. Author the target file(s) in `Allowed Write` directly from the "
-        "schemas, constraints, and context below.",
-        f"  2. Verify the written file(s) by running `{verify_cmd}` "
-        "(and `verification_cmd` for `worker-agent`) once.",
-        "  3. Finish and return a brief summary immediately once verification "
-        "exits with code `0` and empty `stdout` (`MergeGate` runs on exit).",
+        *_build_execution_steps(agent_role, target_doc, next_id),
         *([planner_hint] if agent_role == "planner-agent" else []),
         "",
         "## 2. Output Schemas & Section Budgets",
-        *_render_artifact_schema_block(primary_type, schemas_policy),
+        *(
+            _render_artifact_schema_block(primary_type, schemas_policy)
+            if primary_type
+            else []
+        ),
     ]
     if role_configuration.get("escalation_write"):
         lines.extend(_render_artifact_schema_block("ESC", schemas_policy))
@@ -291,7 +342,7 @@ def build_agent_prompt(
         return "", [Finding(target_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
     forbidden = [str(item) for item in permissions.get("global_forbidden_write", [])]
     lines = _assemble_prompt_sections(
-        repository_root, agent_role, agents[agent_role], forbidden, target_id
+        repository_root, agent_role, agents[agent_role], forbidden, target_doc
     )
     if target_doc is not None:
         lines.extend(_render_target_context_section(repository_root, target_doc, by_id))
