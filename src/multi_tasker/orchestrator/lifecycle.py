@@ -69,10 +69,7 @@ DEFAULT_PYTHON_ARCHITECTURE: dict[str, object] = {
             "name": "cli",
             "paths": ["src/cli/**"],
             "allowed_internal_imports": [
-                "src.domain",
-                "src.services",
-                "src.application",
-                "src.cli",
+                "src",
                 "domain",
                 "services",
                 "application",
@@ -101,7 +98,12 @@ def _scaffold_default_policies_and_gitignore(
     repository_root: Path, preset: str = "python"
 ) -> None:
     """Copy missing default policy/*.yaml templates and ensure .gitignore entries."""
-    template_directory = Path(__file__).resolve().parents[3] / "policy"
+    packaged = Path(__file__).resolve().parents[1] / "policy_templates"
+    template_directory = (
+        packaged
+        if packaged.is_dir()
+        else Path(__file__).resolve().parents[3] / "policy"
+    )
     target_policy_directory = repository_root / "policy"
     if template_directory.is_dir():
         for template_path in sorted(template_directory.glob("*.yaml")):

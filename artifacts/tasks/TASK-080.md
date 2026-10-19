@@ -2,7 +2,7 @@
 id: TASK-080
 title: Implement Wheel Policy Template Resolution in Lifecycle
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-029
 - SPEC-029
