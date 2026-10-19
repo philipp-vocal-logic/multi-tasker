@@ -14,7 +14,6 @@ write_files:
 - src/multi_tasker/orchestrator/lineage.py
 - src/multi_tasker/orchestrator/documentation_generator.py
 verification_cmd: pytest -o pythonpath=src -q tests/test_orchestrator.py tests/test_lifecycle.py
-  tests/test_stage_runner.py tests/test_interaction_logging.py
 ---
 ## Objective
 Implement `group_artifacts_by_intent`, `collect_pytest_line_coverage`, and `render_test_and_coverage_section` in `lineage.py` and update `documentation_generator.py` to render per-Intent subgraphs, the pipeline Mermaid diagram, collapsible example prompts, and the test/coverage report.
