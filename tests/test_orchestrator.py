@@ -343,3 +343,66 @@ def test_role_prompt_synthesis_and_context_assembly(
     assert "### Artifact `TASK-002`" in scoped_output
     assert "### Artifact `SPEC-001`" in scoped_output
     assert "### Required File `tests/test_checkers.py`" in scoped_output
+
+
+def _seed_spec_report_fixture(tmp_path: Path) -> None:
+    """Seed Intents, orphan Requirement, and sample module/test for report checks."""
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    assert main(["intent", "First intent.", "--root", str(tmp_path)]) == 0
+    assert main(["intent", "Second intent.", "--root", str(tmp_path)]) == 0
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-001.md",
+        "---\nid: REQ-001\ntitle: Req One\nstatus: approved\n"
+        "traces_to: [INT-001]\nacceptance_criteria: [{id: AC-01}]\n---\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-099.md",
+        "---\nid: REQ-099\ntitle: Orphan Req\nstatus: draft\ntraces_to: []\n---\n",
+    )
+    _write_document(
+        tmp_path / "src/sample_mod.py",
+        "def compute_sum(left: int, right: int) -> int:\n    return left + right\n",
+    )
+    _write_document(
+        tmp_path / "tests/test_sample_mod.py",
+        "from multi_tasker.domain.models import traces\n"
+        "from sample_mod import compute_sum\n\n"
+        '@traces("REQ-001", "AC-01", "SPEC-001")\n'
+        "def test_compute_sum() -> None:\n"
+        "    assert compute_sum(2, 3) == 5\n",
+    )
+
+
+@traces("REQ-032", "AC-01", "SPEC-032")
+@traces("REQ-032", "AC-02", "SPEC-032")
+@traces("REQ-032", "AC-03", "SPEC-032")
+def test_specification_report_intent_graphs_pipeline_prompts_and_coverage(
+    tmp_path: Path,
+) -> None:
+    """Verify per-Intent graphs, pipeline diagram, example prompts, and coverage."""
+    from multi_tasker.orchestrator.documentation_generator import (
+        write_repository_documentation,
+    )
+    from multi_tasker.orchestrator.lineage import collect_pytest_line_coverage
+
+    _seed_spec_report_fixture(tmp_path)
+    cov_data = collect_pytest_line_coverage(tmp_path)
+    assert cov_data["exit_code"] == 0 and cov_data["covered_lines"] >= 2
+    report_text = write_repository_documentation(tmp_path).read_text(encoding="utf-8")
+    for expected in (
+        "### INT-001",
+        "### INT-002",
+        "### Unlinked Artifacts",
+        "## 6. Declarative Agent Pipeline & Escalation Routing",
+        "intent_to_requirement",
+        "infeasible_scope",
+        "## 7. Generated Example Agent Instructions",
+        "<details>",
+        "````markdown",
+        "# Role Prompt: `worker-agent`",
+        "## 8. Test & Code Coverage Report",
+        "`src/sample_mod.py`",
+        "100.0%",
+    ):
+        assert expected in report_text
+    assert "### Verified TestContract Links" not in report_text

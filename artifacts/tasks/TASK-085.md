@@ -1,8 +1,9 @@
 ---
 id: TASK-085
-title: TestContracts for Per-Intent Traceability Graphs, Pipeline Diagram, Example Prompts, and Coverage
+title: TestContracts for Per-Intent Traceability Graphs, Pipeline Diagram, Example
+  Prompts, and Coverage
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-032
 - SPEC-032
