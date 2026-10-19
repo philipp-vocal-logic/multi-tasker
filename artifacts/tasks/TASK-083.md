@@ -2,7 +2,7 @@
 id: TASK-083
 title: TestContracts for Streamlined Worker and Stage Role Prompts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-031
 - SPEC-031

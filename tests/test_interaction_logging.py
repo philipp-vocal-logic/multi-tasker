@@ -199,6 +199,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
     assert "./mt check all" not in prompt_output
     assert "Architecture Layers" in prompt_output
     assert '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")' in prompt_output
+    assert "### `TASK` Output Contract" not in prompt_output
+    assert "&& pytest -q tests/test_checkers.py" in prompt_output
     assert "Forbidden Synonyms" in prompt_output
     assert "def test_permissions_checker_matrix" in prompt_output
     assert "class Finding" in prompt_output
@@ -208,6 +210,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
 @traces("REQ-028", "AC-01", "SPEC-028")
 @traces("REQ-030", "AC-01", "SPEC-030")
 @traces("REQ-030", "AC-02", "SPEC-030")
+@traces("REQ-031", "AC-01", "SPEC-031")
+@traces("REQ-031", "AC-02", "SPEC-031")
 def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
     """Verify self-contained prompt synthesis and Worktree execution."""
     _assert_self_contained_prompt_output(capsys)
