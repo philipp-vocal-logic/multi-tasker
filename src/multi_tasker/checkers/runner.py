@@ -2,14 +2,14 @@
 
 from pathlib import Path
 
-from src.checkers.architecture_checker import check_architecture
-from src.checkers.clean_code_checker import check_clean_code
-from src.checkers.glossary_checker import check_glossary
-from src.checkers.limits_checker import check_limits
-from src.checkers.permissions_checker import check_permissions
-from src.checkers.schemas_checker import check_schemas
-from src.checkers.traceability_checker import check_traceability
-from src.domain.models import Finding
+from multi_tasker.checkers.architecture_checker import check_architecture
+from multi_tasker.checkers.clean_code_checker import check_clean_code
+from multi_tasker.checkers.glossary_checker import check_glossary
+from multi_tasker.checkers.limits_checker import check_limits
+from multi_tasker.checkers.permissions_checker import check_permissions
+from multi_tasker.checkers.schemas_checker import check_schemas
+from multi_tasker.checkers.traceability_checker import check_traceability
+from multi_tasker.domain.models import Finding
 
 ALL_CHECKS: tuple[str, ...] = (
     "permissions",

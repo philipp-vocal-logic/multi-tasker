@@ -8,32 +8,38 @@ import sys
 import time
 from typing import Any
 
-from src.checkers.runner import ALL_CHECKS, run_checks
-from src.cli.output import emit_findings
-from src.domain.models import Finding
-from src.orchestrator.documentation_generator import (
+from multi_tasker.checkers.runner import ALL_CHECKS, run_checks
+from multi_tasker.cli.output import emit_findings
+from multi_tasker.domain.models import Finding
+from multi_tasker.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
-from src.orchestrator.interaction_logger import (
+from multi_tasker.orchestrator.interaction_logger import (
     record_cli_invocation,
     summarize_pipeline_suitability,
 )
-from src.orchestrator.lifecycle import (
+from multi_tasker.orchestrator.lifecycle import (
     approve_artifact,
     bootstrap_evaluation_repository,
     create_intent,
     initialize_repository,
     resolve_escalation,
 )
-from src.orchestrator.lineage import trace_lineage
-from src.orchestrator.prompt_builder import VALID_CONTEXT_MODES, build_agent_prompt
-from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
-from src.orchestrator.stage_runner import (
+from multi_tasker.orchestrator.lineage import trace_lineage
+from multi_tasker.orchestrator.prompt_builder import (
+    VALID_CONTEXT_MODES,
+    build_agent_prompt,
+)
+from multi_tasker.orchestrator.scheduler import (
+    compute_dirty_subgraph,
+    select_parallel_batch,
+)
+from multi_tasker.orchestrator.stage_runner import (
     is_worktree_agent_enabled,
     run_agent_stage,
     run_declarative_pipeline,
 )
-from src.orchestrator.task_runner import run_scheduled_tasks
+from multi_tasker.orchestrator.task_runner import run_scheduled_tasks
 
 
 def _add_run_and_prompt_parsers(subparsers: Any) -> None:

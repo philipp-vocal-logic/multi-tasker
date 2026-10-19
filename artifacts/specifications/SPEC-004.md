@@ -14,15 +14,15 @@ target_files:
     - tests/test_lifecycle.py
     - tests/test_traceability_and_cli.py
   implementation:
-    - src/orchestrator/prompt_builder.py
-    - src/orchestrator/merge_gate.py
-    - src/orchestrator/lifecycle.py
-    - src/checkers/common.py
-    - src/checkers/traceability_checker.py
-    - src/cli/main.py
+    - src/multi_tasker/orchestrator/prompt_builder.py
+    - src/multi_tasker/orchestrator/merge_gate.py
+    - src/multi_tasker/orchestrator/lifecycle.py
+    - src/multi_tasker/checkers/common.py
+    - src/multi_tasker/checkers/traceability_checker.py
+    - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Implement `src/orchestrator/prompt_builder.py` (`build_agent_prompt`) and `mt prompt` in `src/cli/main.py`, enforce subprocess timeouts in `src/orchestrator/merge_gate.py` and `src/orchestrator/lifecycle.py`, transition upstream `Intent` status to `processed` in `approve_artifact`, and enforce `Task` commit `WriteScope` and `Intent` coverage in `src/checkers/traceability_checker.py`.
+Implement `src/multi_tasker/orchestrator/prompt_builder.py` (`build_agent_prompt`) and `mt prompt` in `src/multi_tasker/cli/main.py`, enforce subprocess timeouts in `src/multi_tasker/orchestrator/merge_gate.py` and `src/multi_tasker/orchestrator/lifecycle.py`, transition upstream `Intent` status to `processed` in `approve_artifact`, and enforce `Task` commit `WriteScope` and `Intent` coverage in `src/multi_tasker/checkers/traceability_checker.py`.
 
 ## Public Interfaces
 ```python

@@ -8,11 +8,11 @@ depends_on: [TASK-001, TASK-009, TASK-010]
 required_files:
   - tests/test_lifecycle.py
 write_files:
-  - src/cli/main.py
+  - src/multi_tasker/cli/main.py
 verification_cmd: "pytest -q"
 ---
 ## Objective
-Implement `src/cli/main.py` wiring all `mt` subcommands (`check`, `schedule`, `impact`, `initialize`, `intent`, `approve`, `resolve`, `run`, `trace`, `documentation`).
+Implement `src/multi_tasker/cli/main.py` wiring all `mt` subcommands (`check`, `schedule`, `impact`, `initialize`, `intent`, `approve`, `resolve`, `run`, `trace`, `documentation`).
 
 ## Scoped Instructions
 Follow all `policy/*.yaml` constraints and maintain zero-noise CLI output across all subcommands.

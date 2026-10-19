@@ -12,10 +12,10 @@ target_files:
   tests:
   - tests/test_orchestrator.py
   implementation:
-  - src/orchestrator/lifecycle.py
+  - src/multi_tasker/orchestrator/lifecycle.py
 ---
 ## Design Overview
-Run `run_checks(repository_root, ["glossary", "schemas"], target_paths=[document.path])` in `approve_artifact` (`src/orchestrator/lifecycle.py`) before calling `update_artifact_frontmatter` so any validation failure returns Findings without mutating the file on disk. In `_finalize_task_outcome` (`src/orchestrator/lifecycle.py`), remove the redundant `update_artifact_frontmatter(absolute_task, {"status": previous_status})` call on failure so `BaseBranch` `Task` files remain byte-for-byte unchanged and Git status stays clean when a `Worktree` fails the `MergeGate`.
+Run `run_checks(repository_root, ["glossary", "schemas"], target_paths=[document.path])` in `approve_artifact` (`src/multi_tasker/orchestrator/lifecycle.py`) before calling `update_artifact_frontmatter` so any validation failure returns Findings without mutating the file on disk. In `_finalize_task_outcome` (`src/multi_tasker/orchestrator/lifecycle.py`), remove the redundant `update_artifact_frontmatter(absolute_task, {"status": previous_status})` call on failure so `BaseBranch` `Task` files remain byte-for-byte unchanged and Git status stays clean when a `Worktree` fails the `MergeGate`.
 
 ## Public Interfaces
 ```python

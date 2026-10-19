@@ -11,11 +11,11 @@ depends_on:
 required_files:
 - tests/test_orchestrator.py
 write_files:
-- src/orchestrator/lifecycle.py
+- src/multi_tasker/orchestrator/lifecycle.py
 verification_cmd: pytest -q
 ---
 ## Objective
-Extend `approve_artifact` in `src/orchestrator/lifecycle.py` to support `Specification` (`SPEC-NNN`) approval.
+Extend `approve_artifact` in `src/multi_tasker/orchestrator/lifecycle.py` to support `Specification` (`SPEC-NNN`) approval.
 
 ## Scoped Instructions
-Update `approve_artifact` in `src/orchestrator/lifecycle.py` to allow `SPEC` alongside `REQ` and `DEC`, validate transition and schema checks, and mark downstream `done` `Task` artifacts as `needs_update`.
+Update `approve_artifact` in `src/multi_tasker/orchestrator/lifecycle.py` to allow `SPEC` alongside `REQ` and `DEC`, validate transition and schema checks, and mark downstream `done` `Task` artifacts as `needs_update`.

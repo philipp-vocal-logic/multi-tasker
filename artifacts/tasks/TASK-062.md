@@ -11,13 +11,13 @@ depends_on:
 - TASK-061
 required_files:
 - tests/test_stage_runner.py
-- src/checkers/code_and_git_traceability.py
+- src/multi_tasker/checkers/code_and_git_traceability.py
 write_files:
-- src/checkers/code_and_git_traceability.py
+- src/multi_tasker/checkers/code_and_git_traceability.py
 verification_cmd: pytest -q tests/test_stage_runner.py
 ---
 ## Objective
-Update `DEFAULT_COMMIT_PATTERN` and `ARTIFACT_ID_REGEX` in `src/checkers/code_and_git_traceability.py` to support `REV-[A-Z0-9-]+` commit identifiers and verify `tests/test_stage_runner.py` passes.
+Update `DEFAULT_COMMIT_PATTERN` and `ARTIFACT_ID_REGEX` in `src/multi_tasker/checkers/code_and_git_traceability.py` to support `REV-[A-Z0-9-]+` commit identifiers and verify `tests/test_stage_runner.py` passes.
 
 ## Scoped Instructions
-- Update `DEFAULT_COMMIT_PATTERN` and `ARTIFACT_ID_REGEX` in `src/checkers/code_and_git_traceability.py` so `REV-[A-Z0-9-]+` identifiers in commit subjects and `[traces: ...]` footers are matched and validated against `by_identifier`.
+- Update `DEFAULT_COMMIT_PATTERN` and `ARTIFACT_ID_REGEX` in `src/multi_tasker/checkers/code_and_git_traceability.py` so `REV-[A-Z0-9-]+` identifiers in commit subjects and `[traces: ...]` footers are matched and validated against `by_identifier`.

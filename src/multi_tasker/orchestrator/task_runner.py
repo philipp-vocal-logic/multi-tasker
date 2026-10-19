@@ -7,24 +7,28 @@ import subprocess
 import threading
 import time
 
-from src.checkers.common import get_git_changed_files
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import load_artifacts_by_id, update_artifact_frontmatter
-from src.orchestrator.documentation_generator import (
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import load_artifacts_by_id, update_artifact_frontmatter
+from multi_tasker.orchestrator.documentation_generator import (
     write_repository_documentation,
 )
-from src.orchestrator.interaction_logger import (
+from multi_tasker.orchestrator.interaction_logger import (
     merge_worktree_task_logs,
     record_task_event,
 )
-from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
-from src.orchestrator.prompt_builder import (
+from multi_tasker.orchestrator.merge_gate import (
+    GateOutcome,
+    GateRequest,
+    evaluate_merge_gate,
+)
+from multi_tasker.orchestrator.prompt_builder import (
     prepare_worker_invocation,
     resolve_task_execution,
 )
-from src.orchestrator.router import route_escalation
-from src.orchestrator.scheduler import select_parallel_batch
-from src.orchestrator.worktree import (
+from multi_tasker.orchestrator.router import route_escalation
+from multi_tasker.orchestrator.scheduler import select_parallel_batch
+from multi_tasker.orchestrator.worktree import (
     commit_traceable_change,
     create_worktree,
     format_task_commit_message,

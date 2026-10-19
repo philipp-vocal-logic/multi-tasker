@@ -9,13 +9,13 @@ required_files:
   - tests/test_lifecycle.py
   - tests/test_traceability_and_cli.py
 write_files:
-  - src/checkers/common.py
-  - src/checkers/traceability_checker.py
-  - src/cli/main.py
+  - src/multi_tasker/checkers/common.py
+  - src/multi_tasker/checkers/traceability_checker.py
+  - src/multi_tasker/cli/main.py
 verification_cmd: "pytest -q"
 ---
 ## Objective
-Implement `get_git_commit_files` in `src/checkers/common.py`, commit `WriteScope` and `Intent` coverage checks in `src/checkers/traceability_checker.py`, and `mt prompt` CLI wiring in `src/cli/main.py`.
+Implement `get_git_commit_files` in `src/multi_tasker/checkers/common.py`, commit `WriteScope` and `Intent` coverage checks in `src/multi_tasker/checkers/traceability_checker.py`, and `mt prompt` CLI wiring in `src/multi_tasker/cli/main.py`.
 
 ## Scoped Instructions
 Ensure full compliance with all `policy/*.yaml` rules and verify `mt check all` and `pytest -q` pass with zero findings.

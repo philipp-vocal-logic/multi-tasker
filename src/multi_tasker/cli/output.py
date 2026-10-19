@@ -3,8 +3,8 @@
 from pathlib import Path
 import sys
 
-from src.domain.models import Finding
-from src.domain.parser import load_yaml_file
+from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import load_yaml_file
 
 
 def load_output_contract(repository_root: Path) -> tuple[bool, str]:

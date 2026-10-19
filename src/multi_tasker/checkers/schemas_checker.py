@@ -5,9 +5,9 @@ from pathlib import Path
 import re
 from typing import Any
 
-from src.checkers.common import collect_repository_files
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import (
+from multi_tasker.checkers.common import collect_repository_files
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import (
     load_yaml_file,
     parse_artifact_file,
     validate_pipeline_policy,

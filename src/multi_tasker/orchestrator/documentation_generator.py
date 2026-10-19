@@ -3,13 +3,13 @@
 from pathlib import Path
 from typing import Any
 
-from src.domain.models import ArtifactDocument
-from src.domain.parser import (
+from multi_tasker.domain.models import ArtifactDocument
+from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_state_transitions,
     load_yaml_file,
 )
-from src.orchestrator.lineage import collect_test_trace_links
+from multi_tasker.orchestrator.lineage import collect_test_trace_links
 
 
 def _render_architecture_section(repository_root: Path) -> list[str]:

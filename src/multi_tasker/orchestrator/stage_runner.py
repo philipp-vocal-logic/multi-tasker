@@ -7,9 +7,9 @@ import subprocess
 import time
 from typing import Any
 
-from src.checkers.common import get_git_changed_files
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import (
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_pipeline_policy,
     load_yaml_file,
@@ -17,21 +17,33 @@ from src.domain.parser import (
     parse_artifact_file,
     update_artifact_frontmatter,
 )
-from src.orchestrator.documentation_generator import write_repository_documentation
-from src.orchestrator.interaction_logger import (
+from multi_tasker.orchestrator.documentation_generator import (
+    write_repository_documentation,
+)
+from multi_tasker.orchestrator.interaction_logger import (
     merge_worktree_task_logs,
     record_task_event,
 )
-from src.orchestrator.lifecycle import approve_stage_artifact, evaluate_review_verdict
-from src.orchestrator.merge_gate import GateOutcome, GateRequest, evaluate_merge_gate
-from src.orchestrator.prompt_builder import (
+from multi_tasker.orchestrator.lifecycle import (
+    approve_stage_artifact,
+    evaluate_review_verdict,
+)
+from multi_tasker.orchestrator.merge_gate import (
+    GateOutcome,
+    GateRequest,
+    evaluate_merge_gate,
+)
+from multi_tasker.orchestrator.prompt_builder import (
     build_agent_prompt,
     resolve_context_mode,
     resolve_task_execution,
 )
-from src.orchestrator.router import CATEGORY_ROUTES, find_actionable_stage_target
-from src.orchestrator.task_runner import run_scheduled_tasks
-from src.orchestrator.worktree import (
+from multi_tasker.orchestrator.router import (
+    CATEGORY_ROUTES,
+    find_actionable_stage_target,
+)
+from multi_tasker.orchestrator.task_runner import run_scheduled_tasks
+from multi_tasker.orchestrator.worktree import (
     commit_traceable_change,
     create_worktree,
     merge_worktree_files,
@@ -106,7 +118,7 @@ def _prepare_stage_invocation(
     )
     environment = {
         **os.environ,
-        "PYTHONPATH": f"{worktree_path}{os.pathsep}{Path(__file__).parents[2]}",
+        "PYTHONPATH": str(worktree_path),
         "MT_AGENT_ROLE": agent_role,
         "MT_TASK_ID": target_id,
         "MT_PROMPT_FILE": str(prompt_file),

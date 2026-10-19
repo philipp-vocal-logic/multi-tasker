@@ -7,14 +7,14 @@ from typing import Any
 import pytest
 import yaml
 
-from src.checkers.architecture_checker import check_architecture
-from src.checkers.clean_code_checker import check_clean_code
-from src.checkers.runner import run_single_check
-from src.checkers.schemas_checker import check_schemas, validate_schema_node
-from src.checkers.traceability_checker import check_traceability
-from src.cli.main import main
-from src.domain.models import traces
-from src.orchestrator.worktree import commit_traceable_change
+from multi_tasker.checkers.architecture_checker import check_architecture
+from multi_tasker.checkers.clean_code_checker import check_clean_code
+from multi_tasker.checkers.runner import run_single_check
+from multi_tasker.checkers.schemas_checker import check_schemas, validate_schema_node
+from multi_tasker.checkers.traceability_checker import check_traceability
+from multi_tasker.cli.main import main
+from multi_tasker.domain.models import traces
+from multi_tasker.orchestrator.worktree import commit_traceable_change
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
@@ -166,7 +166,7 @@ def _seed_trace_fixtures(tmp_path: Path) -> None:
         ),
         "src/undeclared.py": "val = 1\n",
         "tests/test_sample.py": (
-            "from src.domain.models import traces\n"
+            "from multi_tasker.domain.models import traces\n"
             "def test_untagged() -> None:\n    return None\n"
             '@traces("REQ-999", "AC-01", "SPEC-999")\n'
             "def test_bad_tag() -> None:\n    return None\n"
@@ -348,8 +348,8 @@ def test_git_commit_scope_and_intent_traceability(tmp_path: Path) -> None:
 @traces("REQ-025", "AC-01", "SPEC-025")
 def test_fail_fast_worker_task_scope_and_explicit_check_paths(tmp_path: Path) -> None:
     """Verify worker-agent fails fast on missing --task and runner forwards --paths."""
-    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
-    from src.orchestrator.prompt_builder import build_agent_prompt
+    from multi_tasker.orchestrator.lifecycle import bootstrap_evaluation_repository
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 
     eval_root = tmp_path / "fail_fast_repo"
     bootstrap_evaluation_repository(eval_root, "Verify fail-fast worker check.")

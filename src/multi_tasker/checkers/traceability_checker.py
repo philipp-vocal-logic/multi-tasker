@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Any
 
-from src.checkers import code_and_git_traceability
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import load_all_artifacts, load_yaml_file
+from multi_tasker.checkers import code_and_git_traceability
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import load_all_artifacts, load_yaml_file
 
 LIST_REFERENCE_FIELDS = (
     "traces_to",

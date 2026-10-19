@@ -9,13 +9,13 @@ required_files:
   - tests/test_orchestrator.py
   - tests/test_lifecycle.py
 write_files:
-  - src/orchestrator/prompt_builder.py
-  - src/orchestrator/merge_gate.py
-  - src/orchestrator/lifecycle.py
+  - src/multi_tasker/orchestrator/prompt_builder.py
+  - src/multi_tasker/orchestrator/merge_gate.py
+  - src/multi_tasker/orchestrator/lifecycle.py
 verification_cmd: "pytest -q tests/test_orchestrator.py"
 ---
 ## Objective
-Implement `src/orchestrator/prompt_builder.py`, subprocess timeouts in `src/orchestrator/merge_gate.py` and `src/orchestrator/lifecycle.py`, and upstream `Intent` status transitions in `approve_artifact`.
+Implement `src/multi_tasker/orchestrator/prompt_builder.py`, subprocess timeouts in `src/multi_tasker/orchestrator/merge_gate.py` and `src/multi_tasker/orchestrator/lifecycle.py`, and upstream `Intent` status transitions in `approve_artifact`.
 
 ## Scoped Instructions
 Ensure all functions respect sizing limits (`max_function_lines: 40`) and pass `mt check clean_code` and `mt check limits`.

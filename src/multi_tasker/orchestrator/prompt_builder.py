@@ -6,14 +6,14 @@ from typing import Any
 
 import yaml
 
-from src.checkers.limits_checker import collect_refactoring_targets
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import (
+from multi_tasker.checkers.limits_checker import collect_refactoring_targets
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_yaml_file,
     next_artifact_id,
 )
-from src.orchestrator.router import CATEGORY_ROUTES
+from multi_tasker.orchestrator.router import CATEGORY_ROUTES
 
 ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
     "requirement-agent": "REQ",
@@ -385,7 +385,7 @@ def prepare_worker_invocation(
     )
     environment = {
         **os.environ,
-        "PYTHONPATH": f"{worktree_path}{os.pathsep}{Path(__file__).parents[2]}",
+        "PYTHONPATH": str(worktree_path),
         "MT_AGENT_ROLE": "worker-agent",
         "MT_TASK_ID": task_id,
         "MT_WRITE_FILES": ",".join(write_files),

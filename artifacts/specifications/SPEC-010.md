@@ -13,23 +13,23 @@ target_files:
   tests:
   - tests/test_lifecycle.py
   implementation:
-  - src/orchestrator/task_runner.py
-  - src/orchestrator/merge_gate.py
-  - src/orchestrator/lifecycle.py
-  - src/checkers/traceability_checker.py
+  - src/multi_tasker/orchestrator/task_runner.py
+  - src/multi_tasker/orchestrator/merge_gate.py
+  - src/multi_tasker/orchestrator/lifecycle.py
+  - src/multi_tasker/checkers/traceability_checker.py
 ---
 ## Design Overview
-Update `run_scheduled_tasks` in `src/orchestrator/task_runner.py` to execute successive conflict-free `Task` waves in a loop until no eligible `Tasks` remain or a wave emits `Findings`. Update `_run_verification_command` in `src/orchestrator/merge_gate.py` to prepend the first `E   ` assertion line to `lines[-1]` when `verification_cmd` fails. Scope `check_traceability` in `src/checkers/traceability_checker.py` by `target_paths` and include `"traceability"` in `approve_artifact` and `resolve_escalation` in `src/orchestrator/lifecycle.py`.
+Update `run_scheduled_tasks` in `src/multi_tasker/orchestrator/task_runner.py` to execute successive conflict-free `Task` waves in a loop until no eligible `Tasks` remain or a wave emits `Findings`. Update `_run_verification_command` in `src/multi_tasker/orchestrator/merge_gate.py` to prepend the first `E   ` assertion line to `lines[-1]` when `verification_cmd` fails. Scope `check_traceability` in `src/multi_tasker/checkers/traceability_checker.py` by `target_paths` and include `"traceability"` in `approve_artifact` and `resolve_escalation` in `src/multi_tasker/orchestrator/lifecycle.py`.
 
 ## Public Interfaces
-- `src/orchestrator/task_runner.py`:
+- `src/multi_tasker/orchestrator/task_runner.py`:
   - `run_scheduled_tasks(repository_root: Path, max_workers: int = 1, agent_command: str | None = None, model_override: str | None = None, environment_override: str | None = None) -> tuple[list[str], list[Finding]]`
-- `src/orchestrator/merge_gate.py`:
+- `src/multi_tasker/orchestrator/merge_gate.py`:
   - `evaluate_merge_gate(request: GateRequest) -> GateOutcome`
-- `src/orchestrator/lifecycle.py`:
+- `src/multi_tasker/orchestrator/lifecycle.py`:
   - `approve_artifact(repository_root: Path, artifact_id: str) -> list[Finding]`
   - `resolve_escalation(repository_root: Path, escalation_id: str, resolved_by: str) -> list[Finding]`
-- `src/checkers/traceability_checker.py`:
+- `src/multi_tasker/checkers/traceability_checker.py`:
   - `check_traceability(repository_root: Path, target_paths: list[str] | None = None) -> list[Finding]`
 
 ## Test Contract Mapping

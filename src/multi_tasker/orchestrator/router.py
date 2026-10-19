@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.domain.parser import (
+from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_pipeline_policy,
     parse_artifact_file,
 )
-from src.orchestrator.scheduler import select_parallel_batch
+from multi_tasker.orchestrator.scheduler import select_parallel_batch
 
 
 @dataclass(frozen=True)

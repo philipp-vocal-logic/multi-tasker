@@ -7,7 +7,7 @@ name = "multi-tasker"
 version = "0.1.0"
 description = "Deterministic multilevel agent policy enforcement and orchestration CLI"
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [
     { name = "Philipp", email = "274027022+philipp-vocal-logic@users.noreply.github.com" },
@@ -41,10 +41,10 @@ dev = [
 ]
 
 [project.scripts]
-mt = "src.cli.main:main"
+mt = "multi_tasker.cli.main:main"
 
 [tool.setuptools]
-package-dir = {"multi_tasker" = "src", "multi_tasker.policy_templates" = "policy", "src" = "src"}
+package-dir = {"multi_tasker" = "src/multi_tasker", "multi_tasker.policy_templates" = "policy"}
 packages = [
     "multi_tasker",
     "multi_tasker.domain",
@@ -52,11 +52,6 @@ packages = [
     "multi_tasker.orchestrator",
     "multi_tasker.cli",
     "multi_tasker.policy_templates",
-    "src",
-    "src.domain",
-    "src.checkers",
-    "src.orchestrator",
-    "src.cli",
 ]
 
 [tool.setuptools.package-data]

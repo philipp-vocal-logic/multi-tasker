@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from src.domain.models import Finding
+from multi_tasker.domain.models import Finding
 
 
 def _is_ephemeral_git_entry(entry: str) -> bool:

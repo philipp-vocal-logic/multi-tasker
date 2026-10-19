@@ -11,12 +11,12 @@ target_files:
   tests:
     - tests/test_orchestrator.py
   implementation:
-    - src/orchestrator/documentation_generator.py
-    - src/orchestrator/lifecycle.py
-    - src/cli/main.py
+    - src/multi_tasker/orchestrator/documentation_generator.py
+    - src/multi_tasker/orchestrator/lifecycle.py
+    - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Add `write_repository_documentation` to `src/orchestrator/documentation_generator.py` to write `.report/.gitignore` (`*`) and `.report/specification.md` with the output of `generate_repository_documentation`. Invoke `write_repository_documentation` from `mt documentation` in `src/cli/main.py` and after `initialize_repository`, `create_intent`, `_mark_dirty_downstream` (`approve_artifact` and `resolve_escalation`), and `run_scheduled_tasks` in `src/orchestrator/lifecycle.py`.
+Add `write_repository_documentation` to `src/multi_tasker/orchestrator/documentation_generator.py` to write `.report/.gitignore` (`*`) and `.report/specification.md` with the output of `generate_repository_documentation`. Invoke `write_repository_documentation` from `mt documentation` in `src/multi_tasker/cli/main.py` and after `initialize_repository`, `create_intent`, `_mark_dirty_downstream` (`approve_artifact` and `resolve_escalation`), and `run_scheduled_tasks` in `src/multi_tasker/orchestrator/lifecycle.py`.
 
 ## Public Interfaces
 ```python

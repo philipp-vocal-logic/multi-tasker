@@ -5,14 +5,14 @@ from pathlib import Path
 import re
 from typing import Any
 
-from src.checkers.common import (
+from multi_tasker.checkers.common import (
     collect_repository_files,
     extract_test_traces,
     get_git_commit_files,
     get_git_commit_subjects,
     parse_python_ast,
 )
-from src.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.models import ArtifactDocument, Finding
 
 DEFAULT_COMMIT_PATTERN = (
     r"^(?:(INT|REQ|SPEC|TASK|ESC|DEC)-[0-9]{3,}|REV-[A-Z0-9-]+): .+ "
@@ -191,6 +191,11 @@ def _check_task_commit_scope(
     allowed_writes = {
         str(item) for item in task_document.frontmatter.get("write_files", [])
     }
+    allowed_writes.update(
+        f"src/{'/'.join(Path(item).parts[2:])}"
+        for item in list(allowed_writes)
+        if len(Path(item).parts) >= 3 and Path(item).parts[0] == "src"
+    )
     upstream_prefixes = (
         "artifacts/intents/",
         "artifacts/requirements/",

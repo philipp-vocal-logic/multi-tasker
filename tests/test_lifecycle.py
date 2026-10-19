@@ -7,12 +7,12 @@ from typing import Any
 import pytest
 import yaml
 
-from src.checkers.common import get_git_changed_files
-from src.checkers.permissions_checker import check_permissions
-from src.cli.main import main
-from src.domain.models import traces
-from src.domain.parser import load_yaml_file, parse_artifact_file
-from src.orchestrator.worktree import (
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.checkers.permissions_checker import check_permissions
+from multi_tasker.cli.main import main
+from multi_tasker.domain.models import traces
+from multi_tasker.domain.parser import load_yaml_file, parse_artifact_file
+from multi_tasker.orchestrator.worktree import (
     create_worktree,
     remove_worktree,
     verify_clean_repository,
@@ -312,7 +312,7 @@ def test_trace_lineage_and_documentation_generation(
     output_requirement = capsys.readouterr().out
     for expected in ("INT-003", "REQ-003", "SPEC-003", "TASK-009", "TASK-010", "TEST"):
         assert expected in output_requirement
-    target_python = "src/orchestrator/lifecycle.py"
+    target_python = "src/multi_tasker/orchestrator/lifecycle.py"
     assert main(["trace", target_python, "--root", str(REPOSITORY_ROOT)]) == 0
     output_file = capsys.readouterr().out
     assert "SPEC-003" in output_file

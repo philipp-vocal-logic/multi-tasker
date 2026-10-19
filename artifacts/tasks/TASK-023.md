@@ -11,11 +11,11 @@ depends_on:
 required_files:
 - tests/test_orchestrator.py
 write_files:
-- src/orchestrator/lifecycle.py
+- src/multi_tasker/orchestrator/lifecycle.py
 verification_cmd: pytest -q
 ---
 ## Objective
 Enforce validate-before-mutate in `approve_artifact` and remove redundant `BaseBranch` `Task` writes on failed `MergeGate` verification in `_finalize_task_outcome`.
 
 ## Scoped Instructions
-Run `run_checks` before `update_artifact_frontmatter` in `approve_artifact` and remove the failure-path `update_artifact_frontmatter` call on `absolute_task` in `_finalize_task_outcome` in `src/orchestrator/lifecycle.py`.
+Run `run_checks` before `update_artifact_frontmatter` in `approve_artifact` and remove the failure-path `update_artifact_frontmatter` call on `absolute_task` in `_finalize_task_outcome` in `src/multi_tasker/orchestrator/lifecycle.py`.

@@ -12,12 +12,12 @@ required_files:
 - artifacts/specifications/SPEC-024.md
 - tests/test_checkers.py
 write_files:
-- src/orchestrator/lifecycle.py
-- src/checkers/common.py
+- src/multi_tasker/orchestrator/lifecycle.py
+- src/multi_tasker/checkers/common.py
 verification_cmd: pytest -q tests/test_checkers.py
 ---
 ## Objective
-Add `__pycache__/`, `*.py[cod]`, and `.pytest_cache/` to `DEFAULT_GITIGNORE_ENTRIES` in `src/orchestrator/lifecycle.py` and filter ephemeral cache paths in `get_git_changed_files` in `src/checkers/common.py`.
+Add `__pycache__/`, `*.py[cod]`, and `.pytest_cache/` to `DEFAULT_GITIGNORE_ENTRIES` in `src/multi_tasker/orchestrator/lifecycle.py` and filter ephemeral cache paths in `get_git_changed_files` in `src/multi_tasker/checkers/common.py`.
 
 ## Scoped Instructions
-Keep `src/orchestrator/lifecycle.py` and `src/checkers/common.py` within configured line and complexity limits.
+Keep `src/multi_tasker/orchestrator/lifecycle.py` and `src/multi_tasker/checkers/common.py` within configured line and complexity limits.

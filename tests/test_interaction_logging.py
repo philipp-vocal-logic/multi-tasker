@@ -7,18 +7,18 @@ from typing import Any
 
 import yaml
 
-from src.checkers.architecture_checker import check_architecture
-from src.checkers.permissions_checker import check_permissions
+from multi_tasker.checkers.architecture_checker import check_architecture
+from multi_tasker.checkers.permissions_checker import check_permissions
 import pytest
 
-from src.cli.main import build_parser, main
-from src.domain.models import ArtifactDocument, traces
-from src.domain.parser import load_yaml_file, parse_artifact_file
-from src.orchestrator.documentation_generator import (
+from multi_tasker.cli.main import build_parser, main
+from multi_tasker.domain.models import ArtifactDocument, traces
+from multi_tasker.domain.parser import load_yaml_file, parse_artifact_file
+from multi_tasker.orchestrator.documentation_generator import (
     generate_external_agents_guide,
     write_repository_documentation,
 )
-from src.orchestrator.prompt_builder import (
+from multi_tasker.orchestrator.prompt_builder import (
     build_agent_prompt,
     prepare_worker_invocation,
 )
@@ -66,7 +66,9 @@ def test_cli_invocations_logged_to_events_and_task_logs(
 ) -> None:
     """Verify all mt CLI commands log JSONL events and preserve separation."""
     _seed_test_repository(tmp_path)
-    logger_module = importlib.import_module("src.orchestrator.interaction_logger")
+    logger_module = importlib.import_module(
+        "multi_tasker.orchestrator.interaction_logger"
+    )
     assert main(["intent", "Capture CLI telemetry", "--root", str(tmp_path)]) == 0
     check_args = [
         "check",
@@ -126,10 +128,12 @@ def _write_task_artifact(
 def test_worktree_task_execution_and_merge_gate_logs_merged(tmp_path: Path) -> None:
     """Verify Worktree agent, CLI, and MergeGate logs merge onto BaseBranch."""
     _seed_test_repository(tmp_path)
-    logger_module = importlib.import_module("src.orchestrator.interaction_logger")
+    logger_module = importlib.import_module(
+        "multi_tasker.orchestrator.interaction_logger"
+    )
     worker_script = tmp_path / ".report" / "worker_helper.py"
     _write_worker_helper_script(
-        worker_script, REPOSITORY_ROOT / "src" / "cli" / "main.py"
+        worker_script, REPOSITORY_ROOT / "src" / "multi_tasker" / "cli" / "main.py"
     )
     agent_cmd = f"{sys.executable} {worker_script.as_posix()}"
     _write_task_artifact(
@@ -164,7 +168,7 @@ def test_worktree_task_execution_and_merge_gate_logs_merged(tmp_path: Path) -> N
 def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
     """Verify default_context_mode validation and CLI > Task > Policy precedence."""
     _seed_test_repository(tmp_path)
-    prompt_module = importlib.import_module("src.orchestrator.prompt_builder")
+    prompt_module = importlib.import_module("multi_tasker.orchestrator.prompt_builder")
     assert prompt_module.resolve_context_mode(tmp_path) == "inline"
     task_path = tmp_path / "artifacts" / "tasks" / "TASK-001.md"
     task_path.write_text(
@@ -268,6 +272,7 @@ def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> 
 
 
 @traces("REQ-016", "AC-02", "SPEC-016")
+@traces("REQ-026", "AC-02", "SPEC-026")
 def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> None:
     """Verify custom package prefixes in check_architecture and worktree PYTHONPATH."""
     architecture_policy = {
@@ -305,7 +310,7 @@ def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> 
     _, env = prepare_worker_invocation(
         tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
     )
-    assert env["PYTHONPATH"].startswith(str(tmp_path))
+    assert env["PYTHONPATH"] == str(tmp_path)
 
 
 @traces("REQ-020", "AC-01", "SPEC-020")

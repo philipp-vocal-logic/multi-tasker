@@ -6,9 +6,9 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from src.checkers.common import collect_repository_files, parse_python_ast
-from src.domain.models import Finding
-from src.domain.parser import load_yaml_file
+from multi_tasker.checkers.common import collect_repository_files, parse_python_ast
+from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import load_yaml_file
 
 
 def _resolve_relative_import(

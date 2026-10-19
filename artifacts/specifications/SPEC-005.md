@@ -11,13 +11,13 @@ target_files:
   tests:
     - tests/test_lifecycle.py
   implementation:
-    - src/checkers/permissions_checker.py
-    - src/orchestrator/prompt_builder.py
-    - src/orchestrator/lifecycle.py
-    - src/cli/main.py
+    - src/multi_tasker/checkers/permissions_checker.py
+    - src/multi_tasker/orchestrator/prompt_builder.py
+    - src/multi_tasker/orchestrator/lifecycle.py
+    - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Extend `src/checkers/permissions_checker.py` to validate `execution_environments` in `policy/permissions.yaml`, add `ExecutionConfiguration` and `resolve_task_execution` in `src/orchestrator/prompt_builder.py` for CLI/Task/Policy model and environment resolution (`agy` headless mode with `gemini-3.8-flash-high`), and wire `--model` and `--environment` into `mt run` (`src/orchestrator/lifecycle.py` and `src/cli/main.py`).
+Extend `src/multi_tasker/checkers/permissions_checker.py` to validate `execution_environments` in `policy/permissions.yaml`, add `ExecutionConfiguration` and `resolve_task_execution` in `src/multi_tasker/orchestrator/prompt_builder.py` for CLI/Task/Policy model and environment resolution (`agy` headless mode with `gemini-3.8-flash-high`), and wire `--model` and `--environment` into `mt run` (`src/multi_tasker/orchestrator/lifecycle.py` and `src/multi_tasker/cli/main.py`).
 
 ## Public Interfaces
 ```python

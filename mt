@@ -3,7 +3,7 @@
 
 import sys
 
-from src.cli.main import main
+from multi_tasker.cli.main import main
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))

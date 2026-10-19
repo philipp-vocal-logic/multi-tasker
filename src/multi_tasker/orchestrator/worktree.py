@@ -7,9 +7,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from src.checkers.common import get_git_changed_files
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import ARTIFACT_DIRECTORY_TO_TYPE, load_yaml_file
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import ARTIFACT_DIRECTORY_TO_TYPE, load_yaml_file
 
 
 def compute_policy_sha256(repository_root: Path) -> str:

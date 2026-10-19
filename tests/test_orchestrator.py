@@ -7,7 +7,7 @@ import shutil
 import pytest
 import yaml
 
-from src.checkers import (
+from multi_tasker.checkers import (
     architecture_checker,
     clean_code_checker,
     common,
@@ -17,16 +17,19 @@ from src.checkers import (
     schemas_checker,
     traceability_checker,
 )
-from src.cli import output as cli_output
-from src.cli.main import main
-from src.domain import parser as domain_parser
-from src.domain.models import traces
-from src.domain.parser import load_yaml_file
-from src.orchestrator import worktree
-from src.orchestrator.merge_gate import GateRequest, evaluate_merge_gate
-from src.orchestrator.router import route_escalation
-from src.orchestrator.scheduler import compute_dirty_subgraph, select_parallel_batch
-from src.orchestrator.worktree import (
+from multi_tasker.cli import output as cli_output
+from multi_tasker.cli.main import main
+from multi_tasker.domain import parser as domain_parser
+from multi_tasker.domain.models import traces
+from multi_tasker.domain.parser import load_yaml_file
+from multi_tasker.orchestrator import worktree
+from multi_tasker.orchestrator.merge_gate import GateRequest, evaluate_merge_gate
+from multi_tasker.orchestrator.router import route_escalation
+from multi_tasker.orchestrator.scheduler import (
+    compute_dirty_subgraph,
+    select_parallel_batch,
+)
+from multi_tasker.orchestrator.worktree import (
     compute_policy_sha256,
     create_worktree,
     remove_worktree,
@@ -287,7 +290,7 @@ def test_all_policy_yaml_keys_are_enforced_and_read(
         ("review-agent", "artifacts/reviews/REV-001.md"),
         ("worker-agent", "artifacts/escalations/ESC-001.md"),
         ("worker-agent", "tests/test_checkers.py"),
-        ("worker-agent", "src/domain/models.py"),
+        ("worker-agent", "src/multi_tasker/domain/models.py"),
     ):
         task_id = "TASK-001" if path.startswith("tests/") else "TASK-002"
         permissions_checker.check_permissions(tmp_path, role, task_id, [path])

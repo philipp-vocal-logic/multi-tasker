@@ -15,22 +15,22 @@ target_files:
     - tests/test_checkers.py
     - tests/test_traceability_and_cli.py
   implementation:
-    - src/domain/models.py
-    - src/domain/parser.py
-    - src/checkers/common.py
-    - src/checkers/schemas_checker.py
-    - src/checkers/permissions_checker.py
-    - src/checkers/glossary_checker.py
-    - src/checkers/limits_checker.py
-    - src/checkers/clean_code_checker.py
-    - src/checkers/architecture_checker.py
-    - src/checkers/traceability_checker.py
-    - src/checkers/runner.py
-    - src/cli/output.py
-    - src/cli/main.py
+    - src/multi_tasker/domain/models.py
+    - src/multi_tasker/domain/parser.py
+    - src/multi_tasker/checkers/common.py
+    - src/multi_tasker/checkers/schemas_checker.py
+    - src/multi_tasker/checkers/permissions_checker.py
+    - src/multi_tasker/checkers/glossary_checker.py
+    - src/multi_tasker/checkers/limits_checker.py
+    - src/multi_tasker/checkers/clean_code_checker.py
+    - src/multi_tasker/checkers/architecture_checker.py
+    - src/multi_tasker/checkers/traceability_checker.py
+    - src/multi_tasker/checkers/runner.py
+    - src/multi_tasker/cli/output.py
+    - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Implement modular checkers in `src/checkers/` backed by shared utilities in `src/checkers/common.py`, domain models in `src/domain/`, and CLI output formatting in `src/cli/output.py` and `src/cli/main.py`.
+Implement modular checkers in `src/multi_tasker/checkers/` backed by shared utilities in `src/multi_tasker/checkers/common.py`, domain models in `src/multi_tasker/domain/`, and CLI output formatting in `src/multi_tasker/cli/output.py` and `src/multi_tasker/cli/main.py`.
 
 ## Public Interfaces
 ```python

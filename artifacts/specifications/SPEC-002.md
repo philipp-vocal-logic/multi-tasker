@@ -13,10 +13,10 @@ target_files:
   tests:
     - tests/test_orchestrator.py
   implementation:
-    - src/orchestrator/worktree.py
-    - src/orchestrator/merge_gate.py
-    - src/orchestrator/scheduler.py
-    - src/orchestrator/router.py
+    - src/multi_tasker/orchestrator/worktree.py
+    - src/multi_tasker/orchestrator/merge_gate.py
+    - src/multi_tasker/orchestrator/scheduler.py
+    - src/multi_tasker/orchestrator/router.py
 ---
 ## Design Overview
 Implement `worktree.py` for SHA-256 `policy/` verification and read-only `Worktree` creation, `merge_gate.py` for deterministic `MergeGate` evaluation, `scheduler.py` for conflict-free parallel `Task` batching and dirty-flagging, and `router.py` for tiered `Escalation` routing.

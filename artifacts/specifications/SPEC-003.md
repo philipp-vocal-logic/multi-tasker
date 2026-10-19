@@ -13,14 +13,14 @@ target_files:
   tests:
     - tests/test_lifecycle.py
   implementation:
-    - src/orchestrator/lifecycle.py
-    - src/orchestrator/lineage.py
-    - src/orchestrator/documentation_generator.py
-    - src/cli/output.py
-    - src/cli/main.py
+    - src/multi_tasker/orchestrator/lifecycle.py
+    - src/multi_tasker/orchestrator/lineage.py
+    - src/multi_tasker/orchestrator/documentation_generator.py
+    - src/multi_tasker/cli/output.py
+    - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Implement `src/orchestrator/lifecycle.py` for repository initialization (`initialize_repository`), `Intent` creation, `Requirement`/`Decision` approval, `Escalation` resolution, and parallel `Worktree` `Task` execution (`run_scheduled_tasks`), `src/orchestrator/lineage.py` for `trace_lineage`, and `src/orchestrator/documentation_generator.py` for live specification generation (`generate_repository_documentation`).
+Implement `src/multi_tasker/orchestrator/lifecycle.py` for repository initialization (`initialize_repository`), `Intent` creation, `Requirement`/`Decision` approval, `Escalation` resolution, and parallel `Worktree` `Task` execution (`run_scheduled_tasks`), `src/multi_tasker/orchestrator/lineage.py` for `trace_lineage`, and `src/multi_tasker/orchestrator/documentation_generator.py` for live specification generation (`generate_repository_documentation`).
 
 ## Public Interfaces
 ```python

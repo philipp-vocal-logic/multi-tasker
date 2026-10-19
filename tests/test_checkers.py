@@ -6,13 +6,17 @@ from typing import Any
 import pytest
 import yaml
 
-from src.checkers.glossary_checker import check_glossary
-from src.checkers.limits_checker import check_limits
-from src.checkers.permissions_checker import check_permissions
-from src.checkers.schemas_checker import check_schemas
-from src.domain.models import traces
-from src.domain.parser import infer_artifact_type, load_yaml_file, parse_artifact_file
-from src.orchestrator.prompt_builder import build_agent_prompt
+from multi_tasker.checkers.glossary_checker import check_glossary
+from multi_tasker.checkers.limits_checker import check_limits
+from multi_tasker.checkers.permissions_checker import check_permissions
+from multi_tasker.checkers.schemas_checker import check_schemas
+from multi_tasker.domain.models import traces
+from multi_tasker.domain.parser import (
+    infer_artifact_type,
+    load_yaml_file,
+    parse_artifact_file,
+)
+from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 
 SYNTHETIC_PERMISSIONS: dict[str, Any] = {
     "global_forbidden_write": ["policy/**"],
@@ -326,13 +330,15 @@ def test_programmatic_id_normalization_and_streamlined_pipeline_checks(
     tmp_path: Path,
 ) -> None:
     """Verify next_artifact_id, normalize_new_stage_artifacts, and deferred AC check."""
-    from src.checkers.code_and_git_traceability import check_test_contract_coverage
-    from src.domain.parser import (
+    from multi_tasker.checkers.code_and_git_traceability import (
+        check_test_contract_coverage,
+    )
+    from multi_tasker.domain.parser import (
         load_artifacts_by_id,
         next_artifact_id,
         normalize_new_stage_artifacts,
     )
-    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
+    from multi_tasker.orchestrator.lifecycle import bootstrap_evaluation_repository
 
     eval_root = tmp_path / "eval_repo"
     bootstrap_evaluation_repository(eval_root, "Add helper.")
@@ -366,8 +372,8 @@ def test_gitignore_scaffolding_and_changed_files_exclude_python_caches(
 ) -> None:
     """Verify .gitignore and get_git_changed_files exclude Python cache files."""
     import subprocess
-    from src.checkers.common import get_git_changed_files
-    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
+    from multi_tasker.checkers.common import get_git_changed_files
+    from multi_tasker.orchestrator.lifecycle import bootstrap_evaluation_repository
 
     eval_root = tmp_path / "cache_repo"
     bootstrap_evaluation_repository(eval_root, "Verify cache ignore.")

@@ -13,21 +13,21 @@ target_files:
   tests:
   - tests/test_stage_runner.py
   implementation:
-  - src/domain/parser.py
-  - src/checkers/schemas_checker.py
-  - src/orchestrator/router.py
-  - src/orchestrator/stage_runner.py
-  - src/cli/main.py
+  - src/multi_tasker/domain/parser.py
+  - src/multi_tasker/checkers/schemas_checker.py
+  - src/multi_tasker/orchestrator/router.py
+  - src/multi_tasker/orchestrator/stage_runner.py
+  - src/multi_tasker/cli/main.py
 ---
 ## Design Overview
-Add `load_pipeline_policy(repository_root)` in `src/domain/parser.py` to load `policy/pipeline.yaml`. Extend `check_schemas` in `src/checkers/schemas_checker.py` to validate `execution_bounds`, `stages`, and `escalation_routes` in `policy/pipeline.yaml`. Update `route_escalation` in `src/orchestrator/router.py` to read `escalation_routes` and `execution_bounds.max_auto_reroutes` from `policy/pipeline.yaml`. Add `run_declarative_pipeline` in `src/orchestrator/stage_runner.py` and `--pipeline` on `mt run` in `src/cli/main.py` to execute ready stages (`INT` $\rightarrow$ `REQ` $\rightarrow$ `SPEC` $\rightarrow$ `TASK`) and `routed_to_agent` `Escalation` records in isolated `Worktrees` while honoring `approval_gate` (`human`, `review-agent`, `auto`) and `max_steps_per_run`.
+Add `load_pipeline_policy(repository_root)` in `src/multi_tasker/domain/parser.py` to load `policy/pipeline.yaml`. Extend `check_schemas` in `src/multi_tasker/checkers/schemas_checker.py` to validate `execution_bounds`, `stages`, and `escalation_routes` in `policy/pipeline.yaml`. Update `route_escalation` in `src/multi_tasker/orchestrator/router.py` to read `escalation_routes` and `execution_bounds.max_auto_reroutes` from `policy/pipeline.yaml`. Add `run_declarative_pipeline` in `src/multi_tasker/orchestrator/stage_runner.py` and `--pipeline` on `mt run` in `src/multi_tasker/cli/main.py` to execute ready stages (`INT` $\rightarrow$ `REQ` $\rightarrow$ `SPEC` $\rightarrow$ `TASK`) and `routed_to_agent` `Escalation` records in isolated `Worktrees` while honoring `approval_gate` (`human`, `review-agent`, `auto`) and `max_steps_per_run`.
 
 ## Public Interfaces
-- `src/domain/parser.py`:
+- `src/multi_tasker/domain/parser.py`:
   - `load_pipeline_policy(repository_root: Path) -> dict[str, Any]`
-- `src/orchestrator/router.py`:
+- `src/multi_tasker/orchestrator/router.py`:
   - `route_escalation(repository_root: Path, escalation_relative_path: str, prior_reroutes: int = 0) -> RouteDecision`
-- `src/orchestrator/stage_runner.py`:
+- `src/multi_tasker/orchestrator/stage_runner.py`:
   - `run_declarative_pipeline(repository_root: Path, options: tuple[str | None, str | None, str | None] = (None, None, None)) -> tuple[list[str], list[Finding]]`
 
 ## Test Contract Mapping

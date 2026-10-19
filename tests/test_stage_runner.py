@@ -6,14 +6,14 @@ from typing import Any
 
 import yaml
 
-from src.checkers.permissions_checker import check_permissions
-from src.checkers.schemas_checker import check_schemas
-from src.checkers.traceability_checker import check_traceability
-from src.cli.main import main
-from src.domain.models import traces
-from src.domain.parser import load_yaml_file, parse_artifact_file
-from src.orchestrator.router import route_escalation
-from src.orchestrator.stage_runner import run_agent_stage
+from multi_tasker.checkers.permissions_checker import check_permissions
+from multi_tasker.checkers.schemas_checker import check_schemas
+from multi_tasker.checkers.traceability_checker import check_traceability
+from multi_tasker.cli.main import main
+from multi_tasker.domain.models import traces
+from multi_tasker.domain.parser import load_yaml_file, parse_artifact_file
+from multi_tasker.orchestrator.router import route_escalation
+from multi_tasker.orchestrator.stage_runner import run_agent_stage
 from tests.test_interaction_logging import REPOSITORY_ROOT, _seed_test_repository
 
 
@@ -21,7 +21,7 @@ from tests.test_interaction_logging import REPOSITORY_ROOT, _seed_test_repositor
 def test_per_agent_model_precedence_and_policy_validation(tmp_path: Path) -> None:
     """Verify gemini-4-argon role defaults, 4-tier precedence, and policy checks."""
     _seed_test_repository(tmp_path)
-    prompt_module = importlib.import_module("src.orchestrator.prompt_builder")
+    prompt_module = importlib.import_module("multi_tasker.orchestrator.prompt_builder")
     intent_path = tmp_path / "artifacts" / "intents" / "INT-001.md"
     intent_path.write_text(
         "---\nid: INT-001\nstatus: open\ncreated_at: '2026-10-17T00:00:00Z'\n---\n"
@@ -165,7 +165,7 @@ _PIPELINE_HELPER_SCRIPT = (
     "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
     "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
     "target_files:\\n  tests: [tests/test_p.py]\\n"
-    "  implementation: [src/domain/p.py]\\n"
+    "  implementation: [src/multi_tasker/domain/p.py]\\n"
     "---\\n## Design Overview\\nDesign.\\n\\n## Public Interfaces\\nPublic.\\n\\n"
     "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
     "elif role == 'planner-agent':\n"
@@ -184,7 +184,7 @@ _PIPELINE_HELPER_SCRIPT = (
     "    Path('tests').mkdir(exist_ok=True)\n"
     "    q = chr(34)\n"
     "    Path('tests/test_p.py').write_text(\n"
-    "        f'from src.domain.models import traces\\n\\n'\n"
+    "        f'from multi_tasker.domain.models import traces\\n\\n'\n"
     "        f'@traces({q}REQ-001{q}, {q}AC-01{q}, {q}SPEC-001{q})\\n'\n"
     "        f'def test_p() -> None:\\n    assert True\\n'\n"
     "    )\n"
@@ -349,12 +349,13 @@ _GIT_TASK_TWO_BLOCK = (
     "'---\\nid: TASK-002\\ntitle: Pipeline Implementation\\n"
     "type: implementation\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
     "depends_on: [TASK-001]\\nrequired_files: [tests/test_p.py]\\n"
-    "write_files: [src/domain/p.py]\\n"
+    "write_files: [src/multi_tasker/domain/p.py]\\n"
     "verification_cmd: pytest -q tests/test_p.py\\n"
     "---\\n## Objective\\nImpl.\\n\\n## Scoped Instructions\\nImpl.\\n')\n"
     "elif role == 'worker-agent' and target == 'TASK-002':\n"
-    "    Path('src/domain').mkdir(parents=True, exist_ok=True)\n"
-    '    Path(\'src/domain/p.py\').write_text(\'"""Mod."""\\n\\nVALUE = 1\\n\')'
+    "    Path('src/multi_tasker/domain').mkdir(parents=True, exist_ok=True)\n"
+    "    Path('src/multi_tasker/domain/p.py').write_text("
+    '\'"""Mod."""\\n\\nVALUE = 1\\n\')'
 )
 
 _GIT_PIPELINE_SCRIPT = _PIPELINE_HELPER_SCRIPT.replace(
@@ -366,7 +367,7 @@ _GIT_PIPELINE_SCRIPT = _PIPELINE_HELPER_SCRIPT.replace(
 
 def _seed_real_git_pipeline_repo(tmp_path: Path) -> str:
     """Bootstrap a committed real-Git repo with auto INT gate and 2-task planner."""
-    lifecycle = importlib.import_module("src.orchestrator.lifecycle")
+    lifecycle = importlib.import_module("multi_tasker.orchestrator.lifecycle")
     lifecycle.bootstrap_evaluation_repository(tmp_path, "Add calculation helper.")
     script_path = tmp_path / ".report" / "real_git_agent.py"
     script_path.write_text(_GIT_PIPELINE_SCRIPT, encoding="utf-8")
@@ -379,7 +380,7 @@ def test_real_git_pipeline_commits_verification_pythonpath_and_rev_traceability(
     tmp_path: Path, capsys: Any
 ) -> None:
     """Verify full E2E pipeline in a real Git repo passes MergeGate and check all."""
-    from src.orchestrator.prompt_builder import resolve_task_execution
+    from multi_tasker.orchestrator.prompt_builder import resolve_task_execution
 
     agent_cmd = _seed_real_git_pipeline_repo(tmp_path)
     intent_doc, _ = parse_artifact_file(

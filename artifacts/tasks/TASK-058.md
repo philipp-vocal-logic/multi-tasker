@@ -9,8 +9,8 @@ traces_to:
 depends_on: []
 required_files:
 - tests/test_interaction_logging.py
-- src/cli/main.py
-- src/orchestrator/documentation_generator.py
+- src/multi_tasker/cli/main.py
+- src/multi_tasker/orchestrator/documentation_generator.py
 write_files:
 - tests/test_interaction_logging.py
 verification_cmd: pytest -q tests/test_lifecycle.py

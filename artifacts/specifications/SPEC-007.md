@@ -12,10 +12,10 @@ target_files:
   tests:
     - tests/test_orchestrator.py
   implementation:
-    - src/orchestrator/lifecycle.py
+    - src/multi_tasker/orchestrator/lifecycle.py
 ---
 ## Design Overview
-Extend `approve_artifact` in `src/orchestrator/lifecycle.py` so `SPEC-NNN` (`Specification`) artifacts in `draft` or `in_review` state can be approved via `mt approve`, validating `glossary` and `schemas` checks and marking downstream `done` `Task` artifacts as `needs_update`. Add data-driven tests in `tests/test_orchestrator.py` that iterate over all agent roles in `policy/permissions.yaml` and state transitions in `policy/schemas.yaml` to verify every `(agent_role, existing_state, target_state)` combination and CLI approval transition.
+Extend `approve_artifact` in `src/multi_tasker/orchestrator/lifecycle.py` so `SPEC-NNN` (`Specification`) artifacts in `draft` or `in_review` state can be approved via `mt approve`, validating `glossary` and `schemas` checks and marking downstream `done` `Task` artifacts as `needs_update`. Add data-driven tests in `tests/test_orchestrator.py` that iterate over all agent roles in `policy/permissions.yaml` and state transitions in `policy/schemas.yaml` to verify every `(agent_role, existing_state, target_state)` combination and CLI approval transition.
 
 ## Public Interfaces
 ```python

@@ -17,48 +17,49 @@ layers:
   - name: "domain"
     description: "Pure data structures, artifact models, state machines, and domain errors."
     paths:
-      - "src/domain/**"
+      - "src/multi_tasker/__init__.py"
+      - "src/multi_tasker/domain/**"
     allowed_internal_imports:
-      - "src.domain"
+      - "multi_tasker.domain"
     forbidden_internal_imports:
-      - "src.checkers"
-      - "src.orchestrator"
-      - "src.cli"
+      - "multi_tasker.checkers"
+      - "multi_tasker.orchestrator"
+      - "multi_tasker.cli"
       - "tests"
 
   - name: "checkers"
     description: "Deterministic CLI validators (permissions, schemas, glossary, limits, clean_code, architecture, traceability)."
     paths:
-      - "src/checkers/**"
+      - "src/multi_tasker/checkers/**"
     allowed_internal_imports:
-      - "src.domain"
-      - "src.checkers"
+      - "multi_tasker.domain"
+      - "multi_tasker.checkers"
     forbidden_internal_imports:
-      - "src.orchestrator"
-      - "src.cli"
+      - "multi_tasker.orchestrator"
+      - "multi_tasker.cli"
       - "tests"
 
   - name: "orchestrator"
     description: "Clean Worktree manager, MergeGate runner, parallel Task scheduler, and Escalation router."
     paths:
-      - "src/orchestrator/**"
+      - "src/multi_tasker/orchestrator/**"
     allowed_internal_imports:
-      - "src.domain"
-      - "src.checkers"
-      - "src.orchestrator"
+      - "multi_tasker.domain"
+      - "multi_tasker.checkers"
+      - "multi_tasker.orchestrator"
     forbidden_internal_imports:
-      - "src.cli"
+      - "multi_tasker.cli"
       - "tests"
 
   - name: "cli"
     description: "Thin CLI entrypoints (`mt initialize`, `mt check`, `mt schedule`, `mt impact`, `mt intent`, `mt approve`, `mt run`, `mt resolve`, `mt trace`, `mt documentation`, `mt prompt`)."
     paths:
-      - "src/cli/**"
+      - "src/multi_tasker/cli/**"
     allowed_internal_imports:
-      - "src.domain"
-      - "src.checkers"
-      - "src.orchestrator"
-      - "src.cli"
+      - "multi_tasker.domain"
+      - "multi_tasker.checkers"
+      - "multi_tasker.orchestrator"
+      - "multi_tasker.cli"
     forbidden_internal_imports:
       - "tests"
 
@@ -67,9 +68,9 @@ layers:
     paths:
       - "tests/**"
     allowed_internal_imports:
-      - "src.domain"
-      - "src.checkers"
-      - "src.orchestrator"
-      - "src.cli"
+      - "multi_tasker.domain"
+      - "multi_tasker.checkers"
+      - "multi_tasker.orchestrator"
+      - "multi_tasker.cli"
       - "tests"
     forbidden_internal_imports: []

@@ -7,12 +7,12 @@ import subprocess
 import pytest
 import yaml
 
-from src.checkers import common, permissions_checker
-from src.cli.main import main
-from src.domain import parser as domain_parser
-from src.domain.models import traces
-from src.domain.parser import load_yaml_file, parse_artifact_file
-from src.orchestrator.worktree import create_worktree
+from multi_tasker.checkers import common, permissions_checker
+from multi_tasker.cli.main import main
+from multi_tasker.domain import parser as domain_parser
+from multi_tasker.domain.models import traces
+from multi_tasker.domain.parser import load_yaml_file, parse_artifact_file
+from multi_tasker.orchestrator.worktree import create_worktree
 from tests.test_lifecycle import REPOSITORY_ROOT, _seed_policies, _write_document
 from tests.test_orchestrator import _seed_minimal_policies
 
@@ -318,14 +318,19 @@ def test_atomic_approve_and_failed_run_preserve_clean_base(tmp_path: Path) -> No
 @traces("REQ-009", "AC-02", "SPEC-009")
 @traces("REQ-018", "AC-01", "SPEC-018")
 @traces("REQ-018", "AC-02", "SPEC-018")
+@traces("REQ-026", "AC-01", "SPEC-026")
 def test_modular_refactoring_and_file_size_ceilings(tmp_path: Path) -> None:
     """Verify module decomposition, 500-line ceiling, and 400-line refactor hints."""
-    task_runner = importlib.import_module("src.orchestrator.task_runner")
-    lifecycle = importlib.import_module("src.orchestrator.lifecycle")
-    code_git_trace = importlib.import_module("src.checkers.code_and_git_traceability")
-    traceability_module = importlib.import_module("src.checkers.traceability_checker")
-    limits_module = importlib.import_module("src.checkers.limits_checker")
-    prompt_module = importlib.import_module("src.orchestrator.prompt_builder")
+    task_runner = importlib.import_module("multi_tasker.orchestrator.task_runner")
+    lifecycle = importlib.import_module("multi_tasker.orchestrator.lifecycle")
+    code_git_trace = importlib.import_module(
+        "multi_tasker.checkers.code_and_git_traceability"
+    )
+    traceability_module = importlib.import_module(
+        "multi_tasker.checkers.traceability_checker"
+    )
+    limits_module = importlib.import_module("multi_tasker.checkers.limits_checker")
+    prompt_module = importlib.import_module("multi_tasker.orchestrator.prompt_builder")
     assert callable(getattr(task_runner, "run_scheduled_tasks", None))
     assert not hasattr(lifecycle, "run_scheduled_tasks")
     for func_name in (

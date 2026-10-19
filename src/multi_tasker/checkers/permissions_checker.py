@@ -4,9 +4,9 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from src.checkers.common import get_git_changed_files
-from src.domain.models import Finding
-from src.domain.parser import (
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import (
     infer_artifact_type,
     load_state_transitions,
     load_yaml_file,

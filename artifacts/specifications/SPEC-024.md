@@ -11,11 +11,11 @@ target_files:
   tests:
   - tests/test_checkers.py
   implementation:
-  - src/orchestrator/lifecycle.py
-  - src/checkers/common.py
+  - src/multi_tasker/orchestrator/lifecycle.py
+  - src/multi_tasker/checkers/common.py
 ---
 ## Design Overview
-Expand `DEFAULT_GITIGNORE_ENTRIES` in `src/orchestrator/lifecycle.py` with `"__pycache__/"`, `"*.py[cod]"`, and `".pytest_cache/"`, and add a path filter in `get_git_changed_files` in `src/checkers/common.py` so untracked or modified cache files under `__pycache__/` or `.pytest_cache/` and `.pyc`/`.pyo`/`.pyd` files are never returned as changed repository paths.
+Expand `DEFAULT_GITIGNORE_ENTRIES` in `src/multi_tasker/orchestrator/lifecycle.py` with `"__pycache__/"`, `"*.py[cod]"`, and `".pytest_cache/"`, and add a path filter in `get_git_changed_files` in `src/multi_tasker/checkers/common.py` so untracked or modified cache files under `__pycache__/` or `.pytest_cache/` and `.pyc`/`.pyo`/`.pyd` files are never returned as changed repository paths.
 
 ## Public Interfaces
 - `get_git_changed_files(repository_root: Path) -> list[str]`

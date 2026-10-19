@@ -7,10 +7,10 @@ import subprocess
 
 import yaml
 
-from src.checkers.common import get_git_changed_files
-from src.checkers.runner import run_checks
-from src.domain.models import ArtifactDocument, Finding
-from src.domain.parser import (
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.checkers.runner import run_checks
+from multi_tasker.domain.models import ArtifactDocument, Finding
+from multi_tasker.domain.parser import (
     ARTIFACT_DIRECTORY_TO_TYPE,
     load_artifacts_by_id,
     load_pipeline_policy,
@@ -18,12 +18,12 @@ from src.domain.parser import (
     load_yaml_file,
     update_artifact_frontmatter,
 )
-from src.orchestrator.documentation_generator import (
+from multi_tasker.orchestrator.documentation_generator import (
     generate_external_agents_guide,
     write_repository_documentation,
 )
-from src.orchestrator.scheduler import compute_dirty_subgraph
-from src.orchestrator.worktree import commit_traceable_change
+from multi_tasker.orchestrator.scheduler import compute_dirty_subgraph
+from multi_tasker.orchestrator.worktree import commit_traceable_change
 
 
 DEFAULT_GITIGNORE_ENTRIES = (
@@ -38,7 +38,7 @@ DEFAULT_GITIGNORE_ENTRIES = (
 
 def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
     """Copy missing default policy/*.yaml templates and ensure .gitignore entries."""
-    template_directory = Path(__file__).resolve().parents[2] / "policy"
+    template_directory = Path(__file__).resolve().parents[3] / "policy"
     target_policy_directory = repository_root / "policy"
     if template_directory.is_dir():
         for template_path in sorted(template_directory.glob("*.yaml")):

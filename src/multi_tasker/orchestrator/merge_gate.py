@@ -6,12 +6,12 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.checkers.common import get_git_changed_files
-from src.checkers.permissions_checker import check_permissions
-from src.checkers.runner import run_checks
-from src.domain.models import Finding
-from src.domain.parser import parse_artifact_file
-from src.orchestrator.worktree import compute_policy_sha256
+from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.checkers.permissions_checker import check_permissions
+from multi_tasker.checkers.runner import run_checks
+from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import parse_artifact_file
+from multi_tasker.orchestrator.worktree import compute_policy_sha256
 
 GATE_CHECK_SUITES = [
     "schemas",
@@ -65,8 +65,7 @@ def _run_verification_command(
 ) -> list[Finding]:
     """Execute deterministic verification_command and emit a Finding on failure."""
     arguments = shlex.split(command_string)
-    python_path = f"{worktree_path}{os.pathsep}{Path(__file__).parents[2]}"
-    environment = {**os.environ, "PYTHONPATH": python_path}
+    environment = {**os.environ, "PYTHONPATH": str(worktree_path)}
     try:
         process = subprocess.run(
             arguments,

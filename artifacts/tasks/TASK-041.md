@@ -12,16 +12,16 @@ depends_on:
 - TASK-042
 required_files:
 - tests/test_stage_runner.py
-- src/domain/parser.py
-- src/orchestrator/router.py
+- src/multi_tasker/domain/parser.py
+- src/multi_tasker/orchestrator/router.py
 write_files:
-- src/checkers/schemas_checker.py
-- src/orchestrator/stage_runner.py
-- src/cli/main.py
+- src/multi_tasker/checkers/schemas_checker.py
+- src/multi_tasker/orchestrator/stage_runner.py
+- src/multi_tasker/cli/main.py
 verification_cmd: pytest -q tests/test_checkers.py tests/test_stage_runner.py tests/test_orchestrator.py
 ---
 ## Objective
-Implement `run_declarative_pipeline` in `src/orchestrator/stage_runner.py` and wire `--pipeline` into `mt run` in `src/cli/main.py`.
+Implement `run_declarative_pipeline` in `src/multi_tasker/orchestrator/stage_runner.py` and wire `--pipeline` into `mt run` in `src/multi_tasker/cli/main.py`.
 
 ## Scoped Instructions
-Add `run_declarative_pipeline` to `src/orchestrator/stage_runner.py` to evaluate `policy/pipeline.yaml` up to `max_steps_per_run`, dispatching `routed_to_agent` `Escalation` records and actionable `stages` in isolated `Worktrees` while honoring `approval_gate` (`human`, `review-agent`, `auto`). Add `--pipeline` to `mt run` in `src/cli/main.py`.
+Add `run_declarative_pipeline` to `src/multi_tasker/orchestrator/stage_runner.py` to evaluate `policy/pipeline.yaml` up to `max_steps_per_run`, dispatching `routed_to_agent` `Escalation` records and actionable `stages` in isolated `Worktrees` while honoring `approval_gate` (`human`, `review-agent`, `auto`). Add `--pipeline` to `mt run` in `src/multi_tasker/cli/main.py`.

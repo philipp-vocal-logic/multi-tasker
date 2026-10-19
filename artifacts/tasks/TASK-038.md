@@ -11,14 +11,14 @@ depends_on:
 - TASK-037
 required_files:
 - tests/test_stage_runner.py
-- src/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_builder.py
 write_files:
-- src/orchestrator/stage_runner.py
-- src/cli/main.py
+- src/multi_tasker/orchestrator/stage_runner.py
+- src/multi_tasker/cli/main.py
 verification_cmd: pytest -q
 ---
 ## Objective
-Create `src/orchestrator/stage_runner.py` and wire `--agent` and `--target` into `mt run` in `src/cli/main.py`.
+Create `src/multi_tasker/orchestrator/stage_runner.py` and wire `--agent` and `--target` into `mt run` in `src/multi_tasker/cli/main.py`.
 
 ## Scoped Instructions
-Implement `is_worktree_agent_enabled` and `run_agent_stage` in `src/orchestrator/stage_runner.py` to run enabled agent roles in isolated `Worktrees` verified by `MergeGate`, and update `src/cli/main.py` (`mt run`) to support `--agent` and `--target` and enforce `worktree_execution`.
+Implement `is_worktree_agent_enabled` and `run_agent_stage` in `src/multi_tasker/orchestrator/stage_runner.py` to run enabled agent roles in isolated `Worktrees` verified by `MergeGate`, and update `src/multi_tasker/cli/main.py` (`mt run`) to support `--agent` and `--target` and enforce `worktree_execution`.

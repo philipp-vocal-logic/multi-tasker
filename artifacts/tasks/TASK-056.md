@@ -9,7 +9,7 @@ traces_to:
 depends_on: []
 required_files:
 - tests/test_checkers.py
-- src/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_builder.py
 write_files:
 - tests/test_checkers.py
 verification_cmd: pytest -q tests/test_lifecycle.py

@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from src.domain.models import ArtifactDocument
-from src.domain.parser import load_artifacts_by_id
+from multi_tasker.domain.models import ArtifactDocument
+from multi_tasker.domain.parser import load_artifacts_by_id
 
 
 def _is_task_eligible(

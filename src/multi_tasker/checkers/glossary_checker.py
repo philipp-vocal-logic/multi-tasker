@@ -5,9 +5,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from src.checkers.common import collect_repository_files, parse_python_ast
-from src.domain.models import Finding
-from src.domain.parser import load_yaml_file
+from multi_tasker.checkers.common import collect_repository_files, parse_python_ast
+from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import load_yaml_file
 
 WORD_TOKEN_REGEX = re.compile(r"[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|[A-Z]?[a-z]+|\d+")
 SynonymRule = tuple[re.Pattern[str], tuple[str, ...], str, str, str]

@@ -4,13 +4,13 @@ import ast
 from pathlib import Path
 import re
 
-from src.checkers.common import (
+from multi_tasker.checkers.common import (
     extract_test_traces,
     get_git_commit_subjects,
     parse_python_ast,
 )
-from src.domain.models import ArtifactDocument
-from src.domain.parser import load_artifacts_by_id
+from multi_tasker.domain.models import ArtifactDocument
+from multi_tasker.domain.parser import load_artifacts_by_id
 
 COMMIT_ID_REGEX = re.compile(r"\b(?:INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}\b")
 

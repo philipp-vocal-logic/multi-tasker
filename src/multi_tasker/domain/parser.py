@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from src.domain.models import ArtifactDocument, Finding, SectionSlice
+from multi_tasker.domain.models import ArtifactDocument, Finding, SectionSlice
 
 ARTIFACT_DIRECTORY_TO_TYPE: dict[str, str] = {
     "intents": "INT",

@@ -12,14 +12,14 @@ required_files:
 - artifacts/specifications/SPEC-025.md
 - tests/test_traceability_and_cli.py
 write_files:
-- src/checkers/runner.py
-- src/checkers/permissions_checker.py
-- src/orchestrator/prompt_builder.py
-- src/orchestrator/task_runner.py
+- src/multi_tasker/checkers/runner.py
+- src/multi_tasker/checkers/permissions_checker.py
+- src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/task_runner.py
 verification_cmd: pytest -q tests/test_traceability_and_cli.py tests/test_checkers.py
 ---
 ## Objective
-Forward `target_paths` to `check_permissions` in `src/checkers/runner.py`, fail fast on missing `worker-agent` `--task` even when `files` is empty in `src/checkers/permissions_checker.py`, render `--task <target_id>` in `src/orchestrator/prompt_builder.py`, and remove the dummy `task_id` fallback in `src/orchestrator/task_runner.py`.
+Forward `target_paths` to `check_permissions` in `src/multi_tasker/checkers/runner.py`, fail fast on missing `worker-agent` `--task` even when `files` is empty in `src/multi_tasker/checkers/permissions_checker.py`, render `--task <target_id>` in `src/multi_tasker/orchestrator/prompt_builder.py`, and remove the dummy `task_id` fallback in `src/multi_tasker/orchestrator/task_runner.py`.
 
 ## Scoped Instructions
 Keep all modified files under 400 lines and all functions within configured clean code limits.
