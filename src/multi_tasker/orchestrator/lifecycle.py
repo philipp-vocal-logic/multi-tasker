@@ -36,7 +36,70 @@ DEFAULT_GITIGNORE_ENTRIES = (
 )
 
 
-def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
+VALID_PRESETS = ("python", "multi-tasker")
+
+DEFAULT_PYTHON_ARCHITECTURE: dict[str, object] = {
+    "version": 1,
+    "dependency_rules": {
+        "forbid_circular_imports": True,
+        "forbid_src_importing_tests": True,
+    },
+    "allowed_third_party_packages": ["yaml", "jsonschema", "pytest", "multi_tasker"],
+    "layers": [
+        {
+            "name": "domain",
+            "paths": ["src/domain/**", "src/*.py"],
+            "allowed_internal_imports": ["src.domain", "domain"],
+            "forbidden_internal_imports": ["src.services", "src.cli", "tests"],
+        },
+        {
+            "name": "services",
+            "paths": ["src/services/**", "src/application/**"],
+            "allowed_internal_imports": [
+                "src.domain",
+                "src.services",
+                "src.application",
+                "domain",
+                "services",
+                "application",
+            ],
+            "forbidden_internal_imports": ["src.cli", "tests"],
+        },
+        {
+            "name": "cli",
+            "paths": ["src/cli/**"],
+            "allowed_internal_imports": [
+                "src.domain",
+                "src.services",
+                "src.application",
+                "src.cli",
+                "domain",
+                "services",
+                "application",
+                "cli",
+            ],
+            "forbidden_internal_imports": ["tests"],
+        },
+        {
+            "name": "tests",
+            "paths": ["tests/**"],
+            "allowed_internal_imports": [
+                "src",
+                "domain",
+                "services",
+                "application",
+                "cli",
+                "tests",
+            ],
+            "forbidden_internal_imports": [],
+        },
+    ],
+}
+
+
+def _scaffold_default_policies_and_gitignore(
+    repository_root: Path, preset: str = "python"
+) -> None:
     """Copy missing default policy/*.yaml templates and ensure .gitignore entries."""
     template_directory = Path(__file__).resolve().parents[3] / "policy"
     target_policy_directory = repository_root / "policy"
@@ -44,9 +107,12 @@ def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
         for template_path in sorted(template_directory.glob("*.yaml")):
             destination = target_policy_directory / template_path.name
             if not destination.exists():
-                destination.write_text(
-                    template_path.read_text(encoding="utf-8"), encoding="utf-8"
+                content = (
+                    yaml.safe_dump(DEFAULT_PYTHON_ARCHITECTURE, sort_keys=False)
+                    if template_path.name == "architecture.yaml" and preset == "python"
+                    else template_path.read_text(encoding="utf-8")
                 )
+                destination.write_text(content, encoding="utf-8")
     gitignore_path = repository_root / ".gitignore"
     existing_text = (
         gitignore_path.read_text(encoding="utf-8") if gitignore_path.is_file() else ""
@@ -69,12 +135,17 @@ def _scaffold_default_policies_and_gitignore(repository_root: Path) -> None:
         agents_path.write_text(generate_external_agents_guide(), encoding="utf-8")
 
 
-def initialize_repository(repository_root: Path) -> list[Finding]:
+def initialize_repository(
+    repository_root: Path, preset: str = "python"
+) -> list[Finding]:
     """Initialize policy/, artifacts/ subdirectories, and a Git repository."""
+    if preset not in VALID_PRESETS:
+        message = f"Unknown preset '{preset}' (expected: {', '.join(VALID_PRESETS)})."
+        return [Finding("policy/architecture.yaml", 1, "CLI_INVALID_PRESET", message)]
     (repository_root / "policy").mkdir(parents=True, exist_ok=True)
     for folder in ARTIFACT_DIRECTORY_TO_TYPE:
         (repository_root / "artifacts" / folder).mkdir(parents=True, exist_ok=True)
-    _scaffold_default_policies_and_gitignore(repository_root)
+    _scaffold_default_policies_and_gitignore(repository_root, preset)
     if not (repository_root / ".git").exists() and shutil.which("git"):
         subprocess.run(
             ["git", "init", "-q"], cwd=repository_root, capture_output=True, check=False

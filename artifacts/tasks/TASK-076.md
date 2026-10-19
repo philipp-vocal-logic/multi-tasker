@@ -2,7 +2,7 @@
 id: TASK-076
 title: Implement Policy Presets in Repository Initialization and CLI
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-027
 - SPEC-027

@@ -64,9 +64,11 @@ def _add_run_and_prompt_parsers(subparsers: Any) -> None:
 
 def _add_lifecycle_parsers(subparsers: Any) -> None:
     """Register initialize, intent, approve, resolve, run, trace, and documentation."""
-    for name in ("initialize", "documentation"):
-        subparser = subparsers.add_parser(name)
-        subparser.add_argument("--root", default=".", help="Repository root directory.")
+    init_parser = subparsers.add_parser("initialize")
+    init_parser.add_argument("--preset", default="python", dest="preset")
+    init_parser.add_argument("--root", default=".", help="Repository root directory.")
+    doc_parser = subparsers.add_parser("documentation")
+    doc_parser.add_argument("--root", default=".", help="Repository root directory.")
     intent_help = "Intent statement describing what to change and why (or file path)."
     intent_parser = subparsers.add_parser("intent", description=intent_help)
     intent_parser.add_argument("text", help=intent_help)
@@ -230,7 +232,10 @@ def _dispatch_lifecycle(
 ) -> int:
     """Dispatch initialize, intent, approve, resolve, run, trace, or documentation."""
     if command == "initialize":
-        return emit_findings(repository_root, initialize_repository(repository_root))
+        preset = str(getattr(arguments, "preset", "python"))
+        return emit_findings(
+            repository_root, initialize_repository(repository_root, preset)
+        )
     if command == "intent":
         sys.stdout.write(f"{create_intent(repository_root, str(arguments.text))}\n")
         return 0
