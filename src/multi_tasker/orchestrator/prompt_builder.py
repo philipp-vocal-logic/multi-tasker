@@ -143,6 +143,8 @@ def _render_code_and_glossary_section(
     lines = [
         "## 3. Vocabulary & Engineering Constraints",
         *_render_architecture_layers(repository_root),
+        "- **TestContract Decorator**: `from multi_tasker.domain.models import traces` "
+        'with 3 string arguments `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`',
     ]
     if agent_role in {"worker-agent", "review-agent"}:
         limits_path = repository_root / "policy" / "limits.yaml"
@@ -237,7 +239,8 @@ def _assemble_prompt_sections(
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
         f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
-        "`verification_cmd: python3 -m py_compile <test_file>`) and "
+        "`verification_cmd: python3 -m py_compile <test_file>`, decorating tests "
+        'with `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`) and '
         f"`type: implementation` Task(s) (`depends_on: [{next_id}]`, `write_files` "
         "covering `SPEC` `target_files.implementation`, "
         "`verification_cmd: pytest -q <test_file>`)."

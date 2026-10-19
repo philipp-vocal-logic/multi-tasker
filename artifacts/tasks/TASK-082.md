@@ -2,7 +2,7 @@
 id: TASK-082
 title: Implement Decorator Prompt Guidance and Pipeline Worker Environment Default
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-030
 - SPEC-030

@@ -326,7 +326,7 @@ def _step_declarative_stage(
     gate = str(stage.get("approval_gate", "human"))
     if role == "worker-agent":
         return run_scheduled_tasks(
-            repository_root, 1, options[0], options[1], options[2]
+            repository_root, 1, options[0], options[1], options[2] or "agy"
         )
     produced, findings = run_agent_stage(repository_root, role, target_id, options)
     if findings or gate == "human":
