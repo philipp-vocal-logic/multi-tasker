@@ -13,7 +13,7 @@ import pytest
 
 from multi_tasker.cli.main import build_parser, main
 from multi_tasker.domain.models import ArtifactDocument, traces
-from multi_tasker.domain.parser import load_yaml_file, parse_artifact_file
+from multi_tasker.domain.parser import load_yaml_file
 from multi_tasker.orchestrator.documentation_generator import (
     generate_external_agents_guide,
     write_repository_documentation,
@@ -165,77 +165,62 @@ def test_worktree_task_execution_and_merge_gate_logs_merged(tmp_path: Path) -> N
 
 
 @traces("REQ-012", "AC-01", "SPEC-012")
+@traces("REQ-028", "AC-02", "SPEC-028")
 def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
-    """Verify default_context_mode validation and CLI > Task > Policy precedence."""
+    """Verify execution_environments validation without context_mode branching."""
     _seed_test_repository(tmp_path)
     prompt_module = importlib.import_module("multi_tasker.orchestrator.prompt_builder")
-    assert prompt_module.resolve_context_mode(tmp_path) == "inline"
-    task_path = tmp_path / "artifacts" / "tasks" / "TASK-001.md"
-    task_path.write_text(
-        "---\nid: TASK-001\ntitle: Mode Task\ntype: test_contract\n"
-        "status: planned\ntraces_to: [REQ-001]\ndepends_on: []\n"
-        "required_files: []\nwrite_files: [tests/test_mode.py]\n"
-        "context_mode: paths\nverification_cmd: pytest -q\n---\n",
-        encoding="utf-8",
-    )
-    document, _ = parse_artifact_file(task_path, "artifacts/tasks/TASK-001.md")
-    assert document is not None
-    assert prompt_module.resolve_context_mode(tmp_path, document) == "paths"
-    assert prompt_module.resolve_context_mode(tmp_path, document, "inline") == "inline"
+    assert not hasattr(prompt_module, "resolve_context_mode")
+    assert not hasattr(prompt_module, "VALID_CONTEXT_MODES")
     permissions_path = tmp_path / "policy" / "permissions.yaml"
     permissions = load_yaml_file(permissions_path)
-    permissions["execution_environments"]["default_context_mode"] = "invalid"
+    assert "default_context_mode" not in permissions.get("execution_environments", {})
+    permissions["execution_environments"]["default_environment"] = "missing"
     permissions_path.write_text(yaml.safe_dump(permissions), encoding="utf-8")
     findings = check_permissions(tmp_path)
     assert any(item.rule_id == "PERM_INVALID_EXEC_ENV" for item in findings)
 
 
-def _assert_prompt_context_modes(capsys: Any) -> None:
-    """Assert mt prompt outputs for invalid, inline, and paths context modes."""
-    bad_args = ["prompt", "worker-agent", "--context-mode", "bad", "--root"]
-    assert main([*bad_args, str(REPOSITORY_ROOT)]) == 1
-    assert "[CLI_INVALID_CONTEXT_MODE]" in capsys.readouterr().out
-    inline_args = [
+def _assert_self_contained_prompt_output(capsys: Any) -> None:
+    """Assert mt prompt outputs Execution Steps and Architecture Layers."""
+    prompt_args = [
         "prompt",
         "worker-agent",
         "--target",
         "TASK-002",
-        "--context-mode",
-        "inline",
         "--root",
         str(REPOSITORY_ROOT),
     ]
-    assert main(inline_args) == 0
-    inline_output = capsys.readouterr().out
-    assert "Context Mode**: `inline`" in inline_output
-    assert "Forbidden Synonyms" in inline_output
-    assert "def test_permissions_checker_matrix" in inline_output
-    assert "class Finding" in inline_output
-    paths_args = [*inline_args[:-3], "paths", "--root", str(REPOSITORY_ROOT)]
-    assert main(paths_args) == 0
-    paths_output = capsys.readouterr().out
-    assert "Context Mode**: `paths`" in paths_output
-    assert "### Required File `tests/test_checkers.py`" in paths_output
-    assert "def test_permissions_checker_matrix" not in paths_output
-    assert "class Finding" not in paths_output
+    assert main(prompt_args) == 0
+    prompt_output = capsys.readouterr().out
+    assert "Self-Contained Context" in prompt_output
+    assert "Execution Steps" in prompt_output
+    assert "mt check all --agent worker-agent --task TASK-002 --paths" in prompt_output
+    assert "./mt check all" not in prompt_output
+    assert "Architecture Layers" in prompt_output
+    assert "Forbidden Synonyms" in prompt_output
+    assert "def test_permissions_checker_matrix" in prompt_output
+    assert "class Finding" in prompt_output
 
 
 @traces("REQ-012", "AC-02", "SPEC-012")
+@traces("REQ-028", "AC-01", "SPEC-028")
 def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
-    """Verify inline vs paths prompt synthesis and MT_CONTEXT_MODE in mt run."""
-    _assert_prompt_context_modes(capsys)
+    """Verify self-contained prompt synthesis and Worktree execution."""
+    _assert_self_contained_prompt_output(capsys)
     _seed_test_repository(tmp_path)
     _write_task_artifact(
         tmp_path, "TASK-001", "tests/test_mode.py", "python3 -c 'assert True'"
     )
     worker_cmd = (
         'python3 -c "import os; from pathlib import Path; '
-        "assert os.environ['MT_CONTEXT_MODE'] == 'paths'; "
+        "assert 'MT_CONTEXT_MODE' not in os.environ; "
         "prompt = Path(os.environ['MT_PROMPT_FILE']).read_text('utf-8'); "
-        "assert 'Context Mode**: `paths`' in prompt; "
+        "assert 'Self-Contained Context' in prompt; "
+        "assert 'Execution Steps' in prompt; "
         "Path('tests/test_mode.py').write_text('MODE = 1\\n')\""
     )
-    run_args = ["run", "--context-mode", "paths", "--agent-command", worker_cmd]
+    run_args = ["run", "--agent-command", worker_cmd]
     assert main([*run_args, "--root", str(tmp_path)]) == 0
 
 

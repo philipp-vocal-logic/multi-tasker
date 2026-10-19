@@ -2,7 +2,7 @@
 id: TASK-077
 title: TestContracts for Canonical Self-Contained Role Prompts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-028
 - SPEC-028
