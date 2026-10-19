@@ -1,4 +1,4 @@
-"""Deterministic role prompt synthesizer from policies and repository artifacts."""
+"""Deterministic self-contained role prompt synthesizer from policies and artifacts."""
 
 import os
 from pathlib import Path
@@ -22,28 +22,6 @@ ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
     "worker-agent": "TASK",
     "review-agent": "REV",
 }
-VALID_CONTEXT_MODES = {"inline", "paths"}
-
-
-def resolve_context_mode(
-    repository_root: Path,
-    document: ArtifactDocument | None = None,
-    context_mode_override: str | None = None,
-) -> str:
-    """Resolve context_mode ('inline' or 'paths') with CLI > Task > Policy order."""
-    cli_mode = context_mode_override or os.environ.get("MT_CONTEXT_MODE")
-    if cli_mode:
-        return cli_mode.strip()
-    if document is not None:
-        task_mode = str(document.frontmatter.get("context_mode", "")).strip()
-        if task_mode:
-            return task_mode
-    permissions_path = repository_root / "policy" / "permissions.yaml"
-    permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
-    execution_config: dict[str, Any] = permissions.get("execution_environments", {})
-    return (
-        str(execution_config.get("default_context_mode", "inline")).strip() or "inline"
-    )
 
 
 def _find_role_definition(repository_root: Path, agent_role: str) -> str:
@@ -63,14 +41,12 @@ def _render_permissions_section(
     agent_role: str,
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
-    context_mode: str,
 ) -> list[str]:
     """Render WriteScope, state transitions, and escalation rules for agent_role."""
     lines = [
         f"# Role Prompt: `{agent_role}`",
         "",
         "## 1. WriteScope & Permission Contract",
-        f"- **Context Mode**: `{context_mode}`",
         f"- **Global Forbidden Writes**: `{', '.join(global_forbidden) or 'none'}`",
     ]
     for rule in role_configuration.get("allowed_write", []):
@@ -112,7 +88,7 @@ def _render_section_budgets(artifact_rules: dict[str, Any]) -> list[str]:
 
 
 def _render_artifact_schema_block(
-    artifact_type: str, schemas_policy: dict[str, Any], context_mode: str = "inline"
+    artifact_type: str, schemas_policy: dict[str, Any]
 ) -> list[str]:
     """Render frontmatter schema and required Markdown section constraints."""
     artifact_rules = schemas_policy.get("artifacts", {}).get(artifact_type, {})
@@ -120,46 +96,55 @@ def _render_artifact_schema_block(
     if not artifact_rules and not schema_def:
         return []
     lines = [f"### `{artifact_type}` Output Contract"]
-    if context_mode == "inline" and schema_def:
+    if schema_def:
         dumped = yaml.safe_dump(schema_def, sort_keys=False).strip()
         lines.extend(["```yaml", dumped, "```"])
-    elif schema_def:
-        lines.append(
-            f"- **Schema Reference**: `policy/schemas.yaml` (`schemas.{artifact_type}`)"
-        )
     return [*lines, *_render_section_budgets(artifact_rules), ""]
 
 
-def _render_glossary_constraints(repository_root: Path, context_mode: str) -> list[str]:
-    """Render canonical glossary terms and inline forbidden_synonyms when enabled."""
+def _render_glossary_constraints(repository_root: Path) -> list[str]:
+    """Render canonical glossary terms and forbidden_synonyms."""
     glossary_path = repository_root / "policy" / "glossary.yaml"
     if not glossary_path.exists():
         return []
     terms: list[dict[str, Any]] = load_yaml_file(glossary_path).get("terms", [])
     canonical_names = [str(item.get("canonical", "")) for item in terms]
-    lines = [f"- **Canonical Terms**: {', '.join(canonical_names)}"]
-    if context_mode == "inline":
-        forbidden_pairs = [
-            f"`{item.get('canonical')}` != "
-            f"{', '.join(item.get('forbidden_synonyms', [])[:3])}"
-            for item in terms
-            if item.get("forbidden_synonyms")
-        ]
-        lines.append(f"- **Forbidden Synonyms**: {'; '.join(forbidden_pairs)}")
-    return lines
+    forbidden_pairs = [
+        f"`{item.get('canonical')}` != "
+        f"{', '.join(item.get('forbidden_synonyms', [])[:3])}"
+        for item in terms
+        if item.get("forbidden_synonyms")
+    ]
+    return [
+        f"- **Canonical Terms**: {', '.join(canonical_names)}",
+        f"- **Forbidden Synonyms**: {'; '.join(forbidden_pairs)}",
+    ]
+
+
+def _render_architecture_layers(repository_root: Path) -> list[str]:
+    """Render defined layer names and path globs from policy/architecture.yaml."""
+    arch_path = repository_root / "policy" / "architecture.yaml"
+    if not arch_path.exists():
+        return []
+    layers = load_yaml_file(arch_path).get("layers", [])
+    entries = [
+        f"`{item.get('name')}` "
+        f"({', '.join(str(item_path) for item_path in item.get('paths', []))})"
+        for item in layers
+        if isinstance(item, dict) and item.get("name")
+    ]
+    return [f"- **Architecture Layers**: {', '.join(entries)}"] if entries else []
 
 
 def _render_code_and_glossary_section(
-    repository_root: Path, agent_role: str, context_mode: str = "inline"
+    repository_root: Path, agent_role: str
 ) -> list[str]:
-    """Render sizing limits, clean code rules, and canonical glossary terms."""
-    lines = ["## 3. Vocabulary & Engineering Constraints"]
-    if context_mode == "paths":
-        lines.append(
-            "- **Policy Files**: `policy/limits.yaml`, `policy/clean_code.yaml`, "
-            "`policy/glossary.yaml`"
-        )
-    elif agent_role in {"worker-agent", "review-agent"}:
+    """Render architecture layers, sizing limits, AST rules, and glossary terms."""
+    lines = [
+        "## 3. Vocabulary & Engineering Constraints",
+        *_render_architecture_layers(repository_root),
+    ]
+    if agent_role in {"worker-agent", "review-agent"}:
         limits_path = repository_root / "policy" / "limits.yaml"
         if limits_path.exists():
             source_limits = load_yaml_file(limits_path).get("source_code", {})
@@ -175,7 +160,7 @@ def _render_code_and_glossary_section(
         if hints:
             items = ", ".join(f"`{item.path}` ({item.line} lines)" for item in hints)
             lines.append(f"- **Refactoring Targets (Warning)**: {items}")
-    return [*lines, *_render_glossary_constraints(repository_root, context_mode), ""]
+    return [*lines, *_render_glossary_constraints(repository_root), ""]
 
 
 def _collect_context_documents(
@@ -193,12 +178,12 @@ def _collect_context_documents(
 
 
 def _render_code_file_block(
-    repository_root: Path, heading_prefix: str, relative_path: str, context_mode: str
+    repository_root: Path, heading_prefix: str, relative_path: str
 ) -> list[str]:
-    """Render a Required File or Write File entry as inline content or path."""
+    """Render a Required File or Write File entry with inline content if present."""
     lines = [f"### {heading_prefix} `{relative_path}`", f"Path: `{relative_path}`"]
     file_path = repository_root / relative_path
-    if context_mode == "inline" and file_path.is_file():
+    if file_path.is_file():
         lines.extend(["```python", file_path.read_text("utf-8").strip(), "```"])
     return [*lines, ""]
 
@@ -207,31 +192,29 @@ def _render_target_context_section(
     repository_root: Path,
     target_document: ArtifactDocument,
     by_identifier: dict[str, ArtifactDocument],
-    context_mode: str = "inline",
 ) -> list[str]:
     """Render target artifact, upstream artifacts, and required/write file contents."""
     lines = ["## 4. Scoped Target & Upstream Context", ""]
     for document in _collect_context_documents(target_document, by_identifier):
         artifact_id = str(document.frontmatter.get("id", document.path))
-        lines.append(f"### Artifact `{artifact_id}` (`{document.path}`)")
-        lines.append(f"Path: `{document.path}`")
-        if context_mode == "inline":
-            raw = (repository_root / document.path).read_text("utf-8").strip()
-            lines.extend(["```markdown", raw, "```"])
-        lines.append("")
+        raw = (repository_root / document.path).read_text("utf-8").strip()
+        lines.extend(
+            [
+                f"### Artifact `{artifact_id}` (`{document.path}`)",
+                f"Path: `{document.path}`",
+                "```markdown",
+                raw,
+                "```",
+                "",
+            ]
+        )
     for path in target_document.frontmatter.get("required_files", []):
         if (repository_root / str(path)).is_file():
             lines.extend(
-                _render_code_file_block(
-                    repository_root, "Required File", str(path), context_mode
-                )
+                _render_code_file_block(repository_root, "Required File", str(path))
             )
     for path in target_document.frontmatter.get("write_files", []):
-        lines.extend(
-            _render_code_file_block(
-                repository_root, "Write File", str(path), context_mode
-            )
-        )
+        lines.extend(_render_code_file_block(repository_root, "Write File", str(path)))
     return lines
 
 
@@ -240,10 +223,9 @@ def _assemble_prompt_sections(
     agent_role: str,
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
-    context_mode: str,
     target_id: str | None = None,
 ) -> list[str]:
-    """Assemble permissions, mission, schemas, and vocabulary sections."""
+    """Assemble permissions, mission, execution steps, schemas, and vocabulary."""
     schemas_path = repository_root / "policy" / "schemas.yaml"
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "REQ")
@@ -251,6 +233,7 @@ def _assemble_prompt_sections(
     task_flag = (
         f"--task {target_id or '<task_id>'} " if agent_role == "worker-agent" else ""
     )
+    verify_cmd = f"mt check all --agent {agent_role} {task_flag}--paths <written_files>"
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
         f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
@@ -260,59 +243,36 @@ def _assemble_prompt_sections(
         "`verification_cmd: pytest -q <test_file>`)."
     )
     lines = [
-        *_render_permissions_section(
-            agent_role, role_configuration, global_forbidden, context_mode
-        ),
+        *_render_permissions_section(agent_role, role_configuration, global_forbidden),
         f"**Mission**: {_find_role_definition(repository_root, agent_role)}",
         f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)",
-        (
-            f"- **Stage Verification**: Run `./mt check all --agent {agent_role} "
-            f"{task_flag}--paths <written_files>` once; `MergeGate` runs on exit."
-        ),
+        "- **Self-Contained Context**: All required Policy schemas, section budgets, "
+        "Architecture layers, Glossary terms, and upstream artifacts are provided "
+        "below in this document.",
+        "- **Execution Steps**:",
+        "  1. Author the target file(s) in `Allowed Write` directly from the "
+        "schemas, constraints, and context below.",
+        f"  2. Verify the written file(s) by running `{verify_cmd}` "
+        "(and `verification_cmd` for `worker-agent`) once.",
+        "  3. Finish and return a brief summary immediately once verification "
+        "exits with code `0` and empty `stdout` (`MergeGate` runs on exit).",
         *([planner_hint] if agent_role == "planner-agent" else []),
         "",
         "## 2. Output Schemas & Section Budgets",
-        *_render_artifact_schema_block(primary_type, schemas_policy, context_mode),
+        *_render_artifact_schema_block(primary_type, schemas_policy),
     ]
     if role_configuration.get("escalation_write"):
-        lines.extend(_render_artifact_schema_block("ESC", schemas_policy, context_mode))
-    lines.extend(
-        _render_code_and_glossary_section(repository_root, agent_role, context_mode)
-    )
+        lines.extend(_render_artifact_schema_block("ESC", schemas_policy))
+    lines.extend(_render_code_and_glossary_section(repository_root, agent_role))
     return lines
-
-
-def _resolve_prompt_target(
-    repository_root: Path, target_id: str | None, context_mode: str | None
-) -> tuple[dict[str, ArtifactDocument], ArtifactDocument | None, str, list[Finding]]:
-    """Load artifacts, resolve target_id and context_mode, and return Findings."""
-    by_identifier = load_artifacts_by_id(repository_root)
-    target_document = by_identifier.get(target_id) if target_id else None
-    if target_id is not None and target_document is None:
-        message = f"Target artifact '{target_id}' not found."
-        return (
-            by_identifier,
-            None,
-            "",
-            [Finding(target_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)],
-        )
-    resolved_mode = resolve_context_mode(repository_root, target_document, context_mode)
-    if resolved_mode not in VALID_CONTEXT_MODES:
-        message = f"Invalid context_mode '{resolved_mode}'."
-        finding = Finding(
-            "policy/permissions.yaml", 1, "CLI_INVALID_CONTEXT_MODE", message
-        )
-        return by_identifier, None, "", [finding]
-    return by_identifier, target_document, resolved_mode, []
 
 
 def build_agent_prompt(
     repository_root: Path,
     agent_role: str,
     target_id: str | None = None,
-    context_mode: str | None = None,
 ) -> tuple[str, list[Finding]]:
-    """Synthesize a deterministic role prompt from policy/*.yaml and target_id."""
+    """Synthesize a deterministic self-contained role prompt from policy and target."""
     permissions_path = repository_root / "policy" / "permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     agents: dict[str, Any] = permissions.get("agents", {})
@@ -321,19 +281,17 @@ def build_agent_prompt(
         return "", [
             Finding("policy/permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message)
         ]
-    by_id, target_doc, mode, findings = _resolve_prompt_target(
-        repository_root, target_id, context_mode
-    )
-    if findings:
-        return "", findings
+    by_id = load_artifacts_by_id(repository_root)
+    target_doc = by_id.get(target_id) if target_id else None
+    if target_id is not None and target_doc is None:
+        message = f"Target artifact '{target_id}' not found."
+        return "", [Finding(target_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
     forbidden = [str(item) for item in permissions.get("global_forbidden_write", [])]
     lines = _assemble_prompt_sections(
-        repository_root, agent_role, agents[agent_role], forbidden, mode, target_id
+        repository_root, agent_role, agents[agent_role], forbidden, target_id
     )
     if target_doc is not None:
-        lines.extend(
-            _render_target_context_section(repository_root, target_doc, by_id, mode)
-        )
+        lines.extend(_render_target_context_section(repository_root, target_doc, by_id))
     return "\n".join(lines).strip() + "\n", []
 
 
@@ -368,20 +326,17 @@ def prepare_worker_invocation(
     document: ArtifactDocument,
     prompt_file: Path,
     execution_context: tuple[str, str, str],
-    context_mode_override: str | None = None,
 ) -> tuple[str, dict[str, str]]:
     """Write .mt_prompt.md and build command and environment for worker execution."""
     task_id = str(document.frontmatter["id"])
     write_files = [str(item) for item in document.frontmatter.get("write_files", [])]
-    mode = resolve_context_mode(worktree_path, document, context_mode_override)
-    prompt_text, _ = build_agent_prompt(worktree_path, "worker-agent", task_id, mode)
+    prompt_text, _ = build_agent_prompt(worktree_path, "worker-agent", task_id)
     prompt_file.write_text(prompt_text, encoding="utf-8")
     command_template, environment_name, model_name = execution_context
     rendered_command = (
         command_template.replace("{model}", model_name)
         .replace("{task_id}", task_id)
         .replace("{prompt_file}", str(prompt_file))
-        .replace("{context_mode}", mode)
     )
     environment = {
         **os.environ,
@@ -392,6 +347,5 @@ def prepare_worker_invocation(
         "MT_PROMPT_FILE": str(prompt_file),
         "MT_AGENT_MODEL": model_name,
         "MT_EXECUTION_ENVIRONMENT": environment_name,
-        "MT_CONTEXT_MODE": mode,
     }
     return rendered_command, environment

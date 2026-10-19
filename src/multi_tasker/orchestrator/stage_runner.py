@@ -35,7 +35,6 @@ from multi_tasker.orchestrator.merge_gate import (
 )
 from multi_tasker.orchestrator.prompt_builder import (
     build_agent_prompt,
-    resolve_context_mode,
     resolve_task_execution,
 )
 from multi_tasker.orchestrator.router import (
@@ -104,8 +103,7 @@ def _prepare_stage_invocation(
 ) -> tuple[Path, str, dict[str, str]]:
     """Write .mt_prompt.md and build command and environment for stage execution."""
     target_id = str(target_document.frontmatter["id"])
-    mode = resolve_context_mode(worktree_path, target_document)
-    prompt_text, _ = build_agent_prompt(worktree_path, agent_role, target_id, mode)
+    prompt_text, _ = build_agent_prompt(worktree_path, agent_role, target_id)
     prompt_file = worktree_path / ".mt_prompt.md"
     prompt_file.write_text(prompt_text, encoding="utf-8")
     command_template, environment_name, model_name = execution_context
@@ -114,7 +112,6 @@ def _prepare_stage_invocation(
         .replace("{task_id}", target_id)
         .replace("{agent_role}", agent_role)
         .replace("{prompt_file}", str(prompt_file))
-        .replace("{context_mode}", mode)
     )
     environment = {
         **os.environ,
@@ -124,7 +121,6 @@ def _prepare_stage_invocation(
         "MT_PROMPT_FILE": str(prompt_file),
         "MT_AGENT_MODEL": model_name,
         "MT_EXECUTION_ENVIRONMENT": environment_name,
-        "MT_CONTEXT_MODE": mode,
     }
     return prompt_file, rendered, environment
 

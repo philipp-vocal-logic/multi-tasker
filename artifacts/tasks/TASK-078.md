@@ -2,7 +2,7 @@
 id: TASK-078
 title: Implement Self-Contained Role Prompts and Remove Context Mode Split
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-028
 - SPEC-028

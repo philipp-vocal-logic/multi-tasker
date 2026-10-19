@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 import time
@@ -26,10 +25,7 @@ from multi_tasker.orchestrator.lifecycle import (
     resolve_escalation,
 )
 from multi_tasker.orchestrator.lineage import trace_lineage
-from multi_tasker.orchestrator.prompt_builder import (
-    VALID_CONTEXT_MODES,
-    build_agent_prompt,
-)
+from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 from multi_tasker.orchestrator.scheduler import (
     compute_dirty_subgraph,
     select_parallel_batch,
@@ -53,12 +49,10 @@ def _add_run_and_prompt_parsers(subparsers: Any) -> None:
     run_parser.add_argument("--agent-command", default=None, dest="agent_command")
     run_parser.add_argument("--model", default=None, dest="model")
     run_parser.add_argument("--environment", default=None, dest="environment")
-    run_parser.add_argument("--context-mode", default=None, dest="context_mode")
     run_parser.add_argument("--root", default=".", help="Repository root directory.")
     prompt_parser = subparsers.add_parser("prompt")
     prompt_parser.add_argument("agent_role", help="Canonical agent role.")
     prompt_parser.add_argument("--target", default=None, dest="target_id")
-    prompt_parser.add_argument("--context-mode", default=None, dest="context_mode")
     prompt_parser.add_argument("--root", default=".", help="Repository root directory.")
 
 
@@ -167,37 +161,12 @@ def _dispatch_run_target(
     )
 
 
-def _invoke_with_context_mode(
-    repository_root: Path, arguments: argparse.Namespace
-) -> tuple[list[str], list[Finding]]:
-    """Run stage or scheduled tasks with temporary MT_CONTEXT_MODE override."""
-    context_mode = getattr(arguments, "context_mode", None)
-    previous_mode = os.environ.get("MT_CONTEXT_MODE")
-    if context_mode is not None:
-        os.environ["MT_CONTEXT_MODE"] = str(context_mode)
-    try:
-        return _dispatch_run_target(repository_root, arguments)
-    finally:
-        if context_mode is not None:
-            if previous_mode is None:
-                os.environ.pop("MT_CONTEXT_MODE", None)
-            else:
-                os.environ["MT_CONTEXT_MODE"] = previous_mode
-
-
 def _run_tasks_command(repository_root: Path, arguments: argparse.Namespace) -> int:
     """Execute `mt run` and output completed Task IDs or Findings."""
-    context_mode = getattr(arguments, "context_mode", None)
-    if context_mode is not None and str(context_mode) not in VALID_CONTEXT_MODES:
-        message = f"Invalid context_mode '{context_mode}'."
-        finding = Finding(
-            "policy/permissions.yaml", 1, "CLI_INVALID_CONTEXT_MODE", message
-        )
-        return emit_findings(repository_root, [finding])
     eval_intent = getattr(arguments, "evaluate", None)
     if eval_intent:
         bootstrap_evaluation_repository(repository_root, str(eval_intent))
-    done_ids, findings = _invoke_with_context_mode(repository_root, arguments)
+    done_ids, findings = _dispatch_run_target(repository_root, arguments)
     if eval_intent:
         check_errors = run_checks(repository_root, ["all"])
         passed = not findings and not check_errors and bool(done_ids)
@@ -219,7 +188,6 @@ def _run_prompt_command(repository_root: Path, arguments: argparse.Namespace) ->
         repository_root,
         str(arguments.agent_role),
         arguments.target_id,
-        getattr(arguments, "context_mode", None),
     )
     if findings:
         return emit_findings(repository_root, findings)

@@ -303,11 +303,10 @@ def _validate_execution_environments(policy: dict[str, Any]) -> list[Finding]:
         return []
     default_env = str(execution_config.get("default_environment", ""))
     default_model = str(execution_config.get("default_model", ""))
-    default_mode = str(execution_config.get("default_context_mode", "inline"))
     environments: dict[str, Any] = execution_config.get("environments", {})
     templates = {str(name): str(command) for name, command in environments.items()}
     invalid_env = bool(default_env and default_env not in templates)
-    if invalid_env or not default_model or default_mode not in {"inline", "paths"}:
+    if invalid_env or not default_model:
         message = "Invalid execution_environments in policy/permissions.yaml."
         return [Finding("policy/permissions.yaml", 1, "PERM_INVALID_EXEC_ENV", message)]
     return []
