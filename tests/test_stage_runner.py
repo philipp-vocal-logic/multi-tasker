@@ -165,7 +165,7 @@ _PIPELINE_HELPER_SCRIPT = (
     "'---\\nid: SPEC-001\\ntitle: Pipeline Specification\\nstatus: draft\\n"
     "traces_to: [REQ-001]\\ncovers_criteria: [REQ-001:AC-01]\\ndecisions: []\\n"
     "target_files:\\n  tests: [tests/test_p.py]\\n"
-    "  implementation: [src/multi_tasker/domain/p.py]\\n"
+    "  implementation: [src/domain/p.py]\\n"
     "---\\n## Design Overview\\nDesign.\\n\\n## Public Interfaces\\nPublic.\\n\\n"
     "## Test Contract Mapping\\n- REQ-001:AC-01 -> test_p\\n')\n"
     "elif role == 'planner-agent':\n"
@@ -349,12 +349,12 @@ _GIT_TASK_TWO_BLOCK = (
     "'---\\nid: TASK-002\\ntitle: Pipeline Implementation\\n"
     "type: implementation\\nstatus: planned\\ntraces_to: [REQ-001, SPEC-001]\\n"
     "depends_on: [TASK-001]\\nrequired_files: [tests/test_p.py]\\n"
-    "write_files: [src/multi_tasker/domain/p.py]\\n"
+    "write_files: [src/domain/p.py]\\n"
     "verification_cmd: pytest -q tests/test_p.py\\n"
     "---\\n## Objective\\nImpl.\\n\\n## Scoped Instructions\\nImpl.\\n')\n"
     "elif role == 'worker-agent' and target == 'TASK-002':\n"
-    "    Path('src/multi_tasker/domain').mkdir(parents=True, exist_ok=True)\n"
-    "    Path('src/multi_tasker/domain/p.py').write_text("
+    "    Path('src/domain').mkdir(parents=True, exist_ok=True)\n"
+    "    Path('src/domain/p.py').write_text("
     '\'"""Mod."""\\n\\nVALUE = 1\\n\')'
 )
 
@@ -376,6 +376,7 @@ def _seed_real_git_pipeline_repo(tmp_path: Path) -> str:
 
 @traces("REQ-021", "AC-01", "SPEC-021")
 @traces("REQ-021", "AC-02", "SPEC-021")
+@traces("REQ-027", "AC-01", "SPEC-027")
 def test_real_git_pipeline_commits_verification_pythonpath_and_rev_traceability(
     tmp_path: Path, capsys: Any
 ) -> None:

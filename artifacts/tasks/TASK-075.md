@@ -2,7 +2,7 @@
 id: TASK-075
 title: TestContracts for Repository Initialization Presets
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-027
 - SPEC-027

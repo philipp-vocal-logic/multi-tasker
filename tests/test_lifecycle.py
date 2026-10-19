@@ -357,3 +357,23 @@ def test_multi_wave_run_and_approval_traceability_diagnostics(
         )
     assert main(["run", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip().splitlines() == ["TASK-001", "TASK-002"]
+
+
+@traces("REQ-027", "AC-01", "SPEC-027")
+@traces("REQ-027", "AC-02", "SPEC-027")
+def test_initialize_presets_and_invalid_preset_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify default python preset, multi-tasker preset, and CLI_INVALID_PRESET."""
+    python_root = tmp_path / "python_project"
+    assert main(["initialize", "--root", str(python_root)]) == 0
+    python_arch = (python_root / "policy" / "architecture.yaml").read_text("utf-8")
+    assert "src/domain/**" in python_arch
+    assert "src/multi_tasker/domain/**" not in python_arch
+    mt_root = tmp_path / "mt_project"
+    assert main(["initialize", "--preset", "multi-tasker", "--root", str(mt_root)]) == 0
+    mt_arch = (mt_root / "policy" / "architecture.yaml").read_text("utf-8")
+    assert "src/multi_tasker/domain/**" in mt_arch
+    bad_root = tmp_path / "bad_project"
+    assert main(["initialize", "--preset", "invalid", "--root", str(bad_root)]) == 1
+    assert "[CLI_INVALID_PRESET]" in capsys.readouterr().out
