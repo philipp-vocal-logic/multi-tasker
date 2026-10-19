@@ -23,7 +23,6 @@ escalation_exclusivity:
 execution_environments:
   default_environment: "agy"
   default_model: "gemini-3.8-flash-high"
-  default_context_mode: "inline"
   environments:
     agy: "agy --mode accept-edits --dangerously-skip-permissions --model {model} --print \"Execute Task {task_id} following {prompt_file}\""
 
