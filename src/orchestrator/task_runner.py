@@ -133,7 +133,7 @@ def _finalize_task_outcome(
 ) -> list[Finding]:
     """Apply passing Worktree changes or route Escalation under merge lock."""
     absolute_task = repository_root / document.path
-    task_id = str(document.frontmatter.get("id", "TASK-000"))
+    task_id = str(document.frontmatter["id"])
     if outcome.escalated and outcome.escalation_path:
         merge_worktree_files(repository_root, worktree_path, [outcome.escalation_path])
         route = route_escalation(repository_root, outcome.escalation_path)

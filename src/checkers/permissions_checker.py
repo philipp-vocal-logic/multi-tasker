@@ -225,6 +225,18 @@ def _verify_file_against_rules(
     return [*findings, Finding(relative_path, 1, "PERM_OUTSIDE_WRITE_SCOPE", message)]
 
 
+def _check_empty_task_scope(
+    repository_root: Path, rules: list[dict[str, Any]], task_id: str | None
+) -> list[Finding]:
+    """Validate task_id scope up front when rules use $TASK_WRITE_FILES."""
+    return [
+        finding
+        for rule in rules
+        if rule.get("path") == "$TASK_WRITE_FILES"
+        for finding in _resolve_task_write_scope(repository_root, task_id, rule)[1]
+    ]
+
+
 def _evaluate_role_permissions(
     repository_root: Path,
     files: list[str],
@@ -253,6 +265,8 @@ def _evaluate_role_permissions(
     findings.extend(escalation_errors)
     if not is_escalation:
         rules: list[dict[str, Any]] = agent_configuration.get("allowed_write", [])
+        if not files:
+            findings.extend(_check_empty_task_scope(repository_root, rules, task_id))
         for relative_path in files:
             findings.extend(
                 _verify_file_against_rules(
@@ -322,10 +336,19 @@ def check_permissions(
         return [Finding("policy/permissions.yaml", 1, "PERM_POLICY_MISSING", message)]
     policy = load_yaml_file(permissions_path)
     environment_findings = _validate_execution_environments(policy)
+    task_marker = (
+        f"artifacts/tasks/{task_id}.md"
+        if agent_role == "worker-agent" and task_id
+        else ""
+    )
     files = (
         changed_files
         if changed_files is not None
-        else get_git_changed_files(repository_root)
+        else [
+            path
+            for path in get_git_changed_files(repository_root)
+            if path != task_marker
+        ]
     )
     if agent_role is None:
         return [*environment_findings, *_check_unscoped_policy_writes(files)]

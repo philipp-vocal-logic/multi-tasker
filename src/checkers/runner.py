@@ -32,7 +32,10 @@ def run_single_check(
     """Execute a single named checker and return its Findings."""
     if name == "permissions":
         return check_permissions(
-            repository_root, agent_role=agent_role, task_id=task_id
+            repository_root,
+            agent_role=agent_role,
+            task_id=task_id,
+            changed_files=target_paths,
         )
     if name == "schemas":
         return check_schemas(repository_root, target_paths=target_paths)

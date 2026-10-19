@@ -2,20 +2,20 @@
 id: TASK-071
 title: Implement Fail-Fast Worker Task Scope Validation and Explicit Check Arguments
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-025
-  - SPEC-025
+- REQ-025
+- SPEC-025
 depends_on:
-  - TASK-070
+- TASK-070
 required_files:
-  - artifacts/specifications/SPEC-025.md
-  - tests/test_traceability_and_cli.py
+- artifacts/specifications/SPEC-025.md
+- tests/test_traceability_and_cli.py
 write_files:
-  - src/checkers/runner.py
-  - src/checkers/permissions_checker.py
-  - src/orchestrator/prompt_builder.py
-  - src/orchestrator/task_runner.py
+- src/checkers/runner.py
+- src/checkers/permissions_checker.py
+- src/orchestrator/prompt_builder.py
+- src/orchestrator/task_runner.py
 verification_cmd: pytest -q tests/test_traceability_and_cli.py tests/test_checkers.py
 ---
 ## Objective

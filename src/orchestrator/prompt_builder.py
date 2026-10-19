@@ -241,17 +241,23 @@ def _assemble_prompt_sections(
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
     context_mode: str,
+    target_id: str | None = None,
 ) -> list[str]:
     """Assemble permissions, mission, schemas, and vocabulary sections."""
     schemas_path = repository_root / "policy" / "schemas.yaml"
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "REQ")
     next_id = next_artifact_id(repository_root, primary_type)
+    task_flag = (
+        f"--task {target_id or '<task_id>'} " if agent_role == "worker-agent" else ""
+    )
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
-        f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`) and "
+        f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
+        "`verification_cmd: python3 -m py_compile <test_file>`) and "
         f"`type: implementation` Task(s) (`depends_on: [{next_id}]`, `write_files` "
-        "covering `SPEC` `target_files.implementation`)."
+        "covering `SPEC` `target_files.implementation`, "
+        "`verification_cmd: pytest -q <test_file>`)."
     )
     lines = [
         *_render_permissions_section(
@@ -261,7 +267,7 @@ def _assemble_prompt_sections(
         f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)",
         (
             f"- **Stage Verification**: Run `./mt check all --agent {agent_role} "
-            "--paths <written_files>` once; `MergeGate` runs on exit."
+            f"{task_flag}--paths <written_files>` once; `MergeGate` runs on exit."
         ),
         *([planner_hint] if agent_role == "planner-agent" else []),
         "",
@@ -322,7 +328,7 @@ def build_agent_prompt(
         return "", findings
     forbidden = [str(item) for item in permissions.get("global_forbidden_write", [])]
     lines = _assemble_prompt_sections(
-        repository_root, agent_role, agents[agent_role], forbidden, mode
+        repository_root, agent_role, agents[agent_role], forbidden, mode, target_id
     )
     if target_doc is not None:
         lines.extend(
