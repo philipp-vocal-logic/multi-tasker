@@ -361,6 +361,7 @@ def test_multi_wave_run_and_approval_traceability_diagnostics(
 
 @traces("REQ-027", "AC-01", "SPEC-027")
 @traces("REQ-027", "AC-02", "SPEC-027")
+@traces("REQ-029", "AC-01", "SPEC-029")
 def test_initialize_presets_and_invalid_preset_finding(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

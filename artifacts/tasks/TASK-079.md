@@ -2,7 +2,7 @@
 id: TASK-079
 title: TestContracts for Wheel Policy Template Resolution
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-029
 - SPEC-029
