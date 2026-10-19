@@ -2,16 +2,16 @@
 id: TASK-070
 title: Add TestContract for Fail-Fast Worker Task Scope and Check Paths
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-025
-  - SPEC-025
+- REQ-025
+- SPEC-025
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-025.md
-  - artifacts/specifications/SPEC-025.md
+- artifacts/requirements/REQ-025.md
+- artifacts/specifications/SPEC-025.md
 write_files:
-  - tests/test_traceability_and_cli.py
+- tests/test_traceability_and_cli.py
 verification_cmd: python3 -m py_compile tests/test_traceability_and_cli.py
 ---
 ## Objective

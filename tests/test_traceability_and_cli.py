@@ -343,3 +343,43 @@ def test_git_commit_scope_and_intent_traceability(tmp_path: Path) -> None:
     )
     rules = {finding.rule_id for finding in check_traceability(tmp_path)}
     assert {"TRACE_COMMIT_UNSCOPED_FILE", "TRACE_UNPROCESSED_INTENT"}.issubset(rules)
+
+
+@traces("REQ-025", "AC-01", "SPEC-025")
+def test_fail_fast_worker_task_scope_and_explicit_check_paths(tmp_path: Path) -> None:
+    """Verify worker-agent fails fast on missing --task and runner forwards --paths."""
+    from src.orchestrator.lifecycle import bootstrap_evaluation_repository
+    from src.orchestrator.prompt_builder import build_agent_prompt
+
+    eval_root = tmp_path / "fail_fast_repo"
+    bootstrap_evaluation_repository(eval_root, "Verify fail-fast worker check.")
+    empty_diff_findings = run_single_check(
+        "permissions", eval_root, target_paths=[], agent_role="worker-agent"
+    )
+    assert any(item.rule_id == "PERM_TASK_ID_MISSING" for item in empty_diff_findings)
+    _write_document(
+        eval_root / "artifacts/tasks/TASK-001.md",
+        "---\nid: TASK-001\ntitle: Test Task\ntype: test_contract\n"
+        "status: in_progress\ntraces_to: [REQ-001, SPEC-001]\ndepends_on: []\n"
+        "required_files: []\nwrite_files: [tests/test_calc.py]\n"
+        "verification_cmd: python3 -m py_compile tests/test_calc.py\n---\n"
+        "## Objective\nO.\n\n## Scoped Instructions\nI.\n",
+    )
+    _write_document(
+        eval_root / "tests/test_calc.py", "def test_ok() -> None:\n    pass\n"
+    )
+    scoped = run_single_check(
+        "permissions",
+        eval_root,
+        target_paths=["tests/test_calc.py"],
+        agent_role="worker-agent",
+        task_id="TASK-001",
+    )
+    assert scoped == []
+    auto_diff = run_single_check(
+        "permissions", eval_root, agent_role="worker-agent", task_id="TASK-001"
+    )
+    assert auto_diff == []
+    worker_prompt, errors = build_agent_prompt(eval_root, "worker-agent", "TASK-001")
+    assert not errors
+    assert "--agent worker-agent --task TASK-001 --paths" in worker_prompt
