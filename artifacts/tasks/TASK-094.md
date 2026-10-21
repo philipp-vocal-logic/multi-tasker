@@ -2,21 +2,21 @@
 id: TASK-094
 title: Implement Atomic Requirement Decomposition Contract and Existing Catalog
 type: implementation
-status: planned
+status: done
 traces_to:
-  - REQ-036
-  - SPEC-036
+- REQ-036
+- SPEC-036
 depends_on:
-  - TASK-093
+- TASK-093
 required_files:
-  - artifacts/requirements/REQ-036.md
-  - artifacts/specifications/SPEC-036.md
-  - tests/test_orchestrator.py
-  - src/multi_tasker/orchestrator/prompt_builder.py
-  - src/multi_tasker/orchestrator/prompt_context.py
+- artifacts/requirements/REQ-036.md
+- artifacts/specifications/SPEC-036.md
+- tests/test_orchestrator.py
+- src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_context.py
 write_files:
-  - src/multi_tasker/orchestrator/prompt_builder.py
-  - src/multi_tasker/orchestrator/prompt_context.py
+- src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_context.py
 verification_cmd: pytest -o pythonpath=src -q tests/test_orchestrator.py -k atomic_requirement
 ---
 ## Objective

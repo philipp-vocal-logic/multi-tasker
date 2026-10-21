@@ -13,6 +13,7 @@ from multi_tasker.domain.parser import (
 from multi_tasker.orchestrator.prompt_context import (
     MAX_PROMPT_LINE_LENGTH,
     render_code_and_glossary_section,
+    render_decomposition_contract,
     render_target_context_section,
     wrap_prompt_lines,
 )
@@ -284,16 +285,6 @@ def _assemble_prompt_sections(
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role)
     next_id = _resolve_next_prompt_id(repository_root, primary_type, target_doc)
-    planner_hint = (
-        f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
-        f"(`id: {next_id}`, `traces_to: [REQ-NNN, SPEC-NNN]`, `write_files` covering "
-        "`SPEC` `target_files.tests`, `verification_cmd: python3 -m py_compile "
-        '<test_file>`, decorating tests with `@traces("REQ-NNN", "AC-XX", '
-        '"SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: [REQ-NNN, '
-        f"SPEC-NNN]`, `depends_on: [{next_id}]`, `required_files: [<test_file>]`, "
-        "`write_files` covering `SPEC` `target_files.implementation`, "
-        "`verification_cmd: pytest -q <test_file>`)."
-    )
     output_contract = (
         _render_artifact_schema_block(primary_type, schemas_policy)
         if primary_type
@@ -313,7 +304,7 @@ def _assemble_prompt_sections(
         "Architecture layers, Glossary terms, and upstream artifacts are provided "
         "below in this document.",
         *_build_execution_steps(agent_role, target_doc, next_id),
-        *([planner_hint] if agent_role == "planner-agent" else []),
+        *render_decomposition_contract(agent_role, next_id),
         "",
         "## 2. Output Schemas & Section Budgets",
         *output_contract,

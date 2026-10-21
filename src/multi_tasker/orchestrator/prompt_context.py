@@ -103,6 +103,30 @@ def _render_worker_limits_and_ast(repository_root: Path) -> list[str]:
     return lines
 
 
+def render_decomposition_contract(agent_role: str, next_id: str | None) -> list[str]:
+    """Render Requirement or Planner decomposition contract for agent_role."""
+    if agent_role == "requirement-agent":
+        return [
+            "- **Requirement Decomposition Contract**: Author one atomic `REQ` file "
+            f"(starting at `id: {next_id or 'REQ-NNN'}`) per distinct capability in "
+            "the `Intent` (or update an existing `REQ` from the catalog below), and "
+            "evaluate that single capability across good, edge, and failure "
+            "`AcceptanceCriteria` (`AC-01`, `AC-02`, `AC-03`, ...)."
+        ]
+    if agent_role == "planner-agent":
+        return [
+            f"- **Planner Decomposition Contract**: Author a `type: test_contract` "
+            f"Task (`id: {next_id}`, `traces_to: [REQ-NNN, SPEC-NNN]`, `write_files` "
+            "covering `SPEC` `target_files.tests`, `verification_cmd: python3 -m "
+            'py_compile <test_file>`, decorating tests with `@traces("REQ-NNN", '
+            '"AC-XX", "SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: '
+            f"[REQ-NNN, SPEC-NNN]`, `depends_on: [{next_id}]`, `required_files: "
+            "[<test_file>]`, `write_files` covering `SPEC` "
+            "`target_files.implementation`, `verification_cmd: pytest -q <test_file>`)."
+        ]
+    return []
+
+
 def render_code_and_glossary_section(
     repository_root: Path, agent_role: str
 ) -> list[str]:
@@ -120,10 +144,11 @@ def render_code_and_glossary_section(
         lines.extend(_render_worker_limits_and_ast(repository_root))
     if agent_role == "review-agent":
         lines.append(
-            "- **Semantic Review Rubric**: Verify complete upstream `traces_to` and "
-            "`AcceptanceCriterion` coverage, realistic `target_files`/`write_files` "
-            "bounds, and absence of scope creep or layer violations before emitting "
-            "`verdict: pass`."
+            "- **Semantic Review Rubric**: Verify a single cohesive capability per "
+            "`REQ` evaluated across good, edge, and failure `AcceptanceCriteria`, "
+            "complete upstream `traces_to` and `AcceptanceCriterion` coverage, "
+            "realistic `target_files`/`write_files` bounds, and absence of scope "
+            "creep or layer violations before emitting `verdict: pass`."
         )
     if agent_role in {"specification-agent", "planner-agent"}:
         hints = collect_refactoring_targets(repository_root)
@@ -169,6 +194,25 @@ def _render_spec_target_files(
     return lines
 
 
+def _render_existing_requirements_catalog(
+    target_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> list[str]:
+    """Render an index of existing Requirements when targeting an Intent."""
+    if target_document.artifact_type != "INT":
+        return []
+    entries = [
+        f"- `{req_id}`: {doc.frontmatter.get('title', req_id)} "
+        f"(`status: {doc.frontmatter.get('status', 'draft')}`, "
+        f"`version: {doc.frontmatter.get('version', 1)}`)"
+        for req_id, doc in sorted(by_identifier.items())
+        if doc.artifact_type == "REQ"
+    ]
+    if not entries:
+        return []
+    return ["### Existing Requirements Catalog", *entries, ""]
+
+
 def render_target_context_section(
     repository_root: Path,
     target_document: ArtifactDocument,
@@ -202,6 +246,7 @@ def render_target_context_section(
                 "",
             ]
         )
+    lines.extend(_render_existing_requirements_catalog(target_document, by_identifier))
     for path in target_document.frontmatter.get("required_files", []):
         rel_path = str(path)
         if rel_path not in rendered_paths and (repository_root / rel_path).is_file():
