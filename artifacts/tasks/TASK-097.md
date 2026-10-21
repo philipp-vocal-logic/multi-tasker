@@ -2,17 +2,17 @@
 id: TASK-097
 title: Add TestContracts for Subgraph-Scoped Multi-REQ and Multi-SPEC Traceability
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-038
-  - SPEC-038
+- REQ-038
+- SPEC-038
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-038.md
-  - artifacts/specifications/SPEC-038.md
-  - tests/test_traceability_and_cli.py
+- artifacts/requirements/REQ-038.md
+- artifacts/specifications/SPEC-038.md
+- tests/test_traceability_and_cli.py
 write_files:
-  - tests/test_traceability_and_cli.py
+- tests/test_traceability_and_cli.py
 verification_cmd: python3 -m py_compile tests/test_traceability_and_cli.py
 ---
 ## Objective

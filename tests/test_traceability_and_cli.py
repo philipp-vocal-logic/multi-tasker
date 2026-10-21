@@ -383,3 +383,51 @@ def test_fail_fast_worker_task_scope_and_explicit_check_paths(tmp_path: Path) ->
     worker_prompt, errors = build_agent_prompt(eval_root, "worker-agent", "TASK-001")
     assert not errors
     assert "--agent worker-agent --task TASK-001 --paths" in worker_prompt
+
+
+@traces("REQ-038", "AC-01", "SPEC-038")
+@traces("REQ-038", "AC-02", "SPEC-038")
+@traces("REQ-038", "AC-03", "SPEC-038")
+def test_scoped_multi_req_and_spec_traceability_checks(tmp_path: Path) -> None:
+    """Verify subgraph-scoped AC and target_files checks with sibling REQs/SPECs."""
+    _write_document(tmp_path / "policy/traceability.yaml", "traceability_rules: {}\n")
+    for req_id in ("REQ-001", "REQ-002"):
+        _write_document(
+            tmp_path / f"artifacts/requirements/{req_id}.md",
+            f"---\nid: {req_id}\nstatus: approved\n"
+            "acceptance_criteria: [{id: AC-01}, {id: AC-02}]\n---\n",
+        )
+    spec_1 = "artifacts/specifications/SPEC-001.md"
+    _write_document(
+        tmp_path / spec_1,
+        "---\nid: SPEC-001\nstatus: approved\ntraces_to: [REQ-001]\n"
+        "covers_criteria: [REQ-001:AC-01, REQ-001:AC-02]\n"
+        "target_files: {tests: [tests/t1.py], implementation: [src/m1.py]}\n---\n",
+    )
+    assert check_traceability(tmp_path, [spec_1]) == []
+    full_rules = {item.rule_id for item in check_traceability(tmp_path)}
+    assert "TRACE_UNCOVERED_REQ_AC" in full_rules
+    _write_document(
+        tmp_path / "artifacts/specifications/SPEC-002.md",
+        "---\nid: SPEC-002\nstatus: approved\ntraces_to: [REQ-002]\n"
+        "covers_criteria: [REQ-002:AC-01, REQ-002:AC-02]\n"
+        "target_files: {tests: [tests/t2.py], implementation: [src/m2.py]}\n---\n",
+    )
+    task_1 = "artifacts/tasks/TASK-001.md"
+    _write_document(
+        tmp_path / task_1,
+        "---\nid: TASK-001\ntype: test_contract\nstatus: ready\n"
+        "traces_to: [REQ-001, SPEC-001]\ndepends_on: []\nrequired_files: []\n"
+        "write_files: [tests/t1.py, src/m1.py]\n---\n",
+    )
+    assert check_traceability(tmp_path, [task_1]) == []
+    assert "TRACE_UNPLANNED_TARGET_FILE" in {
+        item.rule_id for item in check_traceability(tmp_path)
+    }
+    _write_document(
+        tmp_path / spec_1,
+        "---\nid: SPEC-001\nstatus: draft\ntraces_to: [REQ-001]\n"
+        "covers_criteria: [REQ-001:AC-01]\n---\n",
+    )
+    bad_spec = {item.rule_id for item in check_traceability(tmp_path, [spec_1])}
+    assert "TRACE_UNCOVERED_REQ_AC" in bad_spec
