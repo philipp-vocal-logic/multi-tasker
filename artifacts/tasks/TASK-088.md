@@ -1,19 +1,21 @@
 ---
 id: TASK-088
-title: Implement Compact Templates, Layer Imports, and Role-Tailored Prompts in Prompt Builder
+title: Implement Compact Templates, Layer Imports, and Role-Tailored Prompts in Prompt
+  Builder
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-033
-  - SPEC-033
+- REQ-033
+- SPEC-033
 depends_on:
-  - TASK-087
+- TASK-087
 required_files:
-  - tests/test_interaction_logging.py
-  - tests/test_checkers.py
+- tests/test_interaction_logging.py
+- tests/test_checkers.py
 write_files:
-  - src/multi_tasker/orchestrator/prompt_builder.py
-verification_cmd: "pytest -o pythonpath=src -q tests/test_interaction_logging.py tests/test_checkers.py tests/test_orchestrator.py"
+- src/multi_tasker/orchestrator/prompt_builder.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_interaction_logging.py tests/test_checkers.py
+  tests/test_orchestrator.py
 ---
 ## Objective
 Update `src/multi_tasker/orchestrator/prompt_builder.py` to synthesize compact frontmatter-and-section templates, 3-line `ESC` contracts, layer `allowed_internal_imports`, role-tailored `Execution Steps` Step 1 and constraints, and `SPEC` `target_files` context injection while keeping `prompt_builder.py` under `400` lines.
