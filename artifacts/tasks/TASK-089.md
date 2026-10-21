@@ -1,8 +1,9 @@
 ---
 id: TASK-089
-title: TestContracts for Non-Fixed Prompt Example IDs, 88-Char Line Length, and Glossary Terms
+title: TestContracts for Non-Fixed Prompt Example IDs, 88-Char Line Length, and Glossary
+  Terms
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-034
 - SPEC-034

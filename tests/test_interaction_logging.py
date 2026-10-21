@@ -187,7 +187,11 @@ def _assert_streamlined_stage_and_review_prompts() -> None:
     assert (
         "json_schema:" not in req_prompt and "additionalProperties:" not in req_prompt
     )
-    assert "```markdown\n---\nid: REQ-" in req_prompt
+    assert "```markdown\n---\nid: REQ-NNN" in req_prompt
+    assert "id: ESC-NNN" in req_prompt and "id: ESC-001" not in req_prompt
+    assert "id: AC-XX" in req_prompt and "id: AC-01" not in req_prompt
+    assert all(len(line) <= 88 for line in req_prompt.splitlines())
+    assert "Glossary Terms" in req_prompt and "req_id" in req_prompt
     assert "## Statement" in req_prompt and "## Impact Analysis" in req_prompt
     assert (
         "`status: in_review`" in req_prompt and "verdict: pass|fail" not in req_prompt
@@ -223,7 +227,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
     assert '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")' in prompt_output
     assert "### `TASK` Output Contract" not in prompt_output
     assert "&& pytest -q tests/test_checkers.py" in prompt_output
-    assert "Forbidden Synonyms" in prompt_output
+    assert "`max_line_length=88`" in prompt_output
+    assert "Glossary Terms" in prompt_output and "Forbidden Synonyms" in prompt_output
     assert "def test_permissions_checker_matrix" in prompt_output
     assert "class Finding" in prompt_output
 
@@ -236,6 +241,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
 @traces("REQ-031", "AC-02", "SPEC-031")
 @traces("REQ-033", "AC-01", "SPEC-033")
 @traces("REQ-033", "AC-02", "SPEC-033")
+@traces("REQ-034", "AC-01", "SPEC-034")
+@traces("REQ-034", "AC-02", "SPEC-034")
 def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
     """Verify self-contained prompt synthesis and Worktree execution."""
     _assert_self_contained_prompt_output(capsys)
@@ -339,7 +346,7 @@ def test_intent_why_guidance_in_prompt_cli_and_agents_guide(
     assert findings == []
     assert (
         "translating its requested change and motivating reason into testable "
-        "AcceptanceCriteria and ImpactAnalysis" in prompt_text
+        "AcceptanceCriteria and ImpactAnalysis" in " ".join(prompt_text.split())
     )
     assert "mt intent '<what to change and why>'" in generate_external_agents_guide()
     with pytest.raises(SystemExit):
