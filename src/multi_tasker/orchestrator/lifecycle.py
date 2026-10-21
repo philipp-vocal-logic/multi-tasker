@@ -208,20 +208,40 @@ def _check_transition(
     return []
 
 
+def _sync_upstream_intents(
+    repository_root: Path,
+    changed_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> None:
+    """Update upstream Intents to processing or processed based on all linked REQs."""
+    for upstream_id in (
+        str(item) for item in changed_document.frontmatter.get("traces_to", [])
+    ):
+        intent_doc = by_identifier.get(upstream_id)
+        if not intent_doc or intent_doc.frontmatter.get("status") not in {
+            "open",
+            "processing",
+        }:
+            continue
+        all_approved = all(
+            doc.frontmatter.get("status") == "approved"
+            for doc in by_identifier.values()
+            if doc.artifact_type == "REQ"
+            and upstream_id
+            in {str(item) for item in doc.frontmatter.get("traces_to", [])}
+        )
+        next_status = "processed" if all_approved else "processing"
+        update_artifact_frontmatter(
+            repository_root / intent_doc.path, {"status": next_status}
+        )
+
+
 def _mark_dirty_downstream(repository_root: Path, changed_id: str) -> list[str]:
-    """Transition downstream SPEC/TASK to needs_update and upstream INT to processed."""
+    """Transition downstream SPEC/TASK to needs_update and sync upstream Intents."""
     by_identifier = load_artifacts_by_id(repository_root)
     changed_document = by_identifier.get(changed_id)
     if changed_document and changed_document.artifact_type == "REQ":
-        for upstream_id in changed_document.frontmatter.get("traces_to", []):
-            intent_document = by_identifier.get(str(upstream_id))
-            if intent_document and intent_document.frontmatter.get("status") in {
-                "open",
-                "processing",
-            }:
-                update_artifact_frontmatter(
-                    repository_root / intent_document.path, {"status": "processed"}
-                )
+        _sync_upstream_intents(repository_root, changed_document, by_identifier)
     dirty_ids = compute_dirty_subgraph(repository_root, changed_id)
     for artifact_id in dirty_ids:
         document = by_identifier.get(artifact_id)
