@@ -13,7 +13,7 @@ required_files:
   - tests/test_checkers.py
 write_files:
   - src/multi_tasker/orchestrator/prompt_builder.py
-verification_cmd: "pytest -q tests/test_interaction_logging.py tests/test_checkers.py tests/test_orchestrator.py"
+verification_cmd: "pytest -o pythonpath=src -q tests/test_interaction_logging.py tests/test_checkers.py tests/test_orchestrator.py"
 ---
 ## Objective
 Update `src/multi_tasker/orchestrator/prompt_builder.py` to synthesize compact frontmatter-and-section templates, 3-line `ESC` contracts, layer `allowed_internal_imports`, role-tailored `Execution Steps` Step 1 and constraints, and `SPEC` `target_files` context injection while keeping `prompt_builder.py` under `400` lines.
