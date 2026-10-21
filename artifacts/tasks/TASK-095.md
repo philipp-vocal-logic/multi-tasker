@@ -2,19 +2,19 @@
 id: TASK-095
 title: Add TestContracts for Multi-REQ Intent Completion and Multi-Artifact Review
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-037
-  - SPEC-037
+- REQ-037
+- SPEC-037
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-037.md
-  - artifacts/specifications/SPEC-037.md
-  - tests/test_lifecycle.py
-  - tests/test_stage_runner.py
+- artifacts/requirements/REQ-037.md
+- artifacts/specifications/SPEC-037.md
+- tests/test_lifecycle.py
+- tests/test_stage_runner.py
 write_files:
-  - tests/test_lifecycle.py
-  - tests/test_stage_runner.py
+- tests/test_lifecycle.py
+- tests/test_stage_runner.py
 verification_cmd: python3 -m py_compile tests/test_lifecycle.py tests/test_stage_runner.py
 ---
 ## Objective

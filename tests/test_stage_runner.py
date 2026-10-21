@@ -397,3 +397,61 @@ def test_real_git_pipeline_commits_verification_pythonpath_and_rev_traceability(
     for expected_id in ("REQ-001", "SPEC-001", "REV-SPEC-001", "TASK-001", "TASK-002"):
         assert expected_id in completed
     assert main(["check", "all", "--root", str(tmp_path)]) == 0
+
+
+_MULTI_REQ_STAGE_SCRIPT = (
+    "import os\nfrom pathlib import Path\n"
+    "role, target = os.environ['MT_AGENT_ROLE'], os.environ.get('MT_TASK_ID', '')\n"
+    "fail_second = os.environ.get('FAIL_SECOND_REV') == '1'\n"
+    "if role == 'requirement-agent':\n"
+    "    for rid in ('REQ-001', 'REQ-002'):\n"
+    "        Path(f'artifacts/requirements/{rid}.md').write_text("
+    "f'---\\nid: {rid}\\ntitle: Atomic {rid}\\nstatus: in_review\\n"
+    "traces_to: [INT-001]\\ndecisions: []\\nacceptance_criteria:\\n"
+    "  - id: AC-01\\n    given: valid\\n    when: run\\n    then: done\\n"
+    "version: 1\\n---\\n## Statement\\nStmt.\\n\\n## Impact Analysis\\nImp.\\n')\n"
+    "elif role == 'review-agent':\n"
+    "    v = 'fail' if (fail_second and target == 'REQ-002') else 'pass'\n"
+    "    Path(f'artifacts/reviews/REV-{target}.md').write_text("
+    "f'---\\nid: REV-{target}\\ntarget_artifacts: [{target}]\\n"
+    "stage: requirement\\nverdict: {v}\\nfindings: []\\n---\\nReview.\\n')\n"
+)
+
+
+@traces("REQ-037", "AC-01", "SPEC-037")
+@traces("REQ-037", "AC-03", "SPEC-037")
+def test_multi_artifact_stage_review_pass_and_second_artifact_rejection(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """Verify _step_declarative_stage reviews all artifacts and halts on rejection."""
+    from multi_tasker.orchestrator.stage_runner import _step_declarative_stage
+
+    _seed_test_repository(tmp_path)
+    assert main(["intent", "Two capabilities.", "--root", str(tmp_path)]) == 0
+    script_path = tmp_path / "multi_req_agent.py"
+    script_path.write_text(_MULTI_REQ_STAGE_SCRIPT, encoding="utf-8")
+    stage = {"agent_role": "requirement-agent", "approval_gate": "review-agent"}
+    options = (f"python3 {script_path}", None, None)
+    monkeypatch.setenv("FAIL_SECOND_REV", "1")
+    produced, findings = _step_declarative_stage(tmp_path, stage, "INT-001", options)
+    assert any(item.rule_id == "STAGE_REVIEW_REJECTED" for item in findings)
+    assert "REV-REQ-001" in produced
+    req2_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/requirements/REQ-002.md",
+        "artifacts/requirements/REQ-002.md",
+    )
+    assert req2_doc and req2_doc.frontmatter["status"] == "in_review"
+    for path in (tmp_path / "artifacts/reviews").glob("*.md"):
+        path.unlink()
+    for path in (tmp_path / "artifacts/requirements").glob("*.md"):
+        path.unlink()
+    monkeypatch.setenv("FAIL_SECOND_REV", "0")
+    produced_ok, findings_ok = _step_declarative_stage(
+        tmp_path, stage, "INT-001", options
+    )
+    assert findings_ok == []
+    assert {"REQ-001", "REQ-002", "REV-REQ-001", "REV-REQ-002"} <= set(produced_ok)
+    intent_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/intents/INT-001.md", "artifacts/intents/INT-001.md"
+    )
+    assert intent_doc and intent_doc.frontmatter["status"] == "processed"

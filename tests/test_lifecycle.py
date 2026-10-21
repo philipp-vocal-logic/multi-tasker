@@ -378,3 +378,32 @@ def test_initialize_presets_and_invalid_preset_finding(
     bad_root = tmp_path / "bad_project"
     assert main(["initialize", "--preset", "invalid", "--root", str(bad_root)]) == 1
     assert "[CLI_INVALID_PRESET]" in capsys.readouterr().out
+
+
+@traces("REQ-037", "AC-01", "SPEC-037")
+@traces("REQ-037", "AC-02", "SPEC-037")
+def test_multi_requirement_intent_processing_and_completion(
+    tmp_path: Path,
+) -> None:
+    """Verify INT stays in processing until all linked REQs are approved."""
+    _seed_policies(tmp_path)
+    intent_path = tmp_path / "artifacts/intents/INT-001.md"
+    _write_document(
+        intent_path,
+        '---\nid: INT-001\nstatus: open\ncreated_at: "2026-10-21T00:00:00Z"\n---\n'
+        "Split into two atomic requirements.\n",
+    )
+    for req_id in ("REQ-001", "REQ-002"):
+        _write_document(
+            tmp_path / f"artifacts/requirements/{req_id}.md",
+            f"---\nid: {req_id}\ntitle: Atomic {req_id}\nstatus: draft\n"
+            "traces_to: [INT-001]\ndecisions: []\n"
+            "acceptance_criteria: [{id: AC-01, given: a, when: b, then: c}]\n"
+            "version: 1\n---\n## Statement\nOk.\n\n## Impact Analysis\nOk.\n",
+        )
+    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 0
+    first_intent, _ = parse_artifact_file(intent_path, "artifacts/intents/INT-001.md")
+    assert first_intent and first_intent.frontmatter["status"] == "processing"
+    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
+    final_intent, _ = parse_artifact_file(intent_path, "artifacts/intents/INT-001.md")
+    assert final_intent and final_intent.frontmatter["status"] == "processed"
