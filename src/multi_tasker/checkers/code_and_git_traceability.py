@@ -137,6 +137,29 @@ def _extract_specification_files(document: ArtifactDocument) -> list[str]:
     return [str(item) for item in combined]
 
 
+def _scoped_specification_ids(
+    by_identifier: dict[str, ArtifactDocument], target_paths: list[str] | None
+) -> set[str] | None:
+    """Return referenced SPEC IDs when target_paths only touches artifacts/**."""
+    if not target_paths or any(
+        path.startswith(("src/", "tests/")) for path in target_paths
+    ):
+        return None
+    target_set = set(target_paths)
+    referenced = {
+        str(ref)
+        for doc in by_identifier.values()
+        if doc.path in target_set
+        for ref in (
+            [doc.frontmatter.get("id", "")]
+            if doc.artifact_type == "SPEC"
+            else doc.frontmatter.get("traces_to", [])
+        )
+        if str(ref).startswith("SPEC-")
+    }
+    return referenced or None
+
+
 def check_specification_target_files(
     repository_root: Path,
     by_identifier: dict[str, ArtifactDocument],
@@ -166,11 +189,13 @@ def check_specification_target_files(
         if document.artifact_type == "TASK"
         for path in document.frontmatter.get("write_files", [])
     }
+    scoped_specs = _scoped_specification_ids(by_identifier, target_paths)
     if task_writes and rules.get("require_spec_target_files_covered_by_tasks", True):
         findings.extend(
             Finding(document.path, 1, "TRACE_UNPLANNED_TARGET_FILE", path)
-            for document in by_identifier.values()
+            for spec_id, document in by_identifier.items()
             if document.frontmatter.get("status") == "approved"
+            and (scoped_specs is None or spec_id in scoped_specs)
             for path in _extract_specification_files(document)
             if path not in task_writes
         )

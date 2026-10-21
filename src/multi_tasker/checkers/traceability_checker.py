@@ -65,8 +65,38 @@ def _check_document_references(
     return findings
 
 
+def _scoped_requirement_ids(
+    by_identifier: dict[str, ArtifactDocument], target_paths: list[str] | None
+) -> set[str] | None:
+    """Return referenced REQ IDs when target_paths only touches artifacts/**."""
+    if not target_paths or any(
+        path.startswith(("src/", "tests/")) for path in target_paths
+    ):
+        return None
+    target_set = set(target_paths)
+    referenced: set[str] = set()
+    for doc in by_identifier.values():
+        if doc.path in target_set:
+            if doc.artifact_type == "REQ":
+                referenced.add(str(doc.frontmatter.get("id", "")))
+            for item in doc.frontmatter.get("traces_to", []):
+                ref_id = str(item)
+                if ref_id.startswith("REQ-"):
+                    referenced.add(ref_id)
+                elif ref_id in by_identifier:
+                    referenced.update(
+                        str(upstream)
+                        for upstream in by_identifier[ref_id].frontmatter.get(
+                            "traces_to", []
+                        )
+                        if str(upstream).startswith("REQ-")
+                    )
+    return referenced or None
+
+
 def _check_requirement_to_specification_coverage(
     by_identifier: dict[str, ArtifactDocument],
+    target_paths: list[str] | None = None,
 ) -> list[Finding]:
     """Verify every approved REQ AcceptanceCriterion is covered by a SPEC."""
     covered = {
@@ -76,11 +106,13 @@ def _check_requirement_to_specification_coverage(
         and document.frontmatter.get("status") != "deprecated"
         for item in document.frontmatter.get("covers_criteria", [])
     }
+    scoped_reqs = _scoped_requirement_ids(by_identifier, target_paths)
     findings: list[Finding] = []
-    for document in by_identifier.values():
+    for req_id, document in by_identifier.items():
         if (
             document.artifact_type == "REQ"
             and document.frontmatter.get("status") == "approved"
+            and (scoped_reqs is None or req_id in scoped_reqs)
         ):
             for criterion in document.frontmatter.get("acceptance_criteria", []):
                 key = f"{document.frontmatter.get('id', '')}:{criterion.get('id', '')}"
@@ -208,7 +240,9 @@ def check_traceability(
     if rules.get("require_100_percent_req_ac_covered_by_spec", True) and _stage_active(
         target_paths, spec_prefixes
     ):
-        findings.extend(_check_requirement_to_specification_coverage(by_identifier))
+        findings.extend(
+            _check_requirement_to_specification_coverage(by_identifier, target_paths)
+        )
     findings.extend(
         _check_task_and_code_stages(repository_root, by_identifier, target_paths, rules)
     )
