@@ -14,11 +14,12 @@ required_files:
 - tests/test_interaction_logging.py
 write_files:
 - src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_context.py
 verification_cmd: pytest -q tests/test_interaction_logging.py
 ---
 ## Objective
-Implement non-fixed prompt example IDs (`<TYPE>-NNN`, `ESC-NNN`, `AC-XX`), 88-character line wrapping (`MAX_PROMPT_LINE_LENGTH = 88`), `max_line_length=88` in `WorkerAgent` `Source Limits`, and canonical `Glossary Terms` rendering in `src/multi_tasker/orchestrator/prompt_builder.py`.
+Extract `src/multi_tasker/orchestrator/prompt_context.py` and implement non-fixed prompt example IDs (`<TYPE>-NNN`, `ESC-NNN`, `AC-XX`), 88-character line wrapping (`MAX_PROMPT_LINE_LENGTH = 88`), `max_line_length=88` in `WorkerAgent` `Source Limits`, and canonical `Glossary Terms` rendering.
 
 ## Scoped Instructions
-1. Update `_format_property_hint`, `_render_artifact_schema_block`, `_render_escalation_contract`, and `_assemble_prompt_sections` in `src/multi_tasker/orchestrator/prompt_builder.py` so templates and `ESC` contracts use non-fixed `<TYPE>-NNN`, `ESC-NNN`, and `AC-XX`, and targetless prompts use `<TYPE>-NNN`.
-2. Add `MAX_PROMPT_LINE_LENGTH = 88` and wrap synthesized prompt instruction lines (Sections 1 to 3) to `<= 88` characters, add `max_line_length=88` to `WorkerAgent` `Source Limits`, and render canonical `Glossary Terms` (`canonical` and `code_identifiers`) in `_render_glossary_constraints`.
+1. Create `src/multi_tasker/orchestrator/prompt_context.py` with `MAX_PROMPT_LINE_LENGTH = 88`, `wrap_prompt_lines`, `render_code_and_glossary_section` (including `max_line_length=88` and `Glossary Terms`), and `render_target_context_section`.
+2. Update `src/multi_tasker/orchestrator/prompt_builder.py` to use `prompt_context` and emit non-fixed `<TYPE>-NNN`, `ESC-NNN`, and `AC-XX` in schema skeletons, `ESC` contracts, and targetless role prompts.
