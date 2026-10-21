@@ -181,8 +181,29 @@ def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
     assert any(item.rule_id == "PERM_INVALID_EXEC_ENV" for item in findings)
 
 
+def _assert_streamlined_stage_and_review_prompts() -> None:
+    """Assert compact templates, role-filtered hints, and SPEC target_files context."""
+    req_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "requirement-agent")
+    assert (
+        "json_schema:" not in req_prompt and "additionalProperties:" not in req_prompt
+    )
+    assert "```markdown\n---\nid: REQ-" in req_prompt
+    assert "## Statement" in req_prompt and "## Impact Analysis" in req_prompt
+    assert (
+        "`status: in_review`" in req_prompt and "verdict: pass|fail" not in req_prompt
+    )
+    assert "@traces(" not in req_prompt
+    rev_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "review-agent", "SPEC-001")
+    assert (
+        "`verdict: pass|fail`" in rev_prompt and "status: in_review" not in rev_prompt
+    )
+    assert "Target File `tests/test_checkers.py`" in rev_prompt
+    assert "Semantic Review Rubric" in rev_prompt
+
+
 def _assert_self_contained_prompt_output(capsys: Any) -> None:
     """Assert mt prompt outputs Execution Steps and Architecture Layers."""
+    _assert_streamlined_stage_and_review_prompts()
     prompt_args = [
         "prompt",
         "worker-agent",
@@ -197,7 +218,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
     assert "Execution Steps" in prompt_output
     assert "mt check all --agent worker-agent --task TASK-002 --paths" in prompt_output
     assert "./mt check all" not in prompt_output
-    assert "Architecture Layers" in prompt_output
+    assert "Architecture Layers" in prompt_output and "imports:" in prompt_output
+    assert "json_schema:" not in prompt_output
     assert '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")' in prompt_output
     assert "### `TASK` Output Contract" not in prompt_output
     assert "&& pytest -q tests/test_checkers.py" in prompt_output
@@ -212,6 +234,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
 @traces("REQ-030", "AC-02", "SPEC-030")
 @traces("REQ-031", "AC-01", "SPEC-031")
 @traces("REQ-031", "AC-02", "SPEC-031")
+@traces("REQ-033", "AC-01", "SPEC-033")
+@traces("REQ-033", "AC-02", "SPEC-033")
 def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
     """Verify self-contained prompt synthesis and Worktree execution."""
     _assert_self_contained_prompt_output(capsys)
