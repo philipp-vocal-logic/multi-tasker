@@ -2,17 +2,17 @@
 id: TASK-093
 title: Add TestContracts for Atomic Requirement Decomposition Prompt and Catalog
 type: test_contract
-status: planned
+status: done
 traces_to:
-  - REQ-036
-  - SPEC-036
+- REQ-036
+- SPEC-036
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-036.md
-  - artifacts/specifications/SPEC-036.md
-  - tests/test_orchestrator.py
+- artifacts/requirements/REQ-036.md
+- artifacts/specifications/SPEC-036.md
+- tests/test_orchestrator.py
 write_files:
-  - tests/test_orchestrator.py
+- tests/test_orchestrator.py
 verification_cmd: python3 -m py_compile tests/test_orchestrator.py
 ---
 ## Objective

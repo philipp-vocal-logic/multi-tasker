@@ -406,3 +406,36 @@ def test_specification_report_intent_graphs_pipeline_prompts_and_coverage(
     ):
         assert expected in report_text
     assert "### Verified TestContract Links" not in report_text
+
+
+@traces("REQ-036", "AC-01", "SPEC-036")
+@traces("REQ-036", "AC-02", "SPEC-036")
+@traces("REQ-036", "AC-03", "SPEC-036")
+def test_atomic_requirement_decomposition_prompt_and_catalog(
+    tmp_path: Path,
+) -> None:
+    """Verify Requirement Decomposition Contract, catalog, and review rubric."""
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
+
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    assert main(["intent", "Add login and export.", "--root", str(tmp_path)]) == 0
+    empty_prompt, errors = build_agent_prompt(tmp_path, "requirement-agent", "INT-001")
+    assert not errors
+    assert "Requirement Decomposition Contract" in empty_prompt
+    assert "good" in empty_prompt and "edge" in empty_prompt
+    assert "Existing Requirements Catalog" not in empty_prompt
+    example_prompt, _ = build_agent_prompt(tmp_path, "requirement-agent")
+    assert "Requirement Decomposition Contract" in example_prompt
+    assert "`REQ-NNN`" in example_prompt
+    assert "Existing Requirements Catalog" not in example_prompt
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-001.md",
+        "---\nid: REQ-001\ntitle: User Login\nstatus: approved\n"
+        "traces_to: [INT-001]\nversion: 1\n---\n",
+    )
+    catalog_prompt, _ = build_agent_prompt(tmp_path, "requirement-agent", "INT-001")
+    assert "### Existing Requirements Catalog" in catalog_prompt
+    assert "`REQ-001`: User Login (`status: approved`, `version: 1`)" in catalog_prompt
+    review_prompt, _ = build_agent_prompt(tmp_path, "review-agent")
+    assert "single cohesive capability per `REQ`" in review_prompt
+    assert "good, edge, and failure" in review_prompt
