@@ -2,24 +2,24 @@
 id: TASK-092
 title: Implement Cross-Stage Prompt Alignment and Worker Python Output Contract
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-035
-  - SPEC-035
+- REQ-035
+- SPEC-035
 depends_on:
-  - TASK-091
+- TASK-091
 required_files:
-  - artifacts/requirements/REQ-035.md
-  - artifacts/specifications/SPEC-035.md
-  - tests/test_interaction_logging.py
-  - src/multi_tasker/orchestrator/prompt_builder.py
-  - src/multi_tasker/orchestrator/prompt_context.py
+- artifacts/requirements/REQ-035.md
+- artifacts/specifications/SPEC-035.md
+- tests/test_interaction_logging.py
+- src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_context.py
 write_files:
-  - src/multi_tasker/orchestrator/prompt_builder.py
-  - src/multi_tasker/orchestrator/prompt_context.py
-verification_cmd: pytest -o pythonpath=src -q tests/test_interaction_logging.py -k prompt
+- src/multi_tasker/orchestrator/prompt_builder.py
+- src/multi_tasker/orchestrator/prompt_context.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_interaction_logging.py -k
+  prompt
 ---
-
 ## Objective
 Update `prompt_builder.py` and `prompt_context.py` so engineering roles share `Source Limits` and `Clean Code AST Rules`, `WorkerAgent` gets a Python Output Contract, and Section 4 and `Execution Steps` eliminate ambiguities.
 

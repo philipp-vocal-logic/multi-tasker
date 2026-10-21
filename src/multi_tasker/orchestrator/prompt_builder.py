@@ -32,6 +32,12 @@ ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
     "review-agent": "REV",
 }
 
+ROLE_OUTPUT_DIR: dict[str, str] = {
+    "REQ": "artifacts/requirements",
+    "SPEC": "artifacts/specifications",
+    "REV": "artifacts/reviews",
+}
+
 ROLE_TARGET_STATUS: dict[str, str] = {
     "requirement-agent": "status: in_review",
     "specification-agent": "status: in_review",
@@ -162,6 +168,34 @@ def _render_artifact_schema_block(
     ]
 
 
+def _render_worker_code_contract() -> list[str]:
+    """Render Python Source and TestContract output skeleton for worker-agent."""
+    return [
+        "### Python Source & `TestContract` Output Contract (`Allowed Write`)",
+        "```python",
+        '"""Single-paragraph module docstring within max_docstring_lines/words."""',
+        "",
+        "from multi_tasker.domain.models import traces",
+        "",
+        "",
+        '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")',
+        "def test_example_behavior() -> None:",
+        '    """Single-paragraph docstring (return type, names >= 3 chars)."""',
+        "    expected_value = 1",
+        "    assert expected_value == 1",
+        "```",
+        "- **Scope & Imports**: Create or update only the exact path(s) in "
+        "`Allowed Write` (parent directories are created automatically; `src` and `.` "
+        "are on `PYTHONPATH`, so namespace imports work without extra `__init__.py` "
+        "files).",
+        "- **Docstrings & Types**: Keep every module, class, and function docstring "
+        "within `max_docstring_lines` and `max_docstring_words`; declare explicit "
+        "return types (`-> None`, `-> int`, etc.) and use identifiers "
+        "`>= min_identifier_length` chars.",
+        "",
+    ]
+
+
 def _render_escalation_contract(
     agent_role: str, schemas_policy: dict[str, Any]
 ) -> list[str]:
@@ -178,6 +212,23 @@ def _render_escalation_contract(
     ]
 
 
+def _resolve_stage_write_paths(
+    agent_role: str,
+    target_doc: ArtifactDocument | None,
+    next_id: str | None,
+) -> str:
+    """Resolve concrete verification file paths for worker-agent or stage agents."""
+    if target_doc and target_doc.frontmatter.get("write_files"):
+        return " ".join(str(item) for item in target_doc.frontmatter["write_files"])
+    primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "")
+    output_dir = ROLE_OUTPUT_DIR.get(primary_type, "")
+    if target_doc is not None and output_dir and next_id:
+        if target_doc.artifact_type == primary_type:
+            return target_doc.path
+        return f"{output_dir}/{next_id}.md"
+    return "<written_files>"
+
+
 def _build_execution_steps(
     agent_role: str,
     target_doc: ArtifactDocument | None,
@@ -185,11 +236,7 @@ def _build_execution_steps(
 ) -> list[str]:
     """Build concrete role-specific 3-step Execution Steps for agent_role."""
     target_id = str(target_doc.frontmatter.get("id", "")) if target_doc else "<task_id>"
-    write_paths = (
-        " ".join(str(item) for item in target_doc.frontmatter.get("write_files", []))
-        if target_doc and target_doc.frontmatter.get("write_files")
-        else "<written_files>"
-    )
+    write_paths = _resolve_stage_write_paths(agent_role, target_doc, next_id)
     ver_cmd = (
         str(target_doc.frontmatter.get("verification_cmd", "")).strip()
         if target_doc
@@ -239,12 +286,18 @@ def _assemble_prompt_sections(
     next_id = _resolve_next_prompt_id(repository_root, primary_type, target_doc)
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
-        f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
-        "`verification_cmd: python3 -m py_compile <test_file>`, decorating tests "
-        'with `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`) and '
-        f"`type: implementation` Task(s) (`depends_on: [{next_id}]`, `write_files` "
-        "covering `SPEC` `target_files.implementation`, "
+        f"(`id: {next_id}`, `traces_to: [REQ-NNN, SPEC-NNN]`, `write_files` covering "
+        "`SPEC` `target_files.tests`, `verification_cmd: python3 -m py_compile "
+        '<test_file>`, decorating tests with `@traces("REQ-NNN", "AC-XX", '
+        '"SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: [REQ-NNN, '
+        f"SPEC-NNN]`, `depends_on: [{next_id}]`, `required_files: [<test_file>]`, "
+        "`write_files` covering `SPEC` `target_files.implementation`, "
         "`verification_cmd: pytest -q <test_file>`)."
+    )
+    output_contract = (
+        _render_artifact_schema_block(primary_type, schemas_policy)
+        if primary_type
+        else _render_worker_code_contract()
     )
     lines = [
         *_render_permissions_section(
@@ -263,11 +316,7 @@ def _assemble_prompt_sections(
         *([planner_hint] if agent_role == "planner-agent" else []),
         "",
         "## 2. Output Schemas & Section Budgets",
-        *(
-            _render_artifact_schema_block(primary_type, schemas_policy)
-            if primary_type
-            else []
-        ),
+        *output_contract,
     ]
     if role_configuration.get("escalation_write"):
         lines.extend(_render_escalation_contract(agent_role, schemas_policy))

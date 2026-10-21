@@ -117,6 +117,7 @@ def render_code_and_glossary_section(
             "`from multi_tasker.domain.models import traces` "
             'with 3 string arguments `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`'
         )
+        lines.extend(_render_worker_limits_and_ast(repository_root))
     if agent_role == "review-agent":
         lines.append(
             "- **Semantic Review Rubric**: Verify complete upstream `traces_to` and "
@@ -124,8 +125,6 @@ def render_code_and_glossary_section(
             "bounds, and absence of scope creep or layer violations before emitting "
             "`verdict: pass`."
         )
-    if agent_role == "worker-agent":
-        lines.extend(_render_worker_limits_and_ast(repository_root))
     if agent_role in {"specification-agent", "planner-agent"}:
         hints = collect_refactoring_targets(repository_root)
         if hints:
@@ -137,11 +136,16 @@ def render_code_and_glossary_section(
 def _render_code_file_block(
     repository_root: Path, heading_prefix: str, relative_path: str
 ) -> list[str]:
-    """Render a Required File or Write File entry with inline content if present."""
+    """Render a Required File or Write File entry with inline content or new status."""
     lines = [f"### {heading_prefix} `{relative_path}`", f"Path: `{relative_path}`"]
     file_path = repository_root / relative_path
     if file_path.is_file():
-        lines.extend(["```python", file_path.read_text("utf-8").strip(), "```"])
+        fence = "markdown" if relative_path.endswith(".md") else "python"
+        lines.extend([f"```{fence}", file_path.read_text("utf-8").strip(), "```"])
+    else:
+        lines.append(
+            "Status: New file (does not exist on disk yet; create at this path)."
+        )
     return [*lines, ""]
 
 
@@ -184,6 +188,7 @@ def render_target_context_section(
             if str(item) in by_identifier
         ),
     ]
+    rendered_paths = {document.path for document in context_docs}
     for document in context_docs:
         artifact_id = str(document.frontmatter.get("id", document.path))
         raw = (repository_root / document.path).read_text("utf-8").strip()
@@ -198,9 +203,10 @@ def render_target_context_section(
             ]
         )
     for path in target_document.frontmatter.get("required_files", []):
-        if (repository_root / str(path)).is_file():
+        rel_path = str(path)
+        if rel_path not in rendered_paths and (repository_root / rel_path).is_file():
             lines.extend(
-                _render_code_file_block(repository_root, "Required File", str(path))
+                _render_code_file_block(repository_root, "Required File", rel_path)
             )
     for path in target_document.frontmatter.get("write_files", []):
         lines.extend(_render_code_file_block(repository_root, "Write File", str(path)))
