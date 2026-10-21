@@ -15,7 +15,7 @@ required_files:
 write_files:
 - src/multi_tasker/orchestrator/prompt_builder.py
 - src/multi_tasker/orchestrator/prompt_context.py
-verification_cmd: pytest -q tests/test_interaction_logging.py
+verification_cmd: "python3 -c \"import sys, pytest; sys.path.insert(0, 'src'); raise SystemExit(pytest.main(['-q', 'tests/test_interaction_logging.py']))\""
 ---
 ## Objective
 Extract `src/multi_tasker/orchestrator/prompt_context.py` and implement non-fixed prompt example IDs (`<TYPE>-NNN`, `ESC-NNN`, `AC-XX`), 88-character line wrapping (`MAX_PROMPT_LINE_LENGTH = 88`), `max_line_length=88` in `WorkerAgent` `Source Limits`, and canonical `Glossary Terms` rendering.
