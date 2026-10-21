@@ -4,14 +4,26 @@ import os
 from pathlib import Path
 from typing import Any
 
-from multi_tasker.checkers.limits_checker import collect_refactoring_targets
 from multi_tasker.domain.models import ArtifactDocument, Finding
 from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_yaml_file,
     next_artifact_id,
 )
+from multi_tasker.orchestrator.prompt_context import (
+    MAX_PROMPT_LINE_LENGTH,
+    render_code_and_glossary_section,
+    render_target_context_section,
+    wrap_prompt_lines,
+)
 from multi_tasker.orchestrator.router import CATEGORY_ROUTES
+
+__all__ = [
+    "MAX_PROMPT_LINE_LENGTH",
+    "build_agent_prompt",
+    "prepare_worker_invocation",
+    "resolve_task_execution",
+]
 
 ROLE_TO_OUTPUT_SCHEMA: dict[str, str] = {
     "requirement-agent": "REQ",
@@ -33,10 +45,8 @@ def _find_role_definition(repository_root: Path, agent_role: str) -> str:
     glossary_path = repository_root / "policy" / "glossary.yaml"
     if not glossary_path.exists():
         return f"Scoped agent role `{agent_role}`."
-    terms: list[dict[str, Any]] = load_yaml_file(glossary_path).get("terms", [])
-    for entry in terms:
-        allowed_forms = [str(item) for item in entry.get("allowed_forms", [])]
-        if agent_role in allowed_forms:
+    for entry in load_yaml_file(glossary_path).get("terms", []):
+        if agent_role in [str(item) for item in entry.get("allowed_forms", [])]:
             return " ".join(str(entry.get("definition", "")).split())
     return f"Scoped agent role `{agent_role}`."
 
@@ -105,16 +115,16 @@ def _render_section_budgets(artifact_rules: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _format_property_hint(key: str, prop: dict[str, Any], next_id: str | None) -> str:
-    """Format a compact single-line frontmatter field hint from JSON-Schema property."""
-    if key == "id" and next_id:
-        return f"id: {next_id}"
+def _format_property_hint(key: str, prop: dict[str, Any], artifact_type: str) -> str:
+    """Format a compact single-line frontmatter field hint with non-fixed IDs."""
+    if key == "id":
+        return f"id: {artifact_type}-NNN"
     if key == "status" and "ready" in prop.get("enum", []):
         return "status: ready"
     if key == "status" and "in_review" in prop.get("enum", []):
         return "status: in_review"
     if key == "acceptance_criteria":
-        return "acceptance_criteria: [{id: AC-01, given: ..., when: ..., then: ...}]"
+        return "acceptance_criteria: [{id: AC-XX, given: ..., when: ..., then: ...}]"
     if key == "target_files":
         return "target_files: {tests: [tests/...], implementation: [src/...]}"
     if "enum" in prop:
@@ -126,9 +136,7 @@ def _format_property_hint(key: str, prop: dict[str, Any], next_id: str | None) -
 
 
 def _render_artifact_schema_block(
-    artifact_type: str,
-    schemas_policy: dict[str, Any],
-    next_id: str | None = None,
+    artifact_type: str, schemas_policy: dict[str, Any]
 ) -> list[str]:
     """Render compact Markdown frontmatter + section skeleton and section budgets."""
     artifact_rules = schemas_policy.get("artifacts", {}).get(artifact_type, {})
@@ -139,7 +147,7 @@ def _render_artifact_schema_block(
     props = json_schema.get("properties", {})
     req_keys = json_schema.get("required", list(props.keys()))
     fm_lines = [
-        _format_property_hint(str(key), props.get(str(key), {}), next_id)
+        _format_property_hint(str(key), props.get(str(key), {}), artifact_type)
         for key in req_keys
     ]
     sec_lines = [
@@ -157,169 +165,17 @@ def _render_artifact_schema_block(
 def _render_escalation_contract(
     agent_role: str, schemas_policy: dict[str, Any]
 ) -> list[str]:
-    """Render a compact 3-line Escalation output contract and section budget."""
+    """Render a compact Escalation output contract with non-fixed ESC-NNN ID."""
     esc_rules = schemas_policy.get("artifacts", {}).get("ESC", {})
     return [
         "### `ESC` Output Contract (`artifacts/escalations/ESC-*.md`)",
-        f"- **Frontmatter**: `id: ESC-001`, `source_agent: {agent_role}`, "
+        f"- **Frontmatter**: `id: ESC-NNN`, `source_agent: {agent_role}`, "
         "`task_or_stage: <ID>`, `affected_artifacts: [<ID>]`, "
         "`reason_category: ambiguity|rule_conflict|infeasible_scope|"
         "test_contract_defect|review_exhausted`, `status: open`, `resolved_by: null`",
         *_render_section_budgets(esc_rules),
         "",
     ]
-
-
-def _render_glossary_constraints(repository_root: Path) -> list[str]:
-    """Render canonical glossary terms mapped directly to forbidden_synonyms."""
-    glossary_path = repository_root / "policy" / "glossary.yaml"
-    if not glossary_path.exists():
-        return []
-    terms: list[dict[str, Any]] = load_yaml_file(glossary_path).get("terms", [])
-    forbidden_pairs = [
-        f"`{item.get('canonical')}` != "
-        f"{', '.join(item.get('forbidden_synonyms', [])[:3])}"
-        for item in terms
-        if item.get("forbidden_synonyms")
-    ]
-    return [f"- **Forbidden Synonyms**: {'; '.join(forbidden_pairs)}"]
-
-
-def _format_layer_entry(item: dict[str, Any]) -> str:
-    """Format a single layer name with path globs and allowed_internal_imports."""
-    paths = ", ".join(str(path) for path in item.get("paths", []))
-    imports = ", ".join(str(imp) for imp in item.get("allowed_internal_imports", []))
-    return f"`{item.get('name')}` ({paths}; imports: {imports})"
-
-
-def _render_architecture_layers(repository_root: Path) -> list[str]:
-    """Render defined layer names, path globs, and allowed_internal_imports."""
-    arch_path = repository_root / "policy" / "architecture.yaml"
-    if not arch_path.exists():
-        return []
-    layers = load_yaml_file(arch_path).get("layers", [])
-    entries = [
-        _format_layer_entry(item)
-        for item in layers
-        if isinstance(item, dict) and item.get("name")
-    ]
-    return [f"- **Architecture Layers**: {', '.join(entries)}"] if entries else []
-
-
-def _render_code_and_glossary_section(
-    repository_root: Path, agent_role: str
-) -> list[str]:
-    """Render architecture layers, sizing limits, AST rules, and glossary terms."""
-    lines = [
-        "## 3. Vocabulary & Engineering Constraints",
-        *_render_architecture_layers(repository_root),
-    ]
-    if agent_role != "requirement-agent":
-        lines.append(
-            "- **TestContract Decorator**: "
-            "`from multi_tasker.domain.models import traces` "
-            'with 3 string arguments `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`'
-        )
-    if agent_role == "review-agent":
-        lines.append(
-            "- **Semantic Review Rubric**: Verify complete upstream `traces_to` and "
-            "`AcceptanceCriterion` coverage, realistic `target_files`/`write_files` "
-            "bounds, and absence of scope creep or layer violations before emitting "
-            "`verdict: pass`."
-        )
-    if agent_role == "worker-agent":
-        limits_path = repository_root / "policy" / "limits.yaml"
-        if limits_path.exists():
-            source_limits = load_yaml_file(limits_path).get("source_code", {})
-            pairs = ", ".join(f"`{key}={val}`" for key, val in source_limits.items())
-            lines.append(f"- **Source Limits**: {pairs}")
-        clean_path = repository_root / "policy" / "clean_code.yaml"
-        if clean_path.exists():
-            ast_rules = load_yaml_file(clean_path).get("ast_rules", {})
-            pairs = ", ".join(f"`{key}={val}`" for key, val in ast_rules.items())
-            lines.append(f"- **Clean Code AST Rules**: {pairs}")
-    if agent_role in {"specification-agent", "planner-agent"}:
-        hints = collect_refactoring_targets(repository_root)
-        if hints:
-            items = ", ".join(f"`{item.path}` ({item.line} lines)" for item in hints)
-            lines.append(f"- **Refactoring Targets (Warning)**: {items}")
-    return [*lines, *_render_glossary_constraints(repository_root), ""]
-
-
-def _collect_context_documents(
-    target_document: ArtifactDocument, by_identifier: dict[str, ArtifactDocument]
-) -> list[ArtifactDocument]:
-    """Return target_document followed by its upstream traces_to and decisions."""
-    upstream_ids = [
-        *target_document.frontmatter.get("traces_to", []),
-        *target_document.frontmatter.get("decisions", []),
-    ]
-    upstream = [
-        by_identifier[str(item)] for item in upstream_ids if str(item) in by_identifier
-    ]
-    return [target_document, *upstream]
-
-
-def _render_code_file_block(
-    repository_root: Path, heading_prefix: str, relative_path: str
-) -> list[str]:
-    """Render a Required File or Write File entry with inline content if present."""
-    lines = [f"### {heading_prefix} `{relative_path}`", f"Path: `{relative_path}`"]
-    file_path = repository_root / relative_path
-    if file_path.is_file():
-        lines.extend(["```python", file_path.read_text("utf-8").strip(), "```"])
-    return [*lines, ""]
-
-
-def _render_spec_target_files(
-    repository_root: Path, target_document: ArtifactDocument
-) -> list[str]:
-    """Render existing target_files (tests and implementation) from a SPEC artifact."""
-    target_files = target_document.frontmatter.get("target_files", {})
-    if not isinstance(target_files, dict):
-        return []
-    paths = [
-        *target_files.get("tests", []),
-        *target_files.get("implementation", []),
-    ]
-    lines: list[str] = []
-    for path in paths:
-        if (repository_root / str(path)).is_file():
-            lines.extend(
-                _render_code_file_block(repository_root, "Target File", str(path))
-            )
-    return lines
-
-
-def _render_target_context_section(
-    repository_root: Path,
-    target_document: ArtifactDocument,
-    by_identifier: dict[str, ArtifactDocument],
-) -> list[str]:
-    """Render target artifact, upstream artifacts, and required/write/target files."""
-    lines = ["## 4. Scoped Target & Upstream Context", ""]
-    for document in _collect_context_documents(target_document, by_identifier):
-        artifact_id = str(document.frontmatter.get("id", document.path))
-        raw = (repository_root / document.path).read_text("utf-8").strip()
-        lines.extend(
-            [
-                f"### Artifact `{artifact_id}` (`{document.path}`)",
-                f"Path: `{document.path}`",
-                "```markdown",
-                raw,
-                "```",
-                "",
-            ]
-        )
-    for path in target_document.frontmatter.get("required_files", []):
-        if (repository_root / str(path)).is_file():
-            lines.extend(
-                _render_code_file_block(repository_root, "Required File", str(path))
-            )
-    for path in target_document.frontmatter.get("write_files", []):
-        lines.extend(_render_code_file_block(repository_root, "Write File", str(path)))
-    lines.extend(_render_spec_target_files(repository_root, target_document))
-    return lines
 
 
 def _build_execution_steps(
@@ -356,6 +212,19 @@ def _build_execution_steps(
     ]
 
 
+def _resolve_next_prompt_id(
+    repository_root: Path,
+    primary_type: str | None,
+    target_doc: ArtifactDocument | None,
+) -> str | None:
+    """Return concrete next_artifact_id for targeted runs or <TYPE>-NNN for examples."""
+    if not primary_type:
+        return None
+    if target_doc is not None:
+        return next_artifact_id(repository_root, primary_type)
+    return f"{primary_type}-NNN"
+
+
 def _assemble_prompt_sections(
     repository_root: Path,
     agent_role: str,
@@ -367,7 +236,7 @@ def _assemble_prompt_sections(
     schemas_path = repository_root / "policy" / "schemas.yaml"
     schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role)
-    next_id = next_artifact_id(repository_root, primary_type) if primary_type else None
+    next_id = _resolve_next_prompt_id(repository_root, primary_type, target_doc)
     planner_hint = (
         f"- **Planner Decomposition Contract**: Author a `type: test_contract` Task "
         f"(`id: {next_id}`, `write_files` covering `SPEC` `target_files.tests`, "
@@ -395,15 +264,15 @@ def _assemble_prompt_sections(
         "",
         "## 2. Output Schemas & Section Budgets",
         *(
-            _render_artifact_schema_block(primary_type, schemas_policy, next_id)
+            _render_artifact_schema_block(primary_type, schemas_policy)
             if primary_type
             else []
         ),
     ]
     if role_configuration.get("escalation_write"):
         lines.extend(_render_escalation_contract(agent_role, schemas_policy))
-    lines.extend(_render_code_and_glossary_section(repository_root, agent_role))
-    return lines
+    lines.extend(render_code_and_glossary_section(repository_root, agent_role))
+    return wrap_prompt_lines(lines)
 
 
 def build_agent_prompt(
@@ -430,7 +299,7 @@ def build_agent_prompt(
         repository_root, agent_role, agents[agent_role], forbidden, target_doc
     )
     if target_doc is not None:
-        lines.extend(_render_target_context_section(repository_root, target_doc, by_id))
+        lines.extend(render_target_context_section(repository_root, target_doc, by_id))
     return "\n".join(lines).strip() + "\n", []
 
 
