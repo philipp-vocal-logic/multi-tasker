@@ -2,20 +2,19 @@
 id: TASK-091
 title: Add TestContracts for Cross-Stage Prompt Alignment and Worker Output Contract
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-035
-  - SPEC-035
+- REQ-035
+- SPEC-035
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-035.md
-  - artifacts/specifications/SPEC-035.md
-  - tests/test_interaction_logging.py
+- artifacts/requirements/REQ-035.md
+- artifacts/specifications/SPEC-035.md
+- tests/test_interaction_logging.py
 write_files:
-  - tests/test_interaction_logging.py
+- tests/test_interaction_logging.py
 verification_cmd: python3 -m py_compile tests/test_interaction_logging.py
 ---
-
 ## Objective
 Extend `tests/test_interaction_logging.py` with `@traces("REQ-035", ...)` assertions verifying cross-stage `Source Limits`, the `WorkerAgent` Python Output Contract, Section 4 file deduplication and new-file status, and concrete stage output paths.
 

@@ -182,7 +182,7 @@ def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
 
 
 def _assert_streamlined_stage_and_review_prompts() -> None:
-    """Assert compact templates, role-filtered hints, and SPEC target_files context."""
+    """Assert compact templates, cross-stage limits, and SPEC target_files context."""
     req_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "requirement-agent")
     assert (
         "json_schema:" not in req_prompt and "additionalProperties:" not in req_prompt
@@ -196,11 +196,15 @@ def _assert_streamlined_stage_and_review_prompts() -> None:
     assert (
         "`status: in_review`" in req_prompt and "verdict: pass|fail" not in req_prompt
     )
-    assert "@traces(" not in req_prompt
+    assert "@traces(" not in req_prompt and "Source Limits" not in req_prompt
+    for role in ("specification-agent", "planner-agent", "review-agent"):
+        role_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, role)
+        assert "Source Limits" in role_prompt and "Clean Code AST Rules" in role_prompt
     rev_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "review-agent", "SPEC-001")
     assert (
         "`verdict: pass|fail`" in rev_prompt and "status: in_review" not in rev_prompt
     )
+    assert "artifacts/reviews/REV-" in rev_prompt
     assert "Target File `tests/test_checkers.py`" in rev_prompt
     assert "Semantic Review Rubric" in rev_prompt
 
@@ -228,6 +232,8 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
     assert "### `TASK` Output Contract" not in prompt_output
     assert "&& pytest -q tests/test_checkers.py" in prompt_output
     assert "`max_line_length=88`" in prompt_output
+    assert "### Python Source & `TestContract` Output Contract" in prompt_output
+    assert "### Required File `artifacts/requirements/REQ-001.md`" not in prompt_output
     assert "Glossary Terms" in prompt_output and "Forbidden Synonyms" in prompt_output
     assert "def test_permissions_checker_matrix" in prompt_output
     assert "class Finding" in prompt_output
@@ -243,6 +249,9 @@ def _assert_self_contained_prompt_output(capsys: Any) -> None:
 @traces("REQ-033", "AC-02", "SPEC-033")
 @traces("REQ-034", "AC-01", "SPEC-034")
 @traces("REQ-034", "AC-02", "SPEC-034")
+@traces("REQ-035", "AC-01", "SPEC-035")
+@traces("REQ-035", "AC-02", "SPEC-035")
+@traces("REQ-035", "AC-03", "SPEC-035")
 def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
     """Verify self-contained prompt synthesis and Worktree execution."""
     _assert_self_contained_prompt_output(capsys)
@@ -256,6 +265,7 @@ def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> N
         "prompt = Path(os.environ['MT_PROMPT_FILE']).read_text('utf-8'); "
         "assert 'Self-Contained Context' in prompt; "
         "assert 'Execution Steps' in prompt; "
+        "assert 'Status: New file' in prompt; "
         "Path('tests/test_mode.py').write_text('MODE = 1\\n')\""
     )
     run_args = ["run", "--agent-command", worker_cmd]
