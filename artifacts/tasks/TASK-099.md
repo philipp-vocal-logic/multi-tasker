@@ -2,16 +2,16 @@
 id: TASK-099
 title: Add TestContracts for Requirement Supersession and Deprecation Lifecycle
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-039
-  - SPEC-039
+- REQ-039
+- SPEC-039
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-039.md
-  - artifacts/specifications/SPEC-039.md
+- artifacts/requirements/REQ-039.md
+- artifacts/specifications/SPEC-039.md
 write_files:
-  - tests/test_lifecycle.py
+- tests/test_lifecycle.py
 verification_cmd: python3 -m py_compile tests/test_lifecycle.py
 ---
 ## Objective

@@ -407,3 +407,72 @@ def test_multi_requirement_intent_processing_and_completion(
     assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
     final_intent, _ = parse_artifact_file(intent_path, "artifacts/intents/INT-001.md")
     assert final_intent and final_intent.frontmatter["status"] == "processed"
+
+
+def _seed_supersession_fixture(tmp_path: Path) -> Path:
+    """Seed INT-001..002, REQ-001, SPEC-001, TASK-001, and draft REQ-002."""
+    _seed_policies(tmp_path)
+    for intent_id, state_val in (("INT-001", "processed"), ("INT-002", "open")):
+        _write_document(
+            tmp_path / f"artifacts/intents/{intent_id}.md",
+            f"---\nid: {intent_id}\nstatus: {state_val}\n---\n",
+        )
+    _write_document(
+        tmp_path / "artifacts/requirements/REQ-001.md",
+        "---\nid: REQ-001\ntitle: Legacy Auth\nstatus: approved\n"
+        "traces_to: [INT-001]\nacceptance_criteria: [{id: AC-01}]\n"
+        "version: 1\n---\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/specifications/SPEC-001.md",
+        "---\nid: SPEC-001\nstatus: approved\ntraces_to: [REQ-001]\n"
+        "covers_criteria: [REQ-001:AC-01]\n---\n",
+    )
+    _write_document(
+        tmp_path / "artifacts/tasks/TASK-001.md",
+        "---\nid: TASK-001\nstatus: done\ntraces_to: [REQ-001, SPEC-001]\n---\n",
+    )
+    req2_path = tmp_path / "artifacts/requirements/REQ-002.md"
+    _write_document(
+        req2_path,
+        "---\nid: REQ-002\ntitle: Modern Auth\nstatus: draft\n"
+        "traces_to: [INT-002]\nsupersedes: [REQ-999]\n"
+        "acceptance_criteria: [{id: AC-01}]\n---\n",
+    )
+    return req2_path
+
+
+@traces("REQ-039", "AC-01", "SPEC-039")
+@traces("REQ-039", "AC-02", "SPEC-039")
+@traces("REQ-039", "AC-03", "SPEC-039")
+def test_requirement_supersession_deprecates_old_req_and_spec(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify supersedes auto-deprecates REQ/SPEC and filters trace/prompt/metrics."""
+    from multi_tasker.checkers.traceability_checker import check_traceability
+    from multi_tasker.orchestrator.lineage import _compute_static_test_metrics
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
+
+    req2_path = _seed_supersession_fixture(tmp_path)
+    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 1
+    assert "[TRACE_MISSING_REF]" in capsys.readouterr().out
+    _write_document(
+        req2_path, req2_path.read_text("utf-8").replace("REQ-999", "REQ-001")
+    )
+    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
+    for rel_path in ("requirements/REQ-001.md", "specifications/SPEC-001.md"):
+        doc, _ = parse_artifact_file(tmp_path / "artifacts" / rel_path, rel_path)
+        assert doc and doc.frontmatter["status"] == "deprecated"
+    assert check_traceability(tmp_path, ["artifacts/tasks/TASK-001.md"]) == []
+    _write_document(
+        tmp_path / "artifacts/specifications/SPEC-002.md",
+        "---\nid: SPEC-002\nstatus: draft\ntraces_to: [REQ-001]\n"
+        "covers_criteria: [REQ-002:AC-01]\n---\n",
+    )
+    bad_refs = check_traceability(tmp_path, ["artifacts/specifications/SPEC-002.md"])
+    assert any(item.rule_id == "TRACE_UPSTREAM_NOT_APPROVED" for item in bad_refs)
+    prompt, _ = build_agent_prompt(tmp_path, "requirement-agent", "INT-002")
+    assert "supersedes: [REQ-NNN]" in prompt
+    assert "`REQ-002`: Modern Auth" in prompt
+    assert "`REQ-001`: Legacy Auth" not in prompt
+    assert _compute_static_test_metrics(tmp_path)[3] == "0/1 (0.0%)"
