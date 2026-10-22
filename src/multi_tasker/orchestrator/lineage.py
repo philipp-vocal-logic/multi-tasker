@@ -82,7 +82,6 @@ def _referenced_artifact_ids(document: ArtifactDocument) -> set[str]:
     references: set[str] = set()
     for key in (
         "traces_to",
-        "supersedes",
         "depends_on",
         "target_artifacts",
         "affected_artifacts",
@@ -140,7 +139,8 @@ def _document_matches_target(document: ArtifactDocument, target: str) -> bool:
     frontmatter = document.frontmatter
     if str(frontmatter.get("id", "")) == target or document.path == target:
         return True
-    if target in _referenced_artifact_ids(document):
+    supersedes = {str(item) for item in frontmatter.get("supersedes", [])}
+    if target in (_referenced_artifact_ids(document) | supersedes):
         return True
     writes = frontmatter.get("write_files", [])
     if isinstance(writes, list) and target in {str(item) for item in writes}:

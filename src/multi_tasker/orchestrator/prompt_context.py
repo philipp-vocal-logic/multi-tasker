@@ -214,6 +214,33 @@ def _render_existing_requirements_catalog(
     return ["### Existing Requirements Catalog", *entries, ""]
 
 
+def _collect_superseded_context(
+    repository_root: Path,
+    target_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> tuple[list[ArtifactDocument], list[str]]:
+    """Return superseded REQ/SPEC documents and their existing target_files blocks."""
+    superseded_reqs = [
+        str(item)
+        for item in target_document.frontmatter.get("supersedes", [])
+        if str(item) in by_identifier
+    ]
+    req_set = set(superseded_reqs)
+    superseded_specs = [
+        doc
+        for _, doc in sorted(by_identifier.items())
+        if doc.artifact_type == "SPEC"
+        and req_set & {str(ref) for ref in doc.frontmatter.get("traces_to", [])}
+    ]
+    docs = [*(by_identifier[rid] for rid in superseded_reqs), *superseded_specs]
+    file_lines = [
+        line
+        for spec_doc in superseded_specs
+        for line in _render_spec_target_files(repository_root, spec_doc)
+    ]
+    return docs, file_lines
+
+
 def render_target_context_section(
     repository_root: Path,
     target_document: ArtifactDocument,
@@ -221,6 +248,9 @@ def render_target_context_section(
 ) -> list[str]:
     """Render target artifact, upstream artifacts, and required/write/target files."""
     lines = ["## 4. Scoped Target & Upstream Context", ""]
+    superseded_docs, superseded_files = _collect_superseded_context(
+        repository_root, target_document, by_identifier
+    )
     upstream_ids = [
         *target_document.frontmatter.get("traces_to", []),
         *target_document.frontmatter.get("decisions", []),
@@ -232,6 +262,7 @@ def render_target_context_section(
             for item in upstream_ids
             if str(item) in by_identifier
         ),
+        *superseded_docs,
     ]
     rendered_paths = {document.path for document in context_docs}
     for document in context_docs:
@@ -257,4 +288,5 @@ def render_target_context_section(
     for path in target_document.frontmatter.get("write_files", []):
         lines.extend(_render_code_file_block(repository_root, "Write File", str(path)))
     lines.extend(_render_spec_target_files(repository_root, target_document))
+    lines.extend(superseded_files)
     return lines
