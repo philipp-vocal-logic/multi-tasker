@@ -52,8 +52,46 @@ def test_clean_code_checker_violation_branches(tmp_path: Path) -> None:
     }.issubset(code_rules)
 
 
+def _assert_linter_fail_fast_and_fail_clear(
+    tmp_path: Path,
+    policy_file: Path,
+    clean_configuration: dict[str, Any],
+) -> None:
+    """Verify missing linter binaries and non-zero mypy exits emit Findings."""
+    clean_configuration["linters"]["mypy"] = {
+        "enabled": True,
+        "cmd": ["missing-mypy-executable"],
+    }
+    _write_document(policy_file, yaml.safe_dump(clean_configuration))
+    missing_mypy = check_clean_code(tmp_path)
+    assert missing_mypy[0].rule_id == "CODE_LINTER_MISSING"
+    clean_configuration["linters"]["mypy"]["enabled"] = False
+    clean_configuration["linters"]["ruff"] = {
+        "enabled": True,
+        "cmd": ["missing-ruff-executable"],
+    }
+    _write_document(policy_file, yaml.safe_dump(clean_configuration))
+    missing_ruff = check_clean_code(tmp_path)
+    assert missing_ruff[0].rule_id == "CODE_LINTER_MISSING"
+    clean_configuration["linters"]["ruff"]["enabled"] = False
+    clean_configuration["linters"]["mypy"] = {
+        "enabled": True,
+        "cmd": [
+            "python3",
+            "-c",
+            "import sys; sys.stderr.write('fatal mypy flag error\\n'); sys.exit(2)",
+        ],
+    }
+    _write_document(policy_file, yaml.safe_dump(clean_configuration))
+    failed_mypy = check_clean_code(tmp_path)
+    assert failed_mypy[0].rule_id == "CODE_MYPY"
+    assert "fatal mypy flag error" in failed_mypy[0].message
+
+
 @traces("REQ-001", "AC-03", "SPEC-001")
 @traces("REQ-001", "AC-05", "SPEC-001")
+@traces("REQ-049", "AC-01", "SPEC-049")
+@traces("REQ-049", "AC-02", "SPEC-049")
 def test_output_contract_mypy_and_toggle_sensitivity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -94,3 +132,4 @@ def test_output_contract_mypy_and_toggle_sensitivity(
     _write_document(policy_file, yaml.safe_dump(clean_configuration))
     assert main(["check", "clean_code", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out == "OK\n"
+    _assert_linter_fail_fast_and_fail_clear(tmp_path, policy_file, clean_configuration)

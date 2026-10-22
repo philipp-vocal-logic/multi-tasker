@@ -3,6 +3,8 @@
 import importlib
 from pathlib import Path
 
+import pytest
+
 from multi_tasker.checkers.limits_checker import collect_refactoring_targets
 from multi_tasker.domain.models import traces
 from multi_tasker.domain.parser import parse_artifact_file
@@ -130,8 +132,9 @@ def test_stage_agent_escalation_persistence_routing_and_rejection(
 @traces("REQ-043", "AC-01", "SPEC-043")
 @traces("REQ-043", "AC-02", "SPEC-043")
 @traces("REQ-043", "AC-03", "SPEC-043")
+@traces("REQ-049", "AC-03", "SPEC-049")
 def test_declarative_pipeline_max_workers_forwarding_and_failure_halt(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Verify mt run --pipeline forwards max_workers, defaults to 1, and halts."""
     from multi_tasker.cli.main import main
@@ -149,34 +152,28 @@ def test_declarative_pipeline_max_workers_forwarding_and_failure_halt(
             encoding="utf-8",
         )
     recorded_workers: list[int] = []
-    original_runner = stage_runner.run_scheduled_tasks
 
     def fake_scheduled(
-        root: Path,
+        repository_root: Path,
         max_workers: int = 1,
-        cmd: str | None = None,
-        model: str | None = None,
-        env: str | None = None,
+        agent_command: str | None = None,
+        model_override: str | None = None,
+        environment_override: str | None = None,
     ) -> tuple[list[str], list[Finding]]:
-        _ = (root, cmd, model, env)
+        _ = (repository_root, agent_command, model_override, environment_override)
         recorded_workers.append(max_workers)
         if max_workers == 3:
             return [], [Finding("verification_cmd", 1, "GATE_VERIFY_CMD_FAILED", "err")]
         return ["TASK-001", "TASK-002"], []
 
-    stage_runner.run_scheduled_tasks = fake_scheduled
-    try:
-        done_default, err_default = stage_runner.run_declarative_pipeline(tmp_path)
-        assert {"TASK-001", "TASK-002"} <= set(done_default) and err_default == []
-        assert recorded_workers[-1] == 1
-        run_two = ["run", "--pipeline", "--max-workers", "2", "--root", str(tmp_path)]
-        assert main(run_two) == 0
-        assert recorded_workers[-1] == 2
-        run_three = ["run", "--pipeline", "--max-workers", "3", "--root", str(tmp_path)]
-        assert main(run_three) == 1
-        assert recorded_workers[-1] == 3
-    finally:
-        stage_runner.run_scheduled_tasks = original_runner
+    monkeypatch.setattr(stage_runner, "run_scheduled_tasks", fake_scheduled)
+    done_default, err_default = stage_runner.run_declarative_pipeline(tmp_path)
+    assert {"TASK-001", "TASK-002"} <= set(done_default) and err_default == []
+    assert recorded_workers[-1] == 1
+    run_two = ["run", "--pipeline", "--max-workers", "2", "--root", str(tmp_path)]
+    assert main(run_two) == 0 and recorded_workers[-1] == 2
+    run_three = ["run", "--pipeline", "--max-workers", "3", "--root", str(tmp_path)]
+    assert main(run_three) == 1 and recorded_workers[-1] == 3
 
 
 @traces("REQ-044", "AC-01", "SPEC-044")
