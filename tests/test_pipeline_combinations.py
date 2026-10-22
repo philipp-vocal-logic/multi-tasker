@@ -13,6 +13,7 @@ from multi_tasker.domain.parser import load_artifacts_by_id, load_yaml_file
 from multi_tasker.orchestrator.interaction_logger import record_task_event
 from multi_tasker.orchestrator.lifecycle import bootstrap_evaluation_repository
 from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
+from multi_tasker.orchestrator.worktree import commit_traceable_change
 
 
 @dataclass(frozen=True)
@@ -81,12 +82,12 @@ def _task_md(task_id: str, is_impl: bool = False) -> str:
     )
 
 
-def _rev_md(verdict: str) -> str:
-    """Build a valid REV-001 Markdown artifact string for SPEC-001."""
+def _rev_md(verdict: str, rev_id: str = "REV-001") -> str:
+    """Build a valid REV Markdown artifact string for SPEC-001."""
     finding = "  - Missing edge case coverage in specification\n"
     block = f"findings:\n{finding}" if verdict == "fail" else "findings: []\n"
     return (
-        f"---\nid: REV-001\ntarget_artifacts: [SPEC-001]\n"
+        f"---\nid: {rev_id}\ntarget_artifacts: [SPEC-001]\n"
         f"stage: specification\nverdict: {verdict}\n{block}---\n"
     )
 
@@ -166,8 +167,11 @@ _T_REV_F1 = MockTurn(
     ("Semantic Review Rubric",),
     {_REV_PATH: _rev_md("fail")},
 )
+_REV2_PATH = "artifacts/reviews/REV-002.md"
 _T_REV_P2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("pass")})
-_T_REV_F2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("fail")})
+_T_REV_F2 = MockTurn(
+    "review-agent", "SPEC-001", 2, (), {_REV2_PATH: _rev_md("fail", "REV-002")}
+)
 _T_SPEC_2 = MockTurn(
     "specification-agent",
     "REQ-001",
@@ -298,11 +302,8 @@ def _configure_scenario_repository(
         if stage_id in scenario.stage_gates:
             stage["approval_gate"] = scenario.stage_gates[stage_id]
     pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
-    from tests.test_task_runner import _git_commit_all
-
-    _git_commit_all(
-        repository_root, "INT-001: Configure scenario pipeline [traces: INT-001]"
-    )
+    msg = "INT-001: Configure scenario pipeline [traces: INT-001]"
+    commit_traceable_change(repository_root, ["policy/pipeline.yaml"], msg)
 
 
 def _execute_scripted_turn(
