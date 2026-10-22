@@ -21,7 +21,7 @@ write_files:
   - src/multi_tasker/orchestrator/prompt_context.py
   - src/multi_tasker/orchestrator/router.py
   - src/multi_tasker/orchestrator/stage_runner.py
-verification_cmd: pytest -q tests/test_pipeline_combinations.py tests/test_review_gates.py tests/test_stage_runner.py tests/test_stage_escalation.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_pipeline_combinations.py tests/test_review_gates.py tests/test_stage_runner.py tests/test_stage_escalation.py
 ---
 ## Objective
 Update `parser.py`, `prompt_context.py`, `router.py`, and `stage_runner.py` to support multi-cycle review retries, in-run `routed_to_agent` escalation dispatch, failed `ReviewRecord` and `ESC` context inlining, and `before_snapshot` restoration.
