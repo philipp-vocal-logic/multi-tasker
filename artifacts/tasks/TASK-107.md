@@ -2,7 +2,7 @@
 id: TASK-107
 title: Add TestContracts for Declarative Pipeline Max-Workers Forwarding
 type: test_contract
-status: done
+status: ready
 traces_to:
 - REQ-043
 - SPEC-043
