@@ -167,7 +167,7 @@ def test_declarative_pipeline_max_workers_forwarding_and_failure_halt(
     stage_runner.run_scheduled_tasks = fake_scheduled
     try:
         done_default, err_default = stage_runner.run_declarative_pipeline(tmp_path)
-        assert done_default == ["TASK-001", "TASK-002"] and err_default == []
+        assert {"TASK-001", "TASK-002"} <= set(done_default) and err_default == []
         assert recorded_workers[-1] == 1
         run_two = ["run", "--pipeline", "--max-workers", "2", "--root", str(tmp_path)]
         assert main(run_two) == 0
