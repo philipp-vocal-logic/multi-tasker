@@ -1,18 +1,19 @@
 ---
 id: TASK-119
-title: Add TestContracts for Worktree Src PYTHONPATH Precedence and Identical Review Retry
+title: Add TestContracts for Worktree Src PYTHONPATH Precedence and Identical Review
+  Retry
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-047
-  - SPEC-047
+- REQ-047
+- SPEC-047
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-047.md
-  - artifacts/specifications/SPEC-047.md
-  - tests/test_pipeline_combinations.py
+- artifacts/requirements/REQ-047.md
+- artifacts/specifications/SPEC-047.md
+- tests/test_pipeline_combinations.py
 write_files:
-  - tests/test_pipeline_combinations.py
+- tests/test_pipeline_combinations.py
 verification_cmd: python3 -m py_compile tests/test_pipeline_combinations.py
 ---
 ## Objective

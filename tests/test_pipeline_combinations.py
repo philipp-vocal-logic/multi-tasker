@@ -1,5 +1,6 @@
 """Data-driven E2E pipeline combination TestContracts with mocked model calls."""
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -82,12 +83,12 @@ def _task_md(task_id: str, is_impl: bool = False) -> str:
     )
 
 
-def _rev_md(verdict: str, rev_id: str = "REV-001") -> str:
-    """Build a valid REV Markdown artifact string for SPEC-001."""
+def _rev_md(verdict: str) -> str:
+    """Build a valid REV-001 Markdown artifact string for SPEC-001."""
     finding = "  - Missing edge case coverage in specification\n"
     block = f"findings:\n{finding}" if verdict == "fail" else "findings: []\n"
     return (
-        f"---\nid: {rev_id}\ntarget_artifacts: [SPEC-001]\n"
+        f"---\nid: REV-001\ntarget_artifacts: [SPEC-001]\n"
         f"stage: specification\nverdict: {verdict}\n{block}---\n"
     )
 
@@ -119,92 +120,61 @@ _IMPL_PY = (
     "    return left + right\n"
 )
 
-_T_REQ = MockTurn(
-    "requirement-agent",
-    "INT-001",
-    1,
-    ("Requirement Decomposition Contract", "### Artifact `INT-001`"),
-    {"artifacts/requirements/REQ-001.md": _REQ_MD},
+_PATHS = (
+    "artifacts/requirements/REQ-001.md",
+    "artifacts/specifications/SPEC-001.md",
+    "artifacts/reviews/REV-001.md",
+    "artifacts/tasks/TASK-001.md",
+    "artifacts/tasks/TASK-002.md",
+    "artifacts/escalations/ESC-001.md",
+    "artifacts/escalations/ESC-002.md",
 )
+_REQ_PATH, _SPEC_PATH, _REV_PATH, _TASK1_PATH, _TASK2_PATH, _ESC1_PATH, _ESC2_PATH = (
+    _PATHS
+)
+_P_REQ = ("Requirement Decomposition Contract", "### Artifact `INT-001`")
+_P_PLAN = ("Planner Decomposition Contract", "### Artifact `SPEC-001`")
+_P_WORK1 = ("### Artifact `TASK-001`", "### Write File `tests/test_calc.py`")
+_P_WORK2 = ("### Artifact `TASK-002`", "### Required File `tests/test_calc.py`")
+_P_SPEC2 = ("### Artifact `REV-001`", "Missing edge case coverage in specification")
+_P_RESC = ("### Artifact `ESC-001`", "### Artifact `TASK-001`")
+_P_SPEC1 = ("### Artifact `REQ-001`",)
+_P_REV1 = ("Semantic Review Rubric",)
+_PLAN_OUT = {
+    _TASK1_PATH: _task_md("TASK-001", False),
+    _TASK2_PATH: _task_md("TASK-002", True),
+}
+
+_T_REQ = MockTurn("requirement-agent", "INT-001", 1, _P_REQ, {_REQ_PATH: _REQ_MD})
 _T_SPEC = MockTurn(
-    "specification-agent",
-    "REQ-001",
-    1,
-    ("### Artifact `REQ-001`",),
-    {"artifacts/specifications/SPEC-001.md": _SPEC_MD},
+    "specification-agent", "REQ-001", 1, _P_SPEC1, {_SPEC_PATH: _SPEC_MD}
 )
-_T_PLAN = MockTurn(
-    "planner-agent",
-    "SPEC-001",
-    1,
-    ("Planner Decomposition Contract", "### Artifact `SPEC-001`"),
-    {
-        "artifacts/tasks/TASK-001.md": _task_md("TASK-001", False),
-        "artifacts/tasks/TASK-002.md": _task_md("TASK-002", True),
-    },
-)
+_T_PLAN = MockTurn("planner-agent", "SPEC-001", 1, _P_PLAN, _PLAN_OUT)
 _T_WORK1 = MockTurn(
-    "worker-agent",
-    "TASK-001",
-    1,
-    ("### Artifact `TASK-001`", "### Write File `tests/test_calc.py`"),
-    {"tests/test_calc.py": _TEST_PY},
+    "worker-agent", "TASK-001", 1, _P_WORK1, {"tests/test_calc.py": _TEST_PY}
 )
 _T_WORK2 = MockTurn(
-    "worker-agent",
-    "TASK-002",
-    1,
-    ("### Artifact `TASK-002`", "### Required File `tests/test_calc.py`"),
-    {"src/domain/calc.py": _IMPL_PY},
+    "worker-agent", "TASK-002", 1, _P_WORK2, {"src/domain/calc.py": _IMPL_PY}
 )
 _BASE = (_T_REQ, _T_SPEC, _T_PLAN, _T_WORK1, _T_WORK2)
-_REV_PATH = "artifacts/reviews/REV-001.md"
-_SPEC_PATH = "artifacts/specifications/SPEC-001.md"
 _T_REV_F1 = MockTurn(
-    "review-agent",
-    "SPEC-001",
-    1,
-    ("Semantic Review Rubric",),
-    {_REV_PATH: _rev_md("fail")},
+    "review-agent", "SPEC-001", 1, _P_REV1, {_REV_PATH: _rev_md("fail")}
 )
-_REV2_PATH = "artifacts/reviews/REV-002.md"
 _T_REV_P2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("pass")})
-_T_REV_F2 = MockTurn(
-    "review-agent", "SPEC-001", 2, (), {_REV2_PATH: _rev_md("fail", "REV-002")}
-)
+_T_REV_F2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("fail")})
 _T_SPEC_2 = MockTurn(
-    "specification-agent",
-    "REQ-001",
-    2,
-    ("### Artifact `REV-001`", "Missing edge case coverage in specification"),
-    {_SPEC_PATH: _SPEC_MD},
+    "specification-agent", "REQ-001", 2, _P_SPEC2, {_SPEC_PATH: _SPEC_MD}
 )
-_T_ESC1 = MockTurn(
-    "worker-agent",
-    "TASK-001",
-    1,
-    (),
-    {"artifacts/escalations/ESC-001.md": _esc_md("ESC-001")},
-)
-_T_ESC2 = MockTurn(
-    "worker-agent",
-    "TASK-001",
-    2,
-    (),
-    {"artifacts/escalations/ESC-002.md": _esc_md("ESC-002")},
-)
+_T_ESC1 = MockTurn("worker-agent", "TASK-001", 1, (), {_ESC1_PATH: _esc_md("ESC-001")})
+_T_ESC2 = MockTurn("worker-agent", "TASK-001", 2, (), {_ESC2_PATH: _esc_md("ESC-002")})
 _T_RESCOPE = MockTurn(
-    "planner-agent",
-    "ESC-001",
-    1,
-    ("### Artifact `ESC-001`", "### Artifact `TASK-001`"),
-    {"artifacts/tasks/TASK-001.md": _task_md("TASK-001", False)},
+    "planner-agent", "ESC-001", 1, _P_RESC, {_TASK1_PATH: _PLAN_OUT[_TASK1_PATH]}
 )
 _T_WORK1_2 = MockTurn(
     "worker-agent", "TASK-001", 2, (), {"tests/test_calc.py": _TEST_PY}
 )
 _T_TAMPER = MockTurn(
-    "worker-agent", "TASK-002", 1, (), {"tests/test_calc.py": "# tampered test\n"}
+    "worker-agent", "TASK-002", 1, (), {"tests/test_calc.py": "# tampered\n"}
 )
 
 _AUTO = {
@@ -398,3 +368,31 @@ def test_declarative_pipeline_combinations_matrix(
     for artifact_id, expected_state in scenario.expected_states.items():
         assert artifact_id in by_id, f"Missing expected artifact {artifact_id}"
         assert by_id[artifact_id].frontmatter.get("status") == expected_state
+
+
+@traces("REQ-047", "AC-01", "SPEC-047")
+@traces("REQ-047", "AC-02", "SPEC-047")
+@traces("REQ-047", "AC-03", "SPEC-047")
+def test_worktree_pythonpath_precedence_and_identical_review_retry(
+    tmp_path: Path,
+) -> None:
+    """Verify worktree/src PYTHONPATH precedence, identical REV diff, and empty diff."""
+    from multi_tasker.orchestrator import merge_gate, prompt_builder, stage_runner
+
+    bootstrap_evaluation_repository(tmp_path, "Verify worktree PYTHONPATH.")
+    int_doc = load_artifacts_by_id(tmp_path)["INT-001"]
+    expected = f"{tmp_path / 'src'}{os.pathsep}{tmp_path}"
+    ctx = ("echo", "agy", "m")
+    _, _, s_env = stage_runner._prepare_stage_invocation(
+        tmp_path, "requirement-agent", int_doc, ctx
+    )
+    _, w_env = prompt_builder.prepare_worker_invocation(
+        tmp_path, int_doc, tmp_path / ".mt_prompt.md", ctx
+    )
+    assert s_env["PYTHONPATH"] == expected and w_env["PYTHONPATH"] == expected
+    (tmp_path / "src/domain").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src/domain/mod.py").write_text("VAL = 7\n", encoding="utf-8")
+    cmd = "python3 -c 'import domain.mod; assert domain.mod.VAL == 7'"
+    assert merge_gate._run_verification_command(tmp_path, cmd) == []
+    before_empty = stage_runner._snapshot_artifacts(tmp_path)
+    assert stage_runner._detect_stage_changes(tmp_path, before_empty, "INT-001") == []
