@@ -65,7 +65,7 @@ Before creating your first baseline commit, customize the scaffolded `policy/*.y
    - Add your project's domain terms, `code_identifiers` casing, and `forbidden_synonyms`.
 3. **`policy/pipeline.yaml` & `policy/permissions.yaml` (Workflow & Execution Tuning)**:
    - Configure each stage's `approval_gate` (`"human"`, `"review-agent"`, or `"auto"`), `execution_bounds`, and `escalation_routes` in `policy/pipeline.yaml`.
-   - Configure `execution_environments` (`default_environment`, `default_model`, `default_context_mode`: `"inline"` or `"paths"`), per-role `agents.<role>.model`, and `worker-agent` `task_type_path_constraints` in `policy/permissions.yaml`.
+   - Configure `execution_environments` (`default_environment`, `default_model`), per-role `agents.<role>.model`, and `worker-agent` `task_type_path_constraints` in `policy/permissions.yaml`.
 4. **`policy/clean_code.yaml`, `policy/limits.yaml`, `policy/schemas.yaml`, `policy/traceability.yaml` (Engineering Constraints)**:
    - Tune `ast_rules` (such as `forbid_print_in_src` or `allowed_single_char_names`), linter flags, source code sizing bounds, and `target_files` path patterns.
    - Toggle boolean flags or adjust values rather than deleting required `Policy` keys.
@@ -147,7 +147,7 @@ Never edit `src/**`, `tests/**`, `policy/**`, or completed (`done`) `TASK-NNN.md
 | `mt run [--pipeline] [--agent <role> --target <id>] [--max-workers <n>]` | Execute `Tasks`, single agent stages, or the declarative pipeline in isolated `Worktrees` via the `MergeGate`. |
 | `mt resolve <ESC-ID> --by <DEC\|TASK-ID>` | Resolve an `Escalation` via an approved `Decision` or rescoped `Task` and propagate dirty flags. |
 | `mt trace <ID-or-filepath>` | Inspect bidirectional `Traceability` across artifacts, `@traces` tests, and Git commits. |
-| `mt prompt <agent-role> [--target <id>] [--context-mode inline\|paths]` | Synthesize the deterministic system and task prompt for an agent role from live repository state. |
+| `mt prompt <agent-role> [--target <id>]` | Synthesize the deterministic system and task prompt for an agent role from live repository state. |
 | `mt documentation` | Regenerate and print `.report/specification.md` from live `policy/*.yaml` and `artifacts/**`. |
 
 ### Live Specification vs. Interaction Logs

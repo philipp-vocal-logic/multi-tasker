@@ -1,7 +1,7 @@
 ---
 id: SPEC-012
 title: Configurable Orchestrator Context Delivery Mode Specification
-status: approved
+status: deprecated
 traces_to:
 - REQ-012
 covers_criteria:
