@@ -18,7 +18,7 @@ from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 
 def _render_architecture_section(repository_root: Path) -> list[str]:
     """Render architecture layers table and Mermaid dependency flowchart."""
-    policy_path = repository_root / "policy" / "architecture.yaml"
+    policy_path = repository_root / "policy" / "code_architecture.yaml"
     policy = load_yaml_file(policy_path) if policy_path.exists() else {}
     layers: list[dict[str, Any]] = policy.get("layers", [])
     lines = [
@@ -47,8 +47,8 @@ def _render_architecture_section(repository_root: Path) -> list[str]:
 
 
 def _render_permissions_section(repository_root: Path) -> list[str]:
-    """Render agent WriteScope permissions table from policy/permissions.yaml."""
-    policy_path = repository_root / "policy" / "permissions.yaml"
+    """Render agent WriteScope permissions table from agent_permissions.yaml."""
+    policy_path = repository_root / "policy" / "agent_permissions.yaml"
     policy = load_yaml_file(policy_path) if policy_path.exists() else {}
     agents: dict[str, Any] = policy.get("agents", {})
     header = (
@@ -83,7 +83,7 @@ def _render_permissions_section(repository_root: Path) -> list[str]:
 
 
 def _render_state_lifecycles_section(repository_root: Path) -> list[str]:
-    """Render Mermaid stateDiagram-v2 blocks from policy/schemas.yaml."""
+    """Render Mermaid stateDiagram-v2 blocks from artifact_lifecycle.yaml."""
     transitions = load_state_transitions(repository_root)
     lines = ["## 3. Artifact State Lifecycles", ""]
     for artifact_type, mapping in sorted(transitions.items()):
@@ -104,7 +104,7 @@ def _render_state_lifecycles_section(repository_root: Path) -> list[str]:
 
 def _render_limits_and_glossary_section(repository_root: Path) -> list[str]:
     """Render source code sizing limits and canonical domain glossary table."""
-    limits_path = repository_root / "policy" / "limits.yaml"
+    limits_path = repository_root / "policy" / "code_limits.yaml"
     limits_policy = load_yaml_file(limits_path) if limits_path.exists() else {}
     source_limits: dict[str, Any] = limits_policy.get("source_code", {})
     glossary_path = repository_root / "policy" / "glossary.yaml"
@@ -183,7 +183,7 @@ def _render_traceability_section(repository_root: Path) -> list[str]:
 
 def _render_pipeline_section(repository_root: Path) -> list[str]:
     """Render Declarative Agent Pipeline & Escalation Routing Mermaid flowchart."""
-    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    pipeline_path = repository_root / "policy" / "artifact_lifecycle.yaml"
     policy = load_yaml_file(pipeline_path) if pipeline_path.exists() else {}
     bounds: dict[str, Any] = policy.get("execution_bounds", {})
     stages: list[dict[str, Any]] = policy.get("stages", [])
@@ -225,7 +225,7 @@ def _render_pipeline_section(repository_root: Path) -> list[str]:
 
 def _render_example_prompts_section(repository_root: Path) -> list[str]:
     """Render collapsible 4-backtick role prompt examples for all configured roles."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
+    permissions_path = repository_root / "policy" / "agent_permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     role_names = list(permissions.get("agents", {}).keys())
     lines = ["## 7. Generated Example Agent Instructions", ""]
@@ -284,16 +284,17 @@ def generate_external_agents_guide() -> str:
         "## 1. One-Time Bootstrapping & Tailoring Policy Configuration",
         "1. **Install & Initialize**: Install `multi-tasker` (`pip install -e <path>`) "
         "and run `mt initialize`.",
-        "2. **Customize Architecture & Vocabulary (`policy/architecture.yaml`, "
+        "2. **Customize Architecture & Vocabulary (`policy/code_architecture.yaml`, "
         "`policy/glossary.yaml`)**:",
         "   - Replace `layers` (`paths`, `allowed_internal_imports`, "
         "`forbidden_internal_imports`) and `allowed_third_party_packages` (keep "
         "'\"multi_tasker\"' and '\"pytest\"').",
         "   - Keep core `mt` orchestration terms and agent roles in "
         "`policy/glossary.yaml` and append project domain terms.",
-        "3. **Tune Use-Case Policies (`policy/pipeline.yaml`, "
-        "`policy/permissions.yaml`, `policy/clean_code.yaml`, "
-        "`policy/limits.yaml`, `policy/schemas.yaml`)**:",
+        "3. **Tune Use-Case Policies (`policy/artifact_lifecycle.yaml`, "
+        "`policy/agent_permissions.yaml`, `policy/agent_execution.yaml`, "
+        "`policy/code_quality.yaml`, `policy/code_limits.yaml`, "
+        "`policy/artifact_schemas.yaml`, `policy/artifact_limits.yaml`)**:",
         "   - Configure stage `approval_gate` (`human`, `review-agent`, `auto`), "
         "`execution_environments`, per-role `model`, `ast_rules`, and sizing bounds.",
         "4. **Commit Baseline Policies (`PERM_POLICY_MODIFIED` Rule)**: Uncommitted "

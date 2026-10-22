@@ -2,7 +2,7 @@
 id: TASK-127
 title: Update Documentation Generator for Separated Policy Files
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-048
 - SPEC-048
