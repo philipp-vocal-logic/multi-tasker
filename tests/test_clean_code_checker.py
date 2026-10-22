@@ -23,7 +23,7 @@ def test_clean_code_checker_violation_branches(tmp_path: Path) -> None:
     assert check_clean_code(tmp_path)[0].rule_id == "CODE_POLICY_MISSING"
     marker = "FIX" + "ME"
     _write_document(
-        tmp_path / "policy" / "clean_code.yaml",
+        tmp_path / "policy" / "code_quality.yaml",
         yaml.safe_dump(
             {
                 "linters": {"ruff": {"enabled": True, "select_rules": ["F"]}},
@@ -81,7 +81,7 @@ def test_output_contract_mypy_and_toggle_sensitivity(
             "require_explicit_return_types": False,
         },
     }
-    policy_file = tmp_path / "policy" / "clean_code.yaml"
+    policy_file = tmp_path / "policy" / "code_quality.yaml"
     _write_document(policy_file, yaml.safe_dump(clean_configuration))
     _write_document(
         tmp_path / "src" / "a.py",

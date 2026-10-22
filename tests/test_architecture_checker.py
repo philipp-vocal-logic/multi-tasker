@@ -24,7 +24,7 @@ def test_architecture_checker_violation_branches(tmp_path: Path) -> None:
         "allowed_internal_imports": ["src.domain"],
     }
     _write_document(
-        tmp_path / "policy" / "architecture.yaml",
+        tmp_path / "policy" / "code_architecture.yaml",
         yaml.safe_dump(
             {
                 "dependency_rules": {"forbid_circular_imports": True},

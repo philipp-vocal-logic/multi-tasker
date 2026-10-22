@@ -19,7 +19,7 @@ def _write_document(path: Path, content: str) -> None:
 def _seed_trace_fixtures(tmp_path: Path) -> None:
     """Create synthetic artifacts and test files for trace failure testing."""
     _write_document(
-        tmp_path / "policy/schemas.yaml",
+        tmp_path / "policy/artifact_schemas.yaml",
         "schemas: {REQ: {path_glob: 'artifacts/requirements/REQ-*.md'}}\n",
     )
     _write_document(tmp_path / "policy/traceability.yaml", "traceability_rules: {}\n")

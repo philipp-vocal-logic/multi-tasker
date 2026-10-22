@@ -72,14 +72,16 @@ def _seed_minimal_policies(root: Path) -> None:
         "agents": {"req-agent": agent_rules},
     }
     transitions = {"REQ": {"draft": ["in_review"], "needs_update": ["draft"]}}
-    schemas = {"state_transitions": transitions, "artifacts": {}, "schemas": {}}
     for name, data in {
-        "permissions.yaml": permissions,
+        "agent_permissions.yaml": permissions,
+        "agent_execution.yaml": {"clean_repo_invariants": {}},
         "glossary.yaml": {"enforcement": {}, "terms": []},
-        "limits.yaml": {"source_code": {}},
-        "clean_code.yaml": {"linters": {"ruff": {"enabled": False}}, "ast_rules": {}},
-        "architecture.yaml": {"dependency_rules": {}, "layers": []},
-        "schemas.yaml": schemas,
+        "code_limits.yaml": {"source_code": {}},
+        "code_quality.yaml": {"linters": {"ruff": {"enabled": False}}, "ast_rules": {}},
+        "code_architecture.yaml": {"dependency_rules": {}, "layers": []},
+        "artifact_schemas.yaml": {"schemas": {}},
+        "artifact_limits.yaml": {"artifacts": {}},
+        "artifact_lifecycle.yaml": {"state_transitions": transitions},
         "traceability.yaml": {"traceability_rules": {}},
     }.items():
         _write_document(root / "policy" / name, yaml.safe_dump(data))
@@ -97,7 +99,7 @@ def test_worktree_lifecycle_and_clean_repo_checks(tmp_path: Path) -> None:
     assert any(finding.rule_id == "GATE_POLICY_TAMPERED" for finding in bad)
     worktree_path = create_worktree(tmp_path, "run-01")
     assert worktree_path.exists()
-    assert not os.access(worktree_path / "policy/permissions.yaml", os.W_OK)
+    assert not os.access(worktree_path / "policy/agent_permissions.yaml", os.W_OK)
     remove_worktree(tmp_path, worktree_path)
     remove_worktree(tmp_path, worktree_path)
     assert not worktree_path.exists()
@@ -259,6 +261,7 @@ def _seed_extra_artifacts(root: Path) -> None:
 
 @traces("REQ-001", "AC-05", "SPEC-001")
 @traces("REQ-002", "AC-01", "SPEC-002")
+@traces("REQ-048", "AC-03", "SPEC-048")
 def test_all_policy_yaml_keys_are_enforced_and_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

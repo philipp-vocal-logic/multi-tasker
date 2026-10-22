@@ -62,14 +62,19 @@ def test_schemas_checker_branches(
 @traces("REQ-019", "AC-01", "SPEC-019")
 @traces("REQ-019", "AC-02", "SPEC-019")
 @traces("REQ-045", "AC-01", "SPEC-045")
+@traces("REQ-048", "AC-02", "SPEC-048")
 def test_aligned_policy_limits_and_prompt_artifact_constraints() -> None:
     """Verify aligned policy limits and role prompt artifact constraint rendering."""
     repository_root = Path(__file__).resolve().parent.parent
-    limits_cfg = load_yaml_file(repository_root / "policy/limits.yaml")["source_code"]
+    limits_cfg = load_yaml_file(repository_root / "policy/code_limits.yaml")[
+        "source_code"
+    ]
     assert limits_cfg["max_function_lines"] == 50
     assert limits_cfg["max_function_args"] == 6
-    schemas_cfg = load_yaml_file(repository_root / "policy/schemas.yaml")
-    artifacts_cfg = schemas_cfg["artifacts"]
+    schemas_cfg = load_yaml_file(repository_root / "policy/artifact_schemas.yaml")
+    artifacts_cfg = load_yaml_file(repository_root / "policy/artifact_limits.yaml")[
+        "artifacts"
+    ]
     assert artifacts_cfg["REQ"]["max_criterion_words"] == 45
     assert artifacts_cfg["TASK"]["max_write_files"] == 8
     assert artifacts_cfg["TASK"]["max_required_files"] == 10
@@ -130,7 +135,7 @@ def test_programmatic_id_normalization_and_streamlined_pipeline_checks(
 
     eval_root = tmp_path / "eval_repo"
     bootstrap_evaluation_repository(eval_root, "Add helper.")
-    pipeline_cfg = load_yaml_file(eval_root / "policy/pipeline.yaml")
+    pipeline_cfg = load_yaml_file(eval_root / "policy/artifact_lifecycle.yaml")
     assert pipeline_cfg["stages"][2]["approval_gate"] == "auto"
     assert next_artifact_id(eval_root, "INT") == "INT-002"
     assert next_artifact_id(eval_root, "TASK") == "TASK-001"
@@ -240,16 +245,10 @@ def test_approve_specification_and_dirty_task_propagation(
 ) -> None:
     """Verify mt approve transitions SPEC from draft/in_review and dirties Tasks."""
     _seed_minimal_policies(tmp_path)
-    real_schemas = load_yaml_file(REPOSITORY_ROOT / "policy/schemas.yaml")
+    real_lifecycle = load_yaml_file(REPOSITORY_ROOT / "policy/artifact_lifecycle.yaml")
     _write_document(
-        tmp_path / "policy/schemas.yaml",
-        yaml.safe_dump(
-            {
-                "state_transitions": real_schemas["state_transitions"],
-                "artifacts": {},
-                "schemas": {},
-            }
-        ),
+        tmp_path / "policy/artifact_lifecycle.yaml",
+        yaml.safe_dump({"state_transitions": real_lifecycle["state_transitions"]}),
     )
     _write_document(
         tmp_path / "artifacts/specifications/SPEC-001.md",
@@ -280,17 +279,15 @@ def test_approve_specification_and_dirty_task_propagation(
 def test_exhaustive_agent_and_lifecycle_state_transitions(tmp_path: Path) -> None:
     """Verify every (agent_role, existing_state, target_state) and CLI approval."""
     _seed_minimal_policies(tmp_path)
-    real_permissions = load_yaml_file(REPOSITORY_ROOT / "policy/permissions.yaml")
-    real_schemas = load_yaml_file(REPOSITORY_ROOT / "policy/schemas.yaml")
-    transitions = real_schemas["state_transitions"]
+    real_permissions = load_yaml_file(REPOSITORY_ROOT / "policy/agent_permissions.yaml")
+    real_lifecycle = load_yaml_file(REPOSITORY_ROOT / "policy/artifact_lifecycle.yaml")
+    transitions = real_lifecycle["state_transitions"]
     _write_document(
-        tmp_path / "policy/permissions.yaml", yaml.safe_dump(real_permissions)
+        tmp_path / "policy/agent_permissions.yaml", yaml.safe_dump(real_permissions)
     )
     _write_document(
-        tmp_path / "policy/schemas.yaml",
-        yaml.safe_dump(
-            {"state_transitions": transitions, "artifacts": {}, "schemas": {}}
-        ),
+        tmp_path / "policy/artifact_lifecycle.yaml",
+        yaml.safe_dump({"state_transitions": transitions}),
     )
     total_checked = 0
     for role, config in real_permissions["agents"].items():

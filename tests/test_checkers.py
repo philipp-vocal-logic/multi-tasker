@@ -95,9 +95,9 @@ def _write_text(path: Path, text: str) -> None:
 @pytest.mark.parametrize(
     ("role", "changed", "states", "expected_rule"),
     [
-        (None, ["policy/limits.yaml"], {}, "PERM_POLICY_MODIFIED"),
+        (None, ["policy/code_limits.yaml"], {}, "PERM_POLICY_MODIFIED"),
         ("unknown-role", ["src/mod.py"], {}, "PERM_UNKNOWN_AGENT"),
-        ("req-agent", ["policy/limits.yaml"], {}, "PERM_FORBIDDEN_PATH"),
+        ("req-agent", ["policy/code_limits.yaml"], {}, "PERM_FORBIDDEN_PATH"),
         ("req-agent", ["src/mod.py"], {}, "PERM_OUTSIDE_WRITE_SCOPE"),
         ("rev-agent", ["artifacts/reviews/REV-001.md"], {}, "PERM_CREATE_FORBIDDEN"),
         (
@@ -130,7 +130,7 @@ def test_permissions_checker_matrix(
 ) -> None:
     """Verify permission rejection rules across synthetic scenarios."""
     assert check_permissions(tmp_path)[0].rule_id == "PERM_POLICY_MISSING"
-    _write_yaml(tmp_path / "policy" / "permissions.yaml", SYNTHETIC_PERMISSIONS)
+    _write_yaml(tmp_path / "policy" / "agent_permissions.yaml", SYNTHETIC_PERMISSIONS)
     findings = check_permissions(tmp_path, role, None, changed, states)
     assert expected_rule in {finding.rule_id for finding in findings}
 
@@ -138,7 +138,7 @@ def test_permissions_checker_matrix(
 @traces("REQ-001", "AC-01", "SPEC-001")
 def test_permissions_worker_task_write_scope(tmp_path: Path) -> None:
     """Verify worker-agent $TASK_WRITE_FILES state and path constraints."""
-    _write_yaml(tmp_path / "policy" / "permissions.yaml", SYNTHETIC_PERMISSIONS)
+    _write_yaml(tmp_path / "policy" / "agent_permissions.yaml", SYNTHETIC_PERMISSIONS)
     missing_id = check_permissions(tmp_path, "worker-agent", None, ["src/app.py"])
     assert any(finding.rule_id == "PERM_TASK_ID_MISSING" for finding in missing_id)
     missing_task = check_permissions(
@@ -202,8 +202,9 @@ def test_limits_checker_artifact_and_code_branches(tmp_path: Path) -> None:
     """Verify synthetic artifact section/count limits and Python AST/comment limits."""
     assert check_schemas(tmp_path)[0].rule_id == "SCHEMA_POLICY_MISSING"
     assert check_limits(tmp_path)[0].rule_id == "LIMIT_POLICY_MISSING"
-    _write_yaml(tmp_path / "policy/schemas.yaml", SYNTHETIC_LIMITS)
-    _write_yaml(tmp_path / "policy/limits.yaml", SYNTHETIC_LIMITS)
+    _write_yaml(tmp_path / "policy/artifact_schemas.yaml", {"schemas": {}})
+    _write_yaml(tmp_path / "policy/artifact_limits.yaml", SYNTHETIC_LIMITS)
+    _write_yaml(tmp_path / "policy/code_limits.yaml", SYNTHETIC_LIMITS)
     _write_text(
         tmp_path / "artifacts/requirements/REQ-001.md",
         "---\nid: REQ-001\n"
@@ -237,8 +238,8 @@ def test_limits_checker_artifact_and_code_branches(tmp_path: Path) -> None:
 def test_real_policy_permissions_glossary_limits_sensitivity(tmp_path: Path) -> None:
     """Verify real policy configs and toggle sensitivity for permissions and schemas."""
     repository_root = Path(__file__).resolve().parent.parent
-    real_permissions = load_yaml_file(repository_root / "policy/permissions.yaml")
-    _write_yaml(tmp_path / "policy/permissions.yaml", real_permissions)
+    real_permissions = load_yaml_file(repository_root / "policy/agent_permissions.yaml")
+    _write_yaml(tmp_path / "policy/agent_permissions.yaml", real_permissions)
     escalation = "artifacts/escalations/ESC-001.md"
     escalation_edit = check_permissions(
         tmp_path, "requirement-agent", None, [escalation], {escalation: "open"}
@@ -248,7 +249,7 @@ def test_real_policy_permissions_glossary_limits_sensitivity(tmp_path: Path) -> 
     real_permissions["escalation_exclusivity"][
         "forbid_domain_writes_when_escalating"
     ] = False
-    _write_yaml(tmp_path / "policy/permissions.yaml", real_permissions)
+    _write_yaml(tmp_path / "policy/agent_permissions.yaml", real_permissions)
     scope_outside = check_permissions(tmp_path, "requirement-agent", None, ["src/a.py"])
     assert scope_outside[0].rule_id == "PERM_OUTSIDE_READ_SCOPE"
     escalation_both = check_permissions(
@@ -258,14 +259,16 @@ def test_real_policy_permissions_glossary_limits_sensitivity(tmp_path: Path) -> 
         [escalation, "artifacts/requirements/REQ-001.md"],
     )
     assert all(finding.rule_id != "PERM_ESC_EXCLUSIVITY" for finding in escalation_both)
-    real_schemas = load_yaml_file(repository_root / "policy/schemas.yaml")
-    _write_yaml(tmp_path / "policy/schemas.yaml", real_schemas)
+    real_schemas = load_yaml_file(repository_root / "policy/artifact_schemas.yaml")
+    real_limits = load_yaml_file(repository_root / "policy/artifact_limits.yaml")
+    _write_yaml(tmp_path / "policy/artifact_schemas.yaml", real_schemas)
+    _write_yaml(tmp_path / "policy/artifact_limits.yaml", real_limits)
     requirement_file = repository_root / "artifacts/requirements/REQ-001.md"
     _write_text(
         tmp_path / "artifacts/requirements/REQ-001.md",
         requirement_file.read_text("utf-8"),
     )
     assert check_schemas(tmp_path) == []
-    real_schemas["artifacts"]["REQ"]["max_criterion_words"] = 5
-    _write_yaml(tmp_path / "policy/schemas.yaml", real_schemas)
+    real_limits["artifacts"]["REQ"]["max_criterion_words"] = 5
+    _write_yaml(tmp_path / "policy/artifact_limits.yaml", real_limits)
     assert check_schemas(tmp_path)[0].rule_id == "LIMIT_CRITERION_WORDS"

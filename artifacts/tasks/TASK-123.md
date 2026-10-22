@@ -2,7 +2,7 @@
 id: TASK-123
 title: Update Checker and Orchestrator TestContracts for Separated Policy Files
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-048
 - SPEC-048
