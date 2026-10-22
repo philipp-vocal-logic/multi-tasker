@@ -33,29 +33,14 @@ class RouteDecision:
     action: str
 
 
-CATEGORY_ROUTES: dict[str, tuple[str, str, str]] = {
-    "infeasible_scope": ("planner-agent", "routed_to_agent", "rescope_task"),
-    "test_contract_defect": (
-        "review-agent",
-        "routed_to_agent",
-        "verify_test_contract",
-    ),
-    "ambiguity": ("human", "awaiting_human", "require_decision"),
-    "rule_conflict": ("human", "awaiting_human", "require_decision"),
-    "review_exhausted": ("human", "awaiting_human", "require_decision"),
-}
-
-
 def _load_routing_table(
     repository_root: Path,
 ) -> tuple[dict[str, tuple[str, str, str]], int]:
-    """Load escalation_routes and max_auto_reroutes from policy/pipeline.yaml."""
+    """Load escalation_routes and max_auto_reroutes from artifact_lifecycle.yaml."""
     pipeline = load_pipeline_policy(repository_root)
     bounds: dict[str, Any] = pipeline.get("execution_bounds", {})
     max_reroutes = int(bounds.get("max_auto_reroutes", 1))
     raw_routes: dict[str, Any] = pipeline.get("escalation_routes", {})
-    if not raw_routes:
-        return dict(CATEGORY_ROUTES), max_reroutes
     routes = {
         str(category): (
             str(entry.get("target_actor", "human")),
@@ -326,11 +311,7 @@ def dispatch_routed_escalation(
             continue
         category = str(document.frontmatter.get("reason_category", "ambiguity"))
         routes: dict[str, Any] = pipeline.get("escalation_routes", {})
-        actor = str(
-            routes.get(category, {}).get(
-                "target_actor", CATEGORY_ROUTES.get(category, ("human",))[0]
-            )
-        )
+        actor = str(routes.get(category, {}).get("target_actor", "human"))
         if actor == "human":
             update_artifact_frontmatter(
                 repository_root / document.path, {"status": "awaiting_human"}
@@ -379,3 +360,26 @@ def reset_rejected_stage_artifacts(repository_root: Path, produced: list[str]) -
             f"[traces: {', '.join(produced)}]"
         )
         commit_traceable_change(repository_root, changed, subject)
+
+
+def handle_pipeline_step_outcome(
+    repository_root: Path, produced: list[str], findings: list[Finding]
+) -> tuple[list[str], list[Finding], bool]:
+    """Handle review rejections and auto-routed escalations between pipeline steps."""
+    if not findings:
+        return produced, [], bool(produced)
+    rule_ids = {item.rule_id for item in findings}
+    if rule_ids == {"STAGE_REVIEW_REJECTED"}:
+        reset_rejected_stage_artifacts(repository_root, produced)
+        return [], [], True
+    if rule_ids == {"GATE_TASK_ESCALATED"}:
+        routed_ids = [
+            str(doc.frontmatter["id"])
+            for item in findings
+            if (doc := parse_artifact_file(repository_root / item.path, item.path)[0])
+            is not None
+            and doc.frontmatter.get("status") == "routed_to_agent"
+        ]
+        if routed_ids and len(routed_ids) == len(findings):
+            return [*produced, *routed_ids], [], True
+    return produced, findings, False

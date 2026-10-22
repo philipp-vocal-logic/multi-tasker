@@ -12,13 +12,13 @@ from multi_tasker.domain.parser import (
 )
 from multi_tasker.orchestrator.prompt_context import (
     MAX_PROMPT_LINE_LENGTH,
+    find_role_definition,
     load_artifact_schemas_and_limits,
     render_code_and_glossary_section,
     render_decomposition_contract,
     render_target_context_section,
     wrap_prompt_lines,
 )
-from multi_tasker.orchestrator.router import CATEGORY_ROUTES
 
 __all__ = [
     "MAX_PROMPT_LINE_LENGTH",
@@ -48,17 +48,6 @@ ROLE_TARGET_STATUS: dict[str, str] = {
 }
 
 
-def _find_role_definition(repository_root: Path, agent_role: str) -> str:
-    """Extract canonical role definition from policy/glossary.yaml."""
-    glossary_path = repository_root / "policy" / "glossary.yaml"
-    if not glossary_path.exists():
-        return f"Scoped agent role `{agent_role}`."
-    for entry in load_yaml_file(glossary_path).get("terms", []):
-        if agent_role in [str(item) for item in entry.get("allowed_forms", [])]:
-            return " ".join(str(entry.get("definition", "")).split())
-    return f"Scoped agent role `{agent_role}`."
-
-
 def _resolve_rule_write_path(
     rule: dict[str, Any], target_doc: ArtifactDocument | None
 ) -> str:
@@ -76,6 +65,7 @@ def _render_permissions_section(
     role_configuration: dict[str, Any],
     global_forbidden: list[str],
     target_doc: ArtifactDocument | None = None,
+    escalation_routes: dict[str, Any] | None = None,
 ) -> list[str]:
     """Render WriteScope, state transitions, and escalation rules for agent_role."""
     lines = [
@@ -100,7 +90,9 @@ def _render_permissions_section(
     if escalation_rules:
         paths = ", ".join(f"`{rule.get('path', '')}`" for rule in escalation_rules)
         routes = ", ".join(
-            f"`{cat}` -> `{target[0]}`" for cat, target in CATEGORY_ROUTES.items()
+            f"`{cat}` -> `{cfg.get('target_actor', 'human')}`"
+            for cat, cfg in (escalation_routes or {}).items()
+            if isinstance(cfg, dict)
         )
         lines.append(f"- **Escalation Write**: {paths} ({routes})")
     return [*lines, ""]
@@ -289,9 +281,13 @@ def _assemble_prompt_sections(
     )
     lines = [
         *_render_permissions_section(
-            agent_role, role_configuration, global_forbidden, target_doc
+            agent_role,
+            role_configuration,
+            global_forbidden,
+            target_doc,
+            schemas_policy.get("escalation_routes", {}),
         ),
-        f"**Mission**: {_find_role_definition(repository_root, agent_role)}",
+        f"**Mission**: {find_role_definition(repository_root, agent_role)}",
         *(
             [f"- **Assigned Next Artifact ID**: `{next_id}` (auto-normalized on merge)"]
             if next_id

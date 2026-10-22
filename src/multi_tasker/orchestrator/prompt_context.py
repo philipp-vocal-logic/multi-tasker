@@ -6,7 +6,7 @@ from typing import Any
 
 from multi_tasker.checkers.limits_checker import collect_refactoring_targets
 from multi_tasker.domain.models import ArtifactDocument
-from multi_tasker.domain.parser import load_yaml_file
+from multi_tasker.domain.parser import load_pipeline_policy, load_yaml_file
 
 MAX_PROMPT_LINE_LENGTH: int = 88
 
@@ -18,7 +18,19 @@ def load_artifact_schemas_and_limits(repository_root: Path) -> dict[str, Any]:
     return {
         **(load_yaml_file(schemas_path) if schemas_path.exists() else {}),
         **(load_yaml_file(limits_path) if limits_path.exists() else {}),
+        **load_pipeline_policy(repository_root),
     }
+
+
+def find_role_definition(repository_root: Path, agent_role: str) -> str:
+    """Extract canonical role definition from policy/glossary.yaml."""
+    glossary_path = repository_root / "policy" / "glossary.yaml"
+    if not glossary_path.exists():
+        return f"Scoped agent role `{agent_role}`."
+    for entry in load_yaml_file(glossary_path).get("terms", []):
+        if agent_role in [str(item) for item in entry.get("allowed_forms", [])]:
+            return " ".join(str(entry.get("definition", "")).split())
+    return f"Scoped agent role `{agent_role}`."
 
 
 def wrap_prompt_lines(lines: list[str]) -> list[str]:

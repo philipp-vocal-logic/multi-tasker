@@ -2,7 +2,7 @@
 id: TASK-132
 title: Enforce Unknown Execution Env Guard and Policy-Only Escalation Routes
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-050
 - SPEC-050

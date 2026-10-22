@@ -38,7 +38,7 @@ from multi_tasker.orchestrator.router import (
     evaluate_review_verdict,
     finalize_stage_escalation,
     find_actionable_stage_target,
-    reset_rejected_stage_artifacts,
+    handle_pipeline_step_outcome,
 )
 from multi_tasker.orchestrator.task_runner import run_scheduled_tasks
 from multi_tasker.orchestrator.worktree import (
@@ -229,9 +229,12 @@ def _finalize_stage_outcome(
 
 
 def _validate_stage_request(
-    repository_root: Path, agent_role: str, target_id: str
+    repository_root: Path,
+    agent_role: str,
+    target_id: str,
+    options: tuple[str | None, str | None, str | None] = (None, None, None),
 ) -> tuple[ArtifactDocument | None, list[Finding]]:
-    """Validate agent_role, worktree_execution flag, and target_id existence."""
+    """Validate agent_role, worktree_execution, target_id, and execution env."""
     permissions_path = repository_root / "policy" / "agent_permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     if agent_role not in permissions.get("agents", {}):
@@ -252,6 +255,12 @@ def _validate_stage_request(
     if target_document is None:
         message = f"Target artifact '{target_id}' not found."
         return None, [Finding(target_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
+    ctx = resolve_task_execution(repository_root, target_document, options, agent_role)
+    if not ctx[0]:
+        message = f"Unknown execution environment '{ctx[1]}'."
+        return None, [
+            Finding("policy/agent_execution.yaml", 1, "CLI_UNKNOWN_EXEC_ENV", message)
+        ]
     return target_document, []
 
 
@@ -263,7 +272,7 @@ def run_agent_stage(
 ) -> tuple[list[str], list[Finding]]:
     """Execute a configured agent_role for target_id in an isolated Worktree."""
     target_document, findings = _validate_stage_request(
-        repository_root, agent_role, target_id
+        repository_root, agent_role, target_id, options
     )
     if findings or target_document is None:
         return [], findings
@@ -273,10 +282,8 @@ def run_agent_stage(
             worktree_path, target_document, options, agent_role
         )
         exec_ctx = (ctx[0] or "", ctx[1], ctx[2])
-        changed = (
-            _run_stage_subprocess(worktree_path, agent_role, target_document, exec_ctx)
-            if ctx[0]
-            else []
+        changed = _run_stage_subprocess(
+            worktree_path, agent_role, target_document, exec_ctx
         )
         task_arg = target_id if agent_role == "worker-agent" else None
         request = GateRequest(
@@ -331,29 +338,6 @@ def _step_declarative_stage(
     return produced, []
 
 
-def _handle_pipeline_step_outcome(
-    repository_root: Path, produced: list[str], findings: list[Finding]
-) -> tuple[list[str], list[Finding], bool]:
-    """Handle review rejections and auto-routed escalations between pipeline steps."""
-    if not findings:
-        return produced, [], bool(produced)
-    rule_ids = {item.rule_id for item in findings}
-    if rule_ids == {"STAGE_REVIEW_REJECTED"}:
-        reset_rejected_stage_artifacts(repository_root, produced)
-        return [], [], True
-    if rule_ids == {"GATE_TASK_ESCALATED"}:
-        routed_ids = [
-            str(doc.frontmatter["id"])
-            for item in findings
-            if (doc := parse_artifact_file(repository_root / item.path, item.path)[0])
-            is not None
-            and doc.frontmatter.get("status") == "routed_to_agent"
-        ]
-        if routed_ids and len(routed_ids) == len(findings):
-            return [*produced, *routed_ids], [], True
-    return produced, findings, False
-
-
 def run_declarative_pipeline(
     repository_root: Path,
     options: tuple[str | None, str | None, str | None] = (None, None, None),
@@ -389,7 +373,7 @@ def run_declarative_pipeline(
         raw_produced, raw_findings = _step_declarative_stage(
             repository_root, matched[0], matched[1], options, max_workers
         )
-        step_done, step_err, should_continue = _handle_pipeline_step_outcome(
+        step_done, step_err, should_continue = handle_pipeline_step_outcome(
             repository_root, raw_produced, raw_findings
         )
         completed.extend(step_done)

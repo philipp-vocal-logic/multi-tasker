@@ -244,6 +244,13 @@ def _execute_single_task(
         changed, execution_context = _resolve_and_invoke_worktree(
             worktree_path, document, execution_options
         )
+        if not execution_context[0] and (
+            execution_options[2] or document.frontmatter.get("execution_environment")
+        ):
+            msg = f"Unknown execution environment '{execution_context[1]}'."
+            return [
+                Finding("policy/agent_execution.yaml", 1, "CLI_UNKNOWN_EXEC_ENV", msg)
+            ]
         outcome = evaluate_merge_gate(
             GateRequest(
                 repository_root,
