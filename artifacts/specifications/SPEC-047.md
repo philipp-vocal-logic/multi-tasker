@@ -11,6 +11,7 @@ covers_criteria:
 decisions: []
 target_files:
   tests:
+  - tests/test_interaction_logging.py
   - tests/test_pipeline_combinations.py
   implementation:
   - src/multi_tasker/orchestrator/merge_gate.py
