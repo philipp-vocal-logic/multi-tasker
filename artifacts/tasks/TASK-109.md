@@ -2,7 +2,7 @@
 id: TASK-109
 title: Add TestContracts for Legacy Context Mode Deprecation and Documentation Alignment
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-044
 - SPEC-044

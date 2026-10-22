@@ -177,3 +177,50 @@ def test_declarative_pipeline_max_workers_forwarding_and_failure_halt(
         assert recorded_workers[-1] == 3
     finally:
         stage_runner.run_scheduled_tasks = original_runner
+
+
+@traces("REQ-044", "AC-01", "SPEC-044")
+@traces("REQ-044", "AC-02", "SPEC-044")
+@traces("REQ-044", "AC-03", "SPEC-044")
+def test_legacy_context_mode_deprecation_and_documentation_alignment(
+    tmp_path: Path,
+) -> None:
+    """Verify REQ-012/SPEC-012 deprecation and removal of context-mode from docs."""
+    from multi_tasker.checkers.traceability_checker import check_traceability
+    from multi_tasker.orchestrator.documentation_generator import (
+        generate_external_agents_guide,
+    )
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
+
+    checkout_root = Path(__file__).resolve().parent.parent
+    for rel_path in (
+        "artifacts/requirements/REQ-012.md",
+        "artifacts/specifications/SPEC-012.md",
+    ):
+        doc, _ = parse_artifact_file(checkout_root / rel_path, rel_path)
+        assert doc is not None and doc.frontmatter["status"] == "deprecated"
+    prompt_text, _ = build_agent_prompt(checkout_root, "requirement-agent", "INT-043")
+    assert "`REQ-012`:" not in prompt_text
+    readme_text = (checkout_root / "README.md").read_text(encoding="utf-8")
+    guide_text = generate_external_agents_guide()
+    for text in (readme_text, guide_text):
+        assert "default_context_mode" not in text
+        assert "--context-mode" not in text
+        assert "mt prompt <agent-role> [--target <id>]" in text
+    _seed_test_repository(tmp_path)
+    (tmp_path / "artifacts/requirements/REQ-012.md").write_text(
+        "---\nid: REQ-012\ntitle: Legacy Context Mode\nstatus: deprecated\n"
+        "traces_to: [INT-001]\ndecisions: []\n"
+        "acceptance_criteria: [{id: AC-01, given: a, when: b, then: c}]\n"
+        "version: 1\n---\n## Statement\nOld.\n\n## Impact Analysis\nOld.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "artifacts/specifications/SPEC-099.md").write_text(
+        "---\nid: SPEC-099\ntitle: Active Spec Referencing Deprecated Req\n"
+        "status: draft\ntraces_to: [REQ-012]\ncovers_criteria: [REQ-012:AC-01]\n"
+        "decisions: []\n"
+        "target_files: {tests: [tests/t.py], implementation: [src/a.py]}\n---\n",
+        encoding="utf-8",
+    )
+    findings = check_traceability(tmp_path, ["artifacts/specifications/SPEC-099.md"])
+    assert any(item.rule_id == "TRACE_UPSTREAM_NOT_APPROVED" for item in findings)
