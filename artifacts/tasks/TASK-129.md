@@ -2,7 +2,7 @@
 id: TASK-129
 title: Implement Fail-Fast and Fail-Clear Linter Execution in Clean Code Checker
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-049
 - SPEC-049

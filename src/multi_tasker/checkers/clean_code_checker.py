@@ -2,6 +2,7 @@
 
 import ast
 import io
+import os
 import re
 import shutil
 import subprocess
@@ -29,12 +30,11 @@ def _run_ruff(
         str(part) for part in ruff_configuration.get("cmd", default_command)
     ]
     executable = base_command[0] if base_command else "ruff"
-    if (
-        not ruff_configuration.get("enabled", True)
-        or not shutil.which(executable)
-        or not targets
-    ):
+    if not ruff_configuration.get("enabled", True) or not targets:
         return []
+    if not shutil.which(executable):
+        message = f"Linter executable '{executable}' not found in PATH."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_LINTER_MISSING", message)]
     format_python_files(repository_root, targets, ruff_configuration)
     rules = ",".join(
         str(rule) for rule in ruff_configuration.get("select_rules", ["E", "F"])
@@ -65,28 +65,38 @@ def _run_ruff(
 def _run_mypy(
     repository_root: Path, targets: list[str], mypy_configuration: dict[str, Any]
 ) -> list[Finding]:
-    """Run mypy when enabled and installed in PATH and parse findings."""
+    """Run mypy when enabled and fail clear if executable is missing or fails."""
     base_command = [str(part) for part in mypy_configuration.get("cmd", ["mypy"])]
     executable = base_command[0] if base_command else "mypy"
-    if (
-        not mypy_configuration.get("enabled", False)
-        or not shutil.which(executable)
-        or not targets
-    ):
+    if not mypy_configuration.get("enabled", False) or not targets:
         return []
-    command = [*base_command, *targets]
+    if not shutil.which(executable):
+        message = f"Linter executable '{executable}' not found in PATH."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_LINTER_MISSING", message)]
+    mypy_path = f"{repository_root / 'src'}{os.pathsep}{repository_root}"
     process = subprocess.run(
-        command, cwd=repository_root, capture_output=True, text=True, check=False
+        [*base_command, *targets],
+        cwd=repository_root,
+        env={**os.environ, "MYPYPATH": mypy_path},
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    findings: list[Finding] = []
-    for raw_line in process.stdout.splitlines():
-        parts = raw_line.split(":", maxsplit=3)
-        if len(parts) >= 4 and parts[1].strip().isdigit():
-            normalized_path = Path(parts[0].strip()).as_posix()
-            message = parts[3].strip()
-            findings.append(
-                Finding(normalized_path, int(parts[1].strip()), "CODE_MYPY", message)
-            )
+    findings = [
+        Finding(
+            Path(parts[0].strip()).as_posix(),
+            int(parts[1].strip()),
+            "CODE_MYPY",
+            parts[3].strip(),
+        )
+        for raw_line in process.stdout.splitlines()
+        if len(parts := raw_line.split(":", maxsplit=3)) >= 4
+        and parts[1].strip().isdigit()
+    ]
+    if process.returncode != 0 and not findings:
+        lines = (process.stderr or process.stdout).strip().splitlines()
+        detail = lines[-1] if lines else f"mypy exited with code {process.returncode}."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_MYPY", detail)]
     return findings
 
 
