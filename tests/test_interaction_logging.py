@@ -210,6 +210,7 @@ def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> 
 
 @traces("REQ-016", "AC-02", "SPEC-016")
 @traces("REQ-026", "AC-02", "SPEC-026")
+@traces("REQ-047", "AC-01", "SPEC-047")
 def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> None:
     """Verify custom package prefixes in check_architecture and worktree PYTHONPATH."""
     architecture_policy = {
@@ -247,7 +248,7 @@ def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> 
     _, env = prepare_worker_invocation(
         tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
     )
-    assert env["PYTHONPATH"] == str(tmp_path)
+    assert env["PYTHONPATH"] == f"{tmp_path / 'src'}:{tmp_path}"
 
 
 @traces("REQ-022", "AC-01", "SPEC-022")
