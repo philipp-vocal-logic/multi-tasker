@@ -35,11 +35,9 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
 
 
 def load_pipeline_policy(repository_root: Path) -> dict[str, Any]:
-    """Load policy/pipeline.yaml if present, otherwise return an empty dictionary."""
-    pipeline_path = repository_root / "policy" / "pipeline.yaml"
-    if not pipeline_path.exists():
-        return {}
-    return load_yaml_file(pipeline_path)
+    """Load policy/artifact_lifecycle.yaml if present, else return empty dict."""
+    lifecycle_path = repository_root / "policy" / "artifact_lifecycle.yaml"
+    return load_yaml_file(lifecycle_path) if lifecycle_path.exists() else {}
 
 
 def infer_artifact_type(relative_path: str) -> str:
@@ -158,14 +156,13 @@ def update_artifact_frontmatter(absolute_path: Path, updates: dict[str, Any]) ->
 def load_state_transitions(
     repository_root: Path, fallback_policy: dict[str, Any] | None = None
 ) -> dict[str, dict[str, set[str]]]:
-    """Extract state_transitions table from schemas or permissions policy."""
-    schemas_path = repository_root / "policy" / "schemas.yaml"
-    permissions_path = repository_root / "policy" / "permissions.yaml"
-    source_policy = fallback_policy or {}
-    if schemas_path.exists():
-        source_policy = load_yaml_file(schemas_path)
-    elif permissions_path.exists() and not source_policy:
-        source_policy = load_yaml_file(permissions_path)
+    """Extract state_transitions table from policy/artifact_lifecycle.yaml."""
+    lifecycle_path = repository_root / "policy" / "artifact_lifecycle.yaml"
+    source_policy = (
+        load_yaml_file(lifecycle_path)
+        if lifecycle_path.exists()
+        else (fallback_policy or {})
+    )
     fallback_transitions = (fallback_policy or {}).get("state_transitions", {})
     raw_transitions = source_policy.get("state_transitions", fallback_transitions)
     return {
@@ -179,7 +176,7 @@ def load_state_transitions(
 
 
 def _validate_pipeline_bounds(bounds: dict[str, Any]) -> bool:
-    """Return True if execution_bounds values in policy/pipeline.yaml are valid."""
+    """Return True if execution_bounds in artifact_lifecycle.yaml are valid."""
     max_steps = bounds.get("max_steps_per_run", 0)
     max_reroutes = bounds.get("max_auto_reroutes", -1)
     max_reviews = bounds.get("max_review_cycles", 1)
@@ -194,13 +191,18 @@ def _validate_pipeline_bounds(bounds: dict[str, Any]) -> bool:
 
 
 def _validate_pipeline_stages(stages: list[Any]) -> list[Finding]:
-    """Validate stage definitions in policy/pipeline.yaml."""
+    """Validate stage definitions in policy/artifact_lifecycle.yaml."""
     valid_gates = {"human", "review-agent", "auto"}
     for entry in stages:
         if not isinstance(entry, dict):
-            message = "Invalid stage entry in policy/pipeline.yaml."
+            message = "Invalid stage entry in policy/artifact_lifecycle.yaml."
             return [
-                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_STAGE", message)
+                Finding(
+                    "policy/artifact_lifecycle.yaml",
+                    1,
+                    "PIPELINE_INVALID_STAGE",
+                    message,
+                )
             ]
         stage_id = str(entry.get("id", ""))
         trigger = str(entry.get("trigger_type", ""))
@@ -217,22 +219,36 @@ def _validate_pipeline_stages(stages: list[Any]) -> list[Finding]:
             and role
             and gate in valid_gates
         ):
-            message = f"Invalid pipeline stage '{stage_id}' in policy/pipeline.yaml."
+            message = f"Invalid pipeline stage '{stage_id}'."
             return [
-                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_STAGE", message)
+                Finding(
+                    "policy/artifact_lifecycle.yaml",
+                    1,
+                    "PIPELINE_INVALID_STAGE",
+                    message,
+                )
             ]
     return []
 
 
 def validate_pipeline_policy(repository_root: Path) -> list[Finding]:
-    """Validate execution_bounds, stages, and escalation_routes in pipeline.yaml."""
+    """Validate state_transitions, execution_bounds, stages, and routes."""
     pipeline = load_pipeline_policy(repository_root)
     if not pipeline:
         return []
-    bounds: dict[str, Any] = pipeline.get("execution_bounds", {})
-    if not _validate_pipeline_bounds(bounds):
-        message = "Invalid execution_bounds in policy/pipeline.yaml."
-        return [Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_BOUNDS", message)]
+    for artifact_type, mapping in pipeline.get("state_transitions", {}).items():
+        if artifact_type and isinstance(mapping, dict):
+            _ = list(mapping.items())
+    bounds = pipeline.get("execution_bounds")
+    if bounds is not None and (
+        not isinstance(bounds, dict) or not _validate_pipeline_bounds(bounds)
+    ):
+        message = "Invalid execution_bounds in policy/artifact_lifecycle.yaml."
+        return [
+            Finding(
+                "policy/artifact_lifecycle.yaml", 1, "PIPELINE_INVALID_BOUNDS", message
+            )
+        ]
     stage_findings = _validate_pipeline_stages(list(pipeline.get("stages", [])))
     if stage_findings:
         return stage_findings
@@ -244,9 +260,14 @@ def validate_pipeline_policy(repository_root: Path) -> list[Finding]:
             and route.get("next_status")
             and route.get("action")
         ):
-            message = f"Invalid escalation route '{category}' in policy/pipeline.yaml."
+            message = f"Invalid escalation route '{category}'."
             return [
-                Finding("policy/pipeline.yaml", 1, "PIPELINE_INVALID_ROUTE", message)
+                Finding(
+                    "policy/artifact_lifecycle.yaml",
+                    1,
+                    "PIPELINE_INVALID_ROUTE",
+                    message,
+                )
             ]
     return []
 

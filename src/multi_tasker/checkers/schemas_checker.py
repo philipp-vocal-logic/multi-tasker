@@ -265,17 +265,18 @@ def _check_single_document(
 def check_schemas(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/schemas.yaml and policy/pipeline.yaml across artifacts."""
-    schema_path = repository_root / "policy" / "schemas.yaml"
+    """Enforce artifact_schemas.yaml, artifact_limits.yaml, and lifecycle policy."""
+    schema_path = repository_root / "policy" / "artifact_schemas.yaml"
     if not schema_path.exists():
-        message = "Missing policy/schemas.yaml."
-        return [Finding("policy/schemas.yaml", 1, "SCHEMA_POLICY_MISSING", message)]
+        message = "Missing policy/artifact_schemas.yaml."
+        return [
+            Finding("policy/artifact_schemas.yaml", 1, "SCHEMA_POLICY_MISSING", message)
+        ]
     policy = load_yaml_file(schema_path)
     schemas: dict[str, Any] = policy.get("schemas", {})
-    artifact_configurations: dict[str, Any] = policy.get("artifacts", {})
-    for artifact_type, mapping in policy.get("state_transitions", {}).items():
-        if artifact_type and isinstance(mapping, dict):
-            _ = list(mapping.items())
+    limits_path = repository_root / "policy" / "artifact_limits.yaml"
+    limits_policy = load_yaml_file(limits_path) if limits_path.exists() else {}
+    artifact_configurations: dict[str, Any] = limits_policy.get("artifacts", {})
     findings = validate_pipeline_policy(repository_root)
     for markdown_path in collect_repository_files(
         repository_root,

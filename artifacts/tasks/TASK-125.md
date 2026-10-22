@@ -2,7 +2,7 @@
 id: TASK-125
 title: Update Domain Parser, Checkers, and CLI Output for Separated Policy Files
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-048
 - SPEC-048

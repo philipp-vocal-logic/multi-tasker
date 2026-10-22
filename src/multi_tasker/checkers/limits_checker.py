@@ -142,11 +142,11 @@ def _check_python_file_limits(
 def check_limits(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/limits.yaml across Python source and test files."""
-    limits_path = repository_root / "policy" / "limits.yaml"
+    """Enforce policy/code_limits.yaml across Python source and test files."""
+    limits_path = repository_root / "policy" / "code_limits.yaml"
     if not limits_path.exists():
-        message = "Missing policy/limits.yaml."
-        return [Finding("policy/limits.yaml", 1, "LIMIT_POLICY_MISSING", message)]
+        message = "Missing policy/code_limits.yaml."
+        return [Finding("policy/code_limits.yaml", 1, "LIMIT_POLICY_MISSING", message)]
     policy = load_yaml_file(limits_path)
     source_configuration: dict[str, Any] = policy.get("source_code", {})
     findings: list[Finding] = []
@@ -167,7 +167,7 @@ def collect_refactoring_targets(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
     """Emit non-blocking LIMIT_REFACTOR_HINT Findings for files >400 lines."""
-    limits_path = repository_root / "policy" / "limits.yaml"
+    limits_path = repository_root / "policy" / "code_limits.yaml"
     if not limits_path.exists():
         return []
     source_config: dict[str, Any] = load_yaml_file(limits_path).get("source_code", {})

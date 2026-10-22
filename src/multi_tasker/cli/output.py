@@ -8,9 +8,9 @@ from multi_tasker.domain.parser import load_yaml_file
 
 
 def load_output_contract(repository_root: Path) -> tuple[bool, str]:
-    """Load silent_on_pass and finding_format from policy/clean_code.yaml."""
+    """Load silent_on_pass and finding_format from policy/code_quality.yaml."""
     default_format = "{path}:{line}: [{rule_id}] {message}"
-    configuration_path = repository_root / "policy" / "clean_code.yaml"
+    configuration_path = repository_root / "policy" / "code_quality.yaml"
     if not configuration_path.exists():
         return True, default_format
     contract = load_yaml_file(configuration_path).get("output_contract", {})

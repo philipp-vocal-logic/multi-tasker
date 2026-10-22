@@ -223,11 +223,11 @@ def _check_comment_markers(
 def check_clean_code(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/clean_code.yaml across Python source and test files."""
-    configuration_path = repository_root / "policy" / "clean_code.yaml"
+    """Enforce policy/code_quality.yaml across Python source and test files."""
+    configuration_path = repository_root / "policy" / "code_quality.yaml"
     if not configuration_path.exists():
-        message = "Missing policy/clean_code.yaml."
-        return [Finding("policy/clean_code.yaml", 1, "CODE_POLICY_MISSING", message)]
+        message = "Missing policy/code_quality.yaml."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_POLICY_MISSING", message)]
     policy = load_yaml_file(configuration_path)
     python_files = collect_repository_files(
         repository_root, target_paths, ("src", "tests"), {".py"}

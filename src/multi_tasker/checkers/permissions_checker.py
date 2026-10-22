@@ -102,7 +102,7 @@ def _resolve_task_write_scope(
     if not task_id:
         message = "worker-agent requires --task ID."
         return [], [
-            Finding("policy/permissions.yaml", 1, "PERM_TASK_ID_MISSING", message)
+            Finding("policy/agent_permissions.yaml", 1, "PERM_TASK_ID_MISSING", message)
         ]
     task_relative = f"artifacts/tasks/{task_id}.md"
     task_absolute = repository_root / task_relative
@@ -293,11 +293,17 @@ def _validate_agent_execution_settings(policy: dict[str, Any]) -> bool:
     return True
 
 
-def _validate_execution_environments(policy: dict[str, Any]) -> list[Finding]:
-    """Validate execution_environments and per-agent settings in permissions.yaml."""
+def _validate_execution_environments(repository_root: Path) -> list[Finding]:
+    """Validate execution_environments and role settings in agent_execution.yaml."""
+    execution_path = repository_root / "policy" / "agent_execution.yaml"
+    if not execution_path.exists():
+        return []
+    policy = load_yaml_file(execution_path)
     if not _validate_agent_execution_settings(policy):
-        message = "Invalid agent execution settings in policy/permissions.yaml."
-        return [Finding("policy/permissions.yaml", 1, "PERM_INVALID_EXEC_ENV", message)]
+        message = "Invalid agent execution settings in policy/agent_execution.yaml."
+        return [
+            Finding("policy/agent_execution.yaml", 1, "PERM_INVALID_EXEC_ENV", message)
+        ]
     execution_config: dict[str, Any] = policy.get("execution_environments", {})
     if not execution_config:
         return []
@@ -307,8 +313,10 @@ def _validate_execution_environments(policy: dict[str, Any]) -> list[Finding]:
     templates = {str(name): str(command) for name, command in environments.items()}
     invalid_env = bool(default_env and default_env not in templates)
     if invalid_env or not default_model:
-        message = "Invalid execution_environments in policy/permissions.yaml."
-        return [Finding("policy/permissions.yaml", 1, "PERM_INVALID_EXEC_ENV", message)]
+        message = "Invalid execution_environments in policy/agent_execution.yaml."
+        return [
+            Finding("policy/agent_execution.yaml", 1, "PERM_INVALID_EXEC_ENV", message)
+        ]
     return []
 
 
@@ -328,13 +336,15 @@ def check_permissions(
     changed_files: list[str] | None = None,
     existing_states: dict[str, str] | None = None,
 ) -> list[Finding]:
-    """Enforce policy/permissions.yaml on changed files and agent role."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
+    """Enforce policy/agent_permissions.yaml on changed files and agent role."""
+    permissions_path = repository_root / "policy" / "agent_permissions.yaml"
     if not permissions_path.exists():
-        message = "Missing policy/permissions.yaml."
-        return [Finding("policy/permissions.yaml", 1, "PERM_POLICY_MISSING", message)]
+        message = "Missing policy/agent_permissions.yaml."
+        return [
+            Finding("policy/agent_permissions.yaml", 1, "PERM_POLICY_MISSING", message)
+        ]
     policy = load_yaml_file(permissions_path)
-    environment_findings = _validate_execution_environments(policy)
+    environment_findings = _validate_execution_environments(repository_root)
     task_marker = (
         f"artifacts/tasks/{task_id}.md"
         if agent_role == "worker-agent" and task_id
@@ -354,7 +364,9 @@ def check_permissions(
     agents_configuration: dict[str, Any] = policy.get("agents", {})
     if agent_role not in agents_configuration:
         message = f"Unknown agent role '{agent_role}'."
-        return [Finding("policy/permissions.yaml", 1, "PERM_UNKNOWN_AGENT", message)]
+        return [
+            Finding("policy/agent_permissions.yaml", 1, "PERM_UNKNOWN_AGENT", message)
+        ]
     role_findings = _evaluate_role_permissions(
         repository_root,
         files,

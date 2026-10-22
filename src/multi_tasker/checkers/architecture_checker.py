@@ -223,11 +223,13 @@ def _scan_architecture_files(
 def check_architecture(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/architecture.yaml across configured layer directories."""
-    architecture_path = repository_root / "policy" / "architecture.yaml"
+    """Enforce policy/code_architecture.yaml across configured layer directories."""
+    architecture_path = repository_root / "policy" / "code_architecture.yaml"
     if not architecture_path.exists():
-        message = "Missing policy/architecture.yaml."
-        return [Finding("policy/architecture.yaml", 1, "ARCH_POLICY_MISSING", message)]
+        message = "Missing policy/code_architecture.yaml."
+        return [
+            Finding("policy/code_architecture.yaml", 1, "ARCH_POLICY_MISSING", message)
+        ]
     policy = load_yaml_file(architecture_path)
     layers: list[dict[str, Any]] = policy.get("layers", [])
     allowed = {str(pkg) for pkg in policy.get("allowed_third_party_packages", [])}
