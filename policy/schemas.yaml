@@ -139,6 +139,9 @@ schemas:
         decisions:
           type: "array"
           items: { type: "string", pattern: "^DEC-[0-9]{3,}$" }
+        supersedes:
+          type: "array"
+          items: { type: "string", pattern: "^REQ-[0-9]{3,}$" }
         acceptance_criteria:
           type: "array"
           minItems: 1
