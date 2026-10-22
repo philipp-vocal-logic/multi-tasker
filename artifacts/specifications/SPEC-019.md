@@ -2,7 +2,7 @@
 id: SPEC-019
 title: Aligned Source Sizing Thresholds, Task File Budgets, and Prompt Artifact Limit
   Specification
-status: approved
+status: deprecated
 traces_to:
 - REQ-019
 covers_criteria:
