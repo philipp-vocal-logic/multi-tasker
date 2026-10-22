@@ -2,7 +2,7 @@
 id: TASK-105
 title: Add TestContracts for Stage-Agent Escalation Persistence and Routing
 type: test_contract
-status: done
+status: ready
 traces_to:
 - REQ-042
 - SPEC-042
