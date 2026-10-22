@@ -2,7 +2,7 @@
 id: TASK-103
 title: Add TestContracts for Lifecycle Decomposition and Escalation Router Cohesiveness
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-041
 - SPEC-041
