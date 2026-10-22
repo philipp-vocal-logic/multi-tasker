@@ -12,7 +12,7 @@ required_files:
 - artifacts/specifications/SPEC-041.md
 write_files:
 - tests/test_stage_escalation.py
-verification_cmd: PYTHONPATH=src python3 -m py_compile tests/test_stage_escalation.py
+verification_cmd: python3 -m py_compile tests/test_stage_escalation.py
 ---
 ## Objective
 Author `TestContracts` in `tests/test_stage_escalation.py` covering `REQ-041:AC-01`, `REQ-041:AC-02`, and `REQ-041:AC-03` for `SPEC-041`.

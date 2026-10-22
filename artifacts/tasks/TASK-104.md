@@ -16,7 +16,7 @@ write_files:
 - src/multi_tasker/orchestrator/router.py
 - src/multi_tasker/orchestrator/stage_runner.py
 - src/multi_tasker/cli/main.py
-verification_cmd: PYTHONPATH=src pytest -q tests/test_stage_escalation.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_stage_escalation.py
 ---
 ## Objective
 Move `_create_review_escalation`, `evaluate_review_verdict`, and `resolve_escalation` from `lifecycle.py` into `router.py` and update callers in lockstep (`REQ-041`, `SPEC-041`).
