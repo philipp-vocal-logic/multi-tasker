@@ -2,7 +2,7 @@
 id: TASK-110
 title: Update External Agents Guide with Canonical Prompt Command
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-044
 - SPEC-044

@@ -311,7 +311,9 @@ def generate_external_agents_guide() -> str:
         "4. Author `artifacts/tasks/TASK-NNN.md`: `test_contract` importing "
         "`from multi_tasker.domain.models import traces` (`@traces(...)`) followed by "
         "`implementation` Tasks.",
-        "5. Execute via `mt run`, `mt run --agent <role> --target <id>`, or "
-        "`mt run --pipeline`, and verify `mt check all` exits `0` with empty `stdout`.",
+        "5. Synthesize role prompts via "
+        "`mt prompt <agent-role> [--target <id>]`, execute via `mt run`, "
+        "`mt run --agent <role> --target <id>`, or `mt run --pipeline`, and "
+        "verify `mt check all` exits `0` with empty `stdout`.",
     ]
     return "\n".join(lines) + "\n"
