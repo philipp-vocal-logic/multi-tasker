@@ -265,44 +265,6 @@ def test_cli_resolve_missing_and_task_resolution(
     assert escalation and escalation.frontmatter["resolved_by"] == "TASK-001"
 
 
-@traces("REQ-003", "AC-03", "SPEC-003")
-def test_run_scheduled_tasks_worktree_execution(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Verify `mt run` executes eligible Tasks via MergeGate and updates status."""
-    _seed_policies(tmp_path)
-    assert main(["run", "--root", str(tmp_path)]) == 0
-    assert capsys.readouterr().out == ""
-    _write_document(tmp_path / "tests/helper_mod.py", "VALUE = 1\n")
-    task_path = tmp_path / "artifacts/tasks/TASK-001.md"
-    _write_document(
-        task_path,
-        "---\nid: TASK-001\ntype: test_contract\nstatus: planned\n"
-        "depends_on: []\nrequired_files: []\nwrite_files: [tests/helper_mod.py]\n"
-        "verification_cmd: python3 -c \"print('E   boom'); "
-        "print('FAILED t'); raise SystemExit(1)\"\n---\n",
-    )
-    assert main(["run", "--root", str(tmp_path)]) == 1
-    assert "E   boom | FAILED t" in capsys.readouterr().out
-    failed_document, _ = parse_artifact_file(task_path, "artifacts/tasks/TASK-001.md")
-    assert failed_document and failed_document.frontmatter["status"] == "planned"
-    _write_document(
-        task_path,
-        "---\nid: TASK-001\ntype: test_contract\nstatus: planned\n"
-        "depends_on: []\nrequired_files: []\nwrite_files: [tests/helper_mod.py]\n"
-        "verification_cmd: \"python3 -c 'raise SystemExit(0)'\"\n---\n",
-    )
-    agent_script = (
-        'python3 -c "from pathlib import Path; '
-        "Path('tests/helper_mod.py').write_text('VALUE = 2\\n')\""
-    )
-    assert main(["run", "--agent-command", agent_script, "--root", str(tmp_path)]) == 0
-    assert capsys.readouterr().out.strip() == "TASK-001"
-    assert (tmp_path / "tests/helper_mod.py").read_text("utf-8") == "VALUE = 2\n"
-    done_document, _ = parse_artifact_file(task_path, "artifacts/tasks/TASK-001.md")
-    assert done_document and done_document.frontmatter["status"] == "done"
-
-
 @traces("REQ-003", "AC-04", "SPEC-003")
 def test_trace_lineage_and_documentation_generation(
     capsys: pytest.CaptureFixture[str],
@@ -327,36 +289,6 @@ def test_trace_lineage_and_documentation_generation(
         "## 5. Live Repository Traceability Graph",
     ):
         assert heading in documentation_output
-
-
-@traces("REQ-010", "AC-01", "SPEC-010")
-@traces("REQ-010", "AC-02", "SPEC-010")
-def test_multi_wave_run_and_approval_traceability_diagnostics(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Verify multi-wave mt run, E-line verify failures, and approve traceability."""
-    _seed_policies(tmp_path)
-    _write_document(
-        tmp_path / "artifacts/requirements/REQ-001.md",
-        "---\nid: REQ-001\nstatus: draft\ntraces_to: [INT-999]\n---\n"
-        "## Statement\nOk\n",
-    )
-    assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 1
-    assert "[TRACE_MISSING_REF]" in capsys.readouterr().out
-    _write_document(tmp_path / "tests/w1.py", "VALUE = 1\n")
-    _write_document(tmp_path / "tests/w2.py", "VALUE = 2\n")
-    for task_id, deps, writes in (
-        ("TASK-001", "[]", "[tests/w1.py]"),
-        ("TASK-002", "[TASK-001]", "[tests/w2.py]"),
-    ):
-        _write_document(
-            tmp_path / f"artifacts/tasks/{task_id}.md",
-            f"---\nid: {task_id}\ntype: test_contract\nstatus: planned\n"
-            f"depends_on: {deps}\nrequired_files: []\nwrite_files: {writes}\n"
-            "verification_cmd: \"python3 -c 'raise SystemExit(0)'\"\n---\n",
-        )
-    assert main(["run", "--root", str(tmp_path)]) == 0
-    assert capsys.readouterr().out.strip().splitlines() == ["TASK-001", "TASK-002"]
 
 
 @traces("REQ-027", "AC-01", "SPEC-027")
@@ -407,72 +339,3 @@ def test_multi_requirement_intent_processing_and_completion(
     assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
     final_intent, _ = parse_artifact_file(intent_path, "artifacts/intents/INT-001.md")
     assert final_intent and final_intent.frontmatter["status"] == "processed"
-
-
-def _seed_supersession_fixture(tmp_path: Path) -> Path:
-    """Seed INT-001..002, REQ-001, SPEC-001, TASK-001, and draft REQ-002."""
-    _seed_policies(tmp_path)
-    for intent_id, state_val in (("INT-001", "processed"), ("INT-002", "open")):
-        _write_document(
-            tmp_path / f"artifacts/intents/{intent_id}.md",
-            f"---\nid: {intent_id}\nstatus: {state_val}\n---\n",
-        )
-    _write_document(
-        tmp_path / "artifacts/requirements/REQ-001.md",
-        "---\nid: REQ-001\ntitle: Legacy Auth\nstatus: approved\n"
-        "traces_to: [INT-001]\nacceptance_criteria: [{id: AC-01}]\n"
-        "version: 1\n---\n",
-    )
-    _write_document(
-        tmp_path / "artifacts/specifications/SPEC-001.md",
-        "---\nid: SPEC-001\nstatus: approved\ntraces_to: [REQ-001]\n"
-        "covers_criteria: [REQ-001:AC-01]\n---\n",
-    )
-    _write_document(
-        tmp_path / "artifacts/tasks/TASK-001.md",
-        "---\nid: TASK-001\nstatus: done\ntraces_to: [REQ-001, SPEC-001]\n---\n",
-    )
-    req2_path = tmp_path / "artifacts/requirements/REQ-002.md"
-    _write_document(
-        req2_path,
-        "---\nid: REQ-002\ntitle: Modern Auth\nstatus: draft\n"
-        "traces_to: [INT-002]\nsupersedes: [REQ-999]\n"
-        "acceptance_criteria: [{id: AC-01}]\n---\n",
-    )
-    return req2_path
-
-
-@traces("REQ-039", "AC-01", "SPEC-039")
-@traces("REQ-039", "AC-02", "SPEC-039")
-@traces("REQ-039", "AC-03", "SPEC-039")
-def test_requirement_supersession_deprecates_old_req_and_spec(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Verify supersedes auto-deprecates REQ/SPEC and filters trace/prompt/metrics."""
-    from multi_tasker.checkers.traceability_checker import check_traceability
-    from multi_tasker.orchestrator.lineage import _compute_static_test_metrics
-    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
-
-    req2_path = _seed_supersession_fixture(tmp_path)
-    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 1
-    assert "[TRACE_MISSING_REF]" in capsys.readouterr().out
-    _write_document(
-        req2_path, req2_path.read_text("utf-8").replace("REQ-999", "REQ-001")
-    )
-    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
-    for rel_path in ("requirements/REQ-001.md", "specifications/SPEC-001.md"):
-        doc, _ = parse_artifact_file(tmp_path / "artifacts" / rel_path, rel_path)
-        assert doc and doc.frontmatter["status"] == "deprecated"
-    assert check_traceability(tmp_path, ["artifacts/tasks/TASK-001.md"]) == []
-    _write_document(
-        tmp_path / "artifacts/specifications/SPEC-002.md",
-        "---\nid: SPEC-002\nstatus: draft\ntraces_to: [REQ-001]\n"
-        "covers_criteria: [REQ-002:AC-01]\n---\n",
-    )
-    bad_refs = check_traceability(tmp_path, ["artifacts/specifications/SPEC-002.md"])
-    assert any(item.rule_id == "TRACE_UPSTREAM_NOT_APPROVED" for item in bad_refs)
-    prompt, _ = build_agent_prompt(tmp_path, "requirement-agent", "INT-002")
-    assert "supersedes: [REQ-NNN]" in prompt
-    assert "`REQ-002`: Modern Auth" in prompt
-    assert "`REQ-001`: Legacy Auth" not in prompt
-    assert _compute_static_test_metrics(tmp_path)[3] == "0/1 (0.0%)"

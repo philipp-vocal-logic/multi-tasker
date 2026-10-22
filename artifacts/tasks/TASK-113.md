@@ -2,20 +2,20 @@
 id: TASK-113
 title: Split Lifecycle and TaskRunner TestContracts and Remove Compound Filename
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-045
-  - SPEC-045
+- REQ-045
+- SPEC-045
 depends_on:
-  - TASK-112
+- TASK-112
 required_files:
-  - tests/test_lifecycle.py
-  - tests/test_transitions_and_execution.py
+- tests/test_lifecycle.py
+- tests/test_transitions_and_execution.py
 write_files:
-  - tests/test_transitions_and_execution.py
-  - tests/test_lifecycle.py
-  - tests/test_task_runner.py
-verification_cmd: "python3 -m py_compile tests/test_lifecycle.py tests/test_task_runner.py"
+- tests/test_transitions_and_execution.py
+- tests/test_lifecycle.py
+- tests/test_task_runner.py
+verification_cmd: python3 -m py_compile tests/test_lifecycle.py tests/test_task_runner.py
 ---
 ## Objective
 Replace `tests/test_transitions_and_execution.py` with `tests/test_task_runner.py` and trim `tests/test_lifecycle.py` so every module stays below `400` lines.
