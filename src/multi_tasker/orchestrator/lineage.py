@@ -82,6 +82,7 @@ def _referenced_artifact_ids(document: ArtifactDocument) -> set[str]:
     references: set[str] = set()
     for key in (
         "traces_to",
+        "supersedes",
         "depends_on",
         "target_artifacts",
         "affected_artifacts",
@@ -327,7 +328,7 @@ def _compute_static_test_metrics(
     total_criteria = {
         (aid, str(item.get("id", "")))
         for aid, doc in load_artifacts_by_id(repository_root).items()
-        if doc.artifact_type == "REQ"
+        if doc.artifact_type == "REQ" and doc.frontmatter.get("status") != "deprecated"
         for item in doc.frontmatter.get("acceptance_criteria", [])
         if isinstance(item, dict) and item.get("id")
     }

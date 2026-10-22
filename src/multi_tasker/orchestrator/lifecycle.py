@@ -224,7 +224,7 @@ def _sync_upstream_intents(
         }:
             continue
         all_approved = all(
-            doc.frontmatter.get("status") == "approved"
+            doc.frontmatter.get("status") in {"approved", "deprecated"}
             for doc in by_identifier.values()
             if doc.artifact_type == "REQ"
             and upstream_id
@@ -236,11 +236,47 @@ def _sync_upstream_intents(
         )
 
 
+def _deprecate_superseded_requirements(
+    repository_root: Path,
+    changed_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> None:
+    """Deprecate superseded Requirements and exclusively linked Specifications."""
+    for req_id in (
+        str(item) for item in changed_document.frontmatter.get("supersedes", [])
+    ):
+        req_doc = by_identifier.get(req_id)
+        if req_doc and req_doc.frontmatter.get("status") == "approved":
+            update_artifact_frontmatter(
+                repository_root / req_doc.path, {"status": "deprecated"}
+            )
+            req_doc.frontmatter["status"] = "deprecated"
+    deprecated_reqs = {
+        aid
+        for aid, doc in by_identifier.items()
+        if doc.artifact_type == "REQ" and doc.frontmatter.get("status") == "deprecated"
+    }
+    for doc in by_identifier.values():
+        refs = {str(ref) for ref in doc.frontmatter.get("traces_to", [])}
+        if (
+            doc.artifact_type == "SPEC"
+            and doc.frontmatter.get("status") == "approved"
+            and refs
+            and refs <= deprecated_reqs
+        ):
+            update_artifact_frontmatter(
+                repository_root / doc.path, {"status": "deprecated"}
+            )
+
+
 def _mark_dirty_downstream(repository_root: Path, changed_id: str) -> list[str]:
     """Transition downstream SPEC/TASK to needs_update and sync upstream Intents."""
     by_identifier = load_artifacts_by_id(repository_root)
     changed_document = by_identifier.get(changed_id)
     if changed_document and changed_document.artifact_type == "REQ":
+        _deprecate_superseded_requirements(
+            repository_root, changed_document, by_identifier
+        )
         _sync_upstream_intents(repository_root, changed_document, by_identifier)
     dirty_ids = compute_dirty_subgraph(repository_root, changed_id)
     for artifact_id in dirty_ids:

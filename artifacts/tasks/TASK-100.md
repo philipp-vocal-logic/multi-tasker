@@ -2,21 +2,21 @@
 id: TASK-100
 title: Implement Requirement Supersession and Deprecation Lifecycle
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-039
-  - SPEC-039
+- REQ-039
+- SPEC-039
 depends_on:
-  - TASK-099
+- TASK-099
 required_files:
-  - tests/test_lifecycle.py
-  - artifacts/requirements/REQ-039.md
-  - artifacts/specifications/SPEC-039.md
+- tests/test_lifecycle.py
+- artifacts/requirements/REQ-039.md
+- artifacts/specifications/SPEC-039.md
 write_files:
-  - src/multi_tasker/orchestrator/lifecycle.py
-  - src/multi_tasker/checkers/traceability_checker.py
-  - src/multi_tasker/orchestrator/prompt_context.py
-  - src/multi_tasker/orchestrator/lineage.py
+- src/multi_tasker/orchestrator/lifecycle.py
+- src/multi_tasker/checkers/traceability_checker.py
+- src/multi_tasker/orchestrator/prompt_context.py
+- src/multi_tasker/orchestrator/lineage.py
 verification_cmd: pytest -o pythonpath=src -q tests/test_lifecycle.py -k requirement_supersession
 ---
 ## Objective

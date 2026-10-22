@@ -109,9 +109,10 @@ def render_decomposition_contract(agent_role: str, next_id: str | None) -> list[
         return [
             "- **Requirement Decomposition Contract**: Author one atomic `REQ` file "
             f"(starting at `id: {next_id or 'REQ-NNN'}`) per distinct capability in "
-            "the `Intent` (or update an existing `REQ` from the catalog below), and "
-            "evaluate that single capability across good, edge, and failure "
-            "`AcceptanceCriteria` (`AC-01`, `AC-02`, `AC-03`, ...)."
+            "the `Intent` (declaring `supersedes: [REQ-NNN]` to deprecate any "
+            "replaced `REQ` from the catalog below), and evaluate that single "
+            "capability across good, edge, and failure `AcceptanceCriteria` "
+            "(`AC-01`, `AC-02`, `AC-03`, ...)."
         ]
     if agent_role == "planner-agent":
         return [
@@ -206,7 +207,7 @@ def _render_existing_requirements_catalog(
         f"(`status: {doc.frontmatter.get('status', 'draft')}`, "
         f"`version: {doc.frontmatter.get('version', 1)}`)"
         for req_id, doc in sorted(by_identifier.items())
-        if doc.artifact_type == "REQ"
+        if doc.artifact_type == "REQ" and doc.frontmatter.get("status") != "deprecated"
     ]
     if not entries:
         return []

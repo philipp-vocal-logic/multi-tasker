@@ -9,6 +9,7 @@ from multi_tasker.domain.parser import load_all_artifacts, load_yaml_file
 
 LIST_REFERENCE_FIELDS = (
     "traces_to",
+    "supersedes",
     "decisions",
     "depends_on",
     "affected_artifacts",
@@ -52,12 +53,17 @@ def _check_document_references(
         "require_upstream_approved_for_task", True
     )
     if check_spec or check_task:
+        status = document.frontmatter.get("status")
+        archived = (document.artifact_type == "SPEC" and status == "deprecated") or (
+            document.artifact_type == "TASK" and status == "done"
+        )
+        allowed = {"approved", "deprecated"} if archived else {"approved"}
         upstream_ids = frontmatter.get("traces_to", []) + frontmatter.get(
             "decisions", []
         )
         for upstream_id in (str(item) for item in upstream_ids):
             upstream = by_identifier.get(upstream_id)
-            if upstream and upstream.frontmatter.get("status") != "approved":
+            if upstream and upstream.frontmatter.get("status") not in allowed:
                 message = f"Upstream '{upstream_id}' is not 'approved'."
                 findings.append(
                     Finding(document.path, 1, "TRACE_UPSTREAM_NOT_APPROVED", message)
