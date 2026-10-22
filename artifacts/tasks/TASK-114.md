@@ -17,7 +17,7 @@ required_files:
   - src/multi_tasker/orchestrator/prompt_context.py
 write_files:
   - src/multi_tasker/orchestrator/prompt_context.py
-verification_cmd: "pytest -q tests/test_schemas_checker.py tests/test_prompt_builder.py tests/test_task_runner.py"
+verification_cmd: "pytest -o pythonpath=src -q tests/test_schemas_checker.py tests/test_prompt_builder.py tests/test_task_runner.py"
 ---
 ## Objective
 Update `render_decomposition_contract` in `src/multi_tasker/orchestrator/prompt_context.py` so `planner-agent` decomposes multi-concern specifications into single-concern tasks without `_and_` test filenames.
