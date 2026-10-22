@@ -17,7 +17,10 @@ from multi_tasker.orchestrator.scheduler import (
     compute_dirty_subgraph,
     select_parallel_batch,
 )
-from multi_tasker.orchestrator.worktree import commit_traceable_change
+from multi_tasker.orchestrator.worktree import (
+    commit_traceable_change,
+    merge_worktree_files,
+)
 
 
 @dataclass(frozen=True)
@@ -263,3 +266,34 @@ def resolve_escalation(
     )
     _mark_dirty_subgraph(repository_root, by_identifier, resolved_by)
     return []
+
+
+def finalize_stage_escalation(
+    repository_root: Path,
+    worktree_path: Path,
+    target_id: str,
+    escalation_path: str,
+) -> tuple[list[str], list[Finding]]:
+    """Merge a stage Escalation onto BaseBranch, route it, and block target_id."""
+    merge_worktree_files(repository_root, worktree_path, [escalation_path])
+    route = route_escalation(repository_root, escalation_path)
+    update_artifact_frontmatter(
+        repository_root / escalation_path, {"status": route.next_status}
+    )
+    target_doc = load_artifacts_by_id(repository_root).get(target_id)
+    changed = [escalation_path]
+    if target_doc is not None and target_doc.artifact_type in {"REQ", "SPEC", "TASK"}:
+        update_artifact_frontmatter(
+            repository_root / target_doc.path, {"status": "blocked"}
+        )
+        changed.append(target_doc.path)
+    subject = (
+        f"{route.escalation_id}: Escalate {target_id} to "
+        f"{route.target_actor} ({route.action}) "
+        f"[traces: {target_id}, {route.escalation_id}]"
+    )
+    commit_traceable_change(repository_root, changed, subject)
+    message = (
+        f"Stage '{target_id}' escalated to '{route.target_actor}' ({route.action})."
+    )
+    return [], [Finding(escalation_path, 1, "GATE_TASK_ESCALATED", message)]

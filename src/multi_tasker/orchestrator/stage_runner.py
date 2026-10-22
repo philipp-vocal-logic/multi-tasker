@@ -37,6 +37,7 @@ from multi_tasker.orchestrator.prompt_builder import (
 from multi_tasker.orchestrator.router import (
     CATEGORY_ROUTES,
     evaluate_review_verdict,
+    finalize_stage_escalation,
     find_actionable_stage_target,
 )
 from multi_tasker.orchestrator.task_runner import run_scheduled_tasks
@@ -180,6 +181,13 @@ def _finalize_stage_outcome(
     outcome: GateOutcome,
 ) -> tuple[list[str], list[Finding]]:
     """Merge validated stage artifacts onto BaseBranch and commit traceable change."""
+    if outcome.escalated and outcome.escalation_path:
+        return finalize_stage_escalation(
+            request.base_root,
+            request.worktree_path,
+            target_id,
+            outcome.escalation_path,
+        )
     if not outcome.passed:
         return [], outcome.findings
     changed_files = request.changed_files or []

@@ -2,7 +2,7 @@
 id: TASK-106
 title: Implement Stage-Agent Escalation Persistence and Routing
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-042
 - SPEC-042
