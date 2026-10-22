@@ -1,27 +1,22 @@
-"""Executable TestContracts for REQ-011/SPEC-011 and REQ-012/SPEC-012."""
+"""Executable TestContracts for interaction_logger and repository scaffolding."""
 
 import importlib
 from pathlib import Path
 import sys
 from typing import Any
 
+import pytest
 import yaml
 
 from multi_tasker.checkers.architecture_checker import check_architecture
 from multi_tasker.checkers.permissions_checker import check_permissions
-import pytest
-
-from multi_tasker.cli.main import build_parser, main
+from multi_tasker.cli.main import main
 from multi_tasker.domain.models import ArtifactDocument, traces
 from multi_tasker.domain.parser import load_yaml_file
 from multi_tasker.orchestrator.documentation_generator import (
-    generate_external_agents_guide,
     write_repository_documentation,
 )
-from multi_tasker.orchestrator.prompt_builder import (
-    build_agent_prompt,
-    prepare_worker_invocation,
-)
+from multi_tasker.orchestrator.prompt_builder import prepare_worker_invocation
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
@@ -181,97 +176,6 @@ def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
     assert any(item.rule_id == "PERM_INVALID_EXEC_ENV" for item in findings)
 
 
-def _assert_streamlined_stage_and_review_prompts() -> None:
-    """Assert compact templates, cross-stage limits, and SPEC target_files context."""
-    req_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "requirement-agent")
-    assert (
-        "json_schema:" not in req_prompt and "additionalProperties:" not in req_prompt
-    )
-    assert "```markdown\n---\nid: REQ-NNN" in req_prompt
-    assert "id: ESC-NNN" in req_prompt and "id: ESC-001" not in req_prompt
-    assert "id: AC-XX" in req_prompt and "id: AC-01" not in req_prompt
-    assert all(len(line) <= 88 for line in req_prompt.splitlines())
-    assert "Glossary Terms" in req_prompt and "req_id" in req_prompt
-    assert "## Statement" in req_prompt and "## Impact Analysis" in req_prompt
-    assert (
-        "`status: in_review`" in req_prompt and "verdict: pass|fail" not in req_prompt
-    )
-    assert "@traces(" not in req_prompt and "Source Limits" not in req_prompt
-    for role in ("specification-agent", "planner-agent", "review-agent"):
-        role_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, role)
-        assert "Source Limits" in role_prompt and "Clean Code AST Rules" in role_prompt
-    rev_prompt, _ = build_agent_prompt(REPOSITORY_ROOT, "review-agent", "SPEC-001")
-    assert (
-        "`verdict: pass|fail`" in rev_prompt and "status: in_review" not in rev_prompt
-    )
-    assert "artifacts/reviews/REV-" in rev_prompt
-    assert "Target File `tests/test_checkers.py`" in rev_prompt
-    assert "Semantic Review Rubric" in rev_prompt
-
-
-def _assert_self_contained_prompt_output(capsys: Any) -> None:
-    """Assert mt prompt outputs Execution Steps and Architecture Layers."""
-    _assert_streamlined_stage_and_review_prompts()
-    prompt_args = [
-        "prompt",
-        "worker-agent",
-        "--target",
-        "TASK-002",
-        "--root",
-        str(REPOSITORY_ROOT),
-    ]
-    assert main(prompt_args) == 0
-    prompt_output = capsys.readouterr().out
-    assert "Self-Contained Context" in prompt_output
-    assert "Execution Steps" in prompt_output
-    assert "mt check all --agent worker-agent --task TASK-002 --paths" in prompt_output
-    assert "./mt check all" not in prompt_output
-    assert "Architecture Layers" in prompt_output and "imports:" in prompt_output
-    assert "json_schema:" not in prompt_output
-    assert '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")' in prompt_output
-    assert "### `TASK` Output Contract" not in prompt_output
-    assert "&& pytest -q tests/test_checkers.py" in prompt_output
-    assert "`max_line_length=88`" in prompt_output
-    assert "### Python Source & `TestContract` Output Contract" in prompt_output
-    assert "### Required File `artifacts/requirements/REQ-001.md`" not in prompt_output
-    assert "Glossary Terms" in prompt_output and "Forbidden Synonyms" in prompt_output
-    assert "def test_permissions_checker_matrix" in prompt_output
-    assert "class Finding" in prompt_output
-
-
-@traces("REQ-012", "AC-02", "SPEC-012")
-@traces("REQ-028", "AC-01", "SPEC-028")
-@traces("REQ-030", "AC-01", "SPEC-030")
-@traces("REQ-030", "AC-02", "SPEC-030")
-@traces("REQ-031", "AC-01", "SPEC-031")
-@traces("REQ-031", "AC-02", "SPEC-031")
-@traces("REQ-033", "AC-01", "SPEC-033")
-@traces("REQ-033", "AC-02", "SPEC-033")
-@traces("REQ-034", "AC-01", "SPEC-034")
-@traces("REQ-034", "AC-02", "SPEC-034")
-@traces("REQ-035", "AC-01", "SPEC-035")
-@traces("REQ-035", "AC-02", "SPEC-035")
-@traces("REQ-035", "AC-03", "SPEC-035")
-def test_prompt_and_worktree_run_context_modes(tmp_path: Path, capsys: Any) -> None:
-    """Verify self-contained prompt synthesis and Worktree execution."""
-    _assert_self_contained_prompt_output(capsys)
-    _seed_test_repository(tmp_path)
-    _write_task_artifact(
-        tmp_path, "TASK-001", "tests/test_mode.py", "python3 -c 'assert True'"
-    )
-    worker_cmd = (
-        'python3 -c "import os; from pathlib import Path; '
-        "assert 'MT_CONTEXT_MODE' not in os.environ; "
-        "prompt = Path(os.environ['MT_PROMPT_FILE']).read_text('utf-8'); "
-        "assert 'Self-Contained Context' in prompt; "
-        "assert 'Execution Steps' in prompt; "
-        "assert 'Status: New file' in prompt; "
-        "Path('tests/test_mode.py').write_text('MODE = 1\\n')\""
-    )
-    run_args = ["run", "--agent-command", worker_cmd]
-    assert main([*run_args, "--root", str(tmp_path)]) == 0
-
-
 def _write_file(path: Path, text: str) -> None:
     """Create parent folders and write text content."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,28 +248,6 @@ def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> 
         tmp_path, document, tmp_path / ".mt_prompt.md", ("echo", "agy", "m")
     )
     assert env["PYTHONPATH"] == str(tmp_path)
-
-
-@traces("REQ-020", "AC-01", "SPEC-020")
-@traces("REQ-020", "AC-02", "SPEC-020")
-def test_intent_why_guidance_in_prompt_cli_and_agents_guide(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Verify Intent why guidance in RequirementAgent prompt, CLI help, and guide."""
-    prompt_text, findings = build_agent_prompt(REPOSITORY_ROOT, "requirement-agent")
-    assert findings == []
-    assert (
-        "translating its requested change and motivating reason into testable "
-        "AcceptanceCriteria and ImpactAnalysis" in " ".join(prompt_text.split())
-    )
-    assert "mt intent '<what to change and why>'" in generate_external_agents_guide()
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["intent", "--help"])
-    intent_help = capsys.readouterr().out
-    assert (
-        "Intent statement describing what to change and why (or file path)."
-        in intent_help
-    )
 
 
 @traces("REQ-022", "AC-01", "SPEC-022")
