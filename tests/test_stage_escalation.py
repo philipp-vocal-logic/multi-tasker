@@ -56,3 +56,72 @@ def test_lifecycle_decomposition_and_router_cohesiveness(tmp_path: Path) -> None
     assert router.resolve_escalation(tmp_path, "ESC-001", "DEC-001") == []
     esc_doc, _ = parse_artifact_file(esc_path, "artifacts/escalations/ESC-001.md")
     assert esc_doc is not None and esc_doc.frontmatter["status"] == "resolved"
+
+
+def _seed_stage_escalation_targets(tmp_path: Path) -> str:
+    """Seed INT-001 and REQ-001 and return requirement-agent escalation command."""
+    _seed_test_repository(tmp_path)
+    (tmp_path / "artifacts" / "intents" / "INT-001.md").write_text(
+        "---\nid: INT-001\nstatus: open\ncreated_at: '2026-10-22T00:00:00Z'\n---\n"
+        "Ambiguous intent.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "artifacts" / "requirements" / "REQ-001.md").write_text(
+        "---\nid: REQ-001\ntitle: Approved Requirement\nstatus: approved\n"
+        "traces_to: [INT-001]\ndecisions: []\n"
+        "acceptance_criteria: [{id: AC-01, given: a, when: b, then: c}]\n"
+        "version: 1\n---\n## Statement\nOk.\n\n## Impact Analysis\nOk.\n",
+        encoding="utf-8",
+    )
+    return (
+        'python3 -c "from pathlib import Path; '
+        "Path('artifacts/escalations/ESC-001.md').write_text("
+        "'---\\nid: ESC-001\\nsource_agent: requirement-agent\\n"
+        "task_or_stage: INT-001\\naffected_artifacts: [INT-001]\\n"
+        "reason_category: ambiguity\\nstatus: open\\nresolved_by: null\\n---\\n"
+        "## Blocking Problem\\nNeed clarification on intent scope.\\n')\""
+    )
+
+
+@traces("REQ-042", "AC-01", "SPEC-042")
+@traces("REQ-042", "AC-02", "SPEC-042")
+@traces("REQ-042", "AC-03", "SPEC-042")
+def test_stage_agent_escalation_persistence_routing_and_rejection(
+    tmp_path: Path,
+) -> None:
+    """Verify run_agent_stage merges/routes valid ESC and rejects invalid ESC."""
+    from multi_tasker.orchestrator.stage_runner import run_agent_stage
+
+    esc_int_cmd = _seed_stage_escalation_targets(tmp_path)
+    produced, findings = run_agent_stage(
+        tmp_path, "requirement-agent", "INT-001", (esc_int_cmd, None, None)
+    )
+    assert produced == [] and findings[0].rule_id == "GATE_TASK_ESCALATED"
+    esc_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/escalations/ESC-001.md", "ESC-001.md"
+    )
+    int_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/intents/INT-001.md", "INT-001.md"
+    )
+    assert esc_doc is not None and esc_doc.frontmatter["status"] == "awaiting_human"
+    assert int_doc is not None and int_doc.frontmatter["status"] == "open"
+    esc_req_cmd = esc_int_cmd.replace(
+        "requirement-agent", "specification-agent"
+    ).replace("INT-001", "REQ-001")
+    _, req_findings = run_agent_stage(
+        tmp_path, "specification-agent", "REQ-001", (esc_req_cmd, None, None)
+    )
+    assert req_findings[0].rule_id == "GATE_TASK_ESCALATED"
+    req_doc, _ = parse_artifact_file(
+        tmp_path / "artifacts/requirements/REQ-001.md", "REQ-001.md"
+    )
+    assert req_doc is not None and req_doc.frontmatter["status"] == "blocked"
+    bad_esc_cmd = (
+        'python3 -c "from pathlib import Path; '
+        "Path('artifacts/escalations/ESC-009.md').write_text('---\\nid: X\\n---\\n')\""
+    )
+    _, bad_findings = run_agent_stage(
+        tmp_path, "requirement-agent", "INT-001", (bad_esc_cmd, None, None)
+    )
+    assert not (tmp_path / "artifacts/escalations/ESC-009.md").exists()
+    assert any(item.rule_id != "GATE_TASK_ESCALATED" for item in bad_findings)
