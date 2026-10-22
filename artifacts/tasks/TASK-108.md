@@ -2,7 +2,7 @@
 id: TASK-108
 title: Forward Max-Workers Through Declarative Pipeline Runner
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-043
 - SPEC-043

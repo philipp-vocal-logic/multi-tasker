@@ -136,7 +136,8 @@ def _dispatch_run_target(
     """Dispatch mt run to pipeline, single agent stage, or scheduled worker tasks."""
     options = (arguments.agent_command, arguments.model, arguments.environment)
     if getattr(arguments, "pipeline", False) or getattr(arguments, "evaluate", None):
-        return run_declarative_pipeline(repository_root, options)
+        workers = int(getattr(arguments, "max_workers", 1))
+        return run_declarative_pipeline(repository_root, options, workers)
     agent_role = getattr(arguments, "agent_role", None)
     if agent_role is not None:
         return run_agent_stage(

@@ -326,13 +326,14 @@ def _step_declarative_stage(
     stage: dict[str, Any],
     target_id: str,
     options: tuple[str | None, str | None, str | None],
+    max_workers: int = 1,
 ) -> tuple[list[str], list[Finding]]:
     """Execute one matched stage and apply its configured approval_gate."""
     role = str(stage.get("agent_role", ""))
     gate = str(stage.get("approval_gate", "human"))
     if role == "worker-agent":
         return run_scheduled_tasks(
-            repository_root, 1, options[0], options[1], options[2] or "agy"
+            repository_root, max_workers, options[0], options[1], options[2] or "agy"
         )
     produced, findings = run_agent_stage(repository_root, role, target_id, options)
     if findings or gate == "human":
@@ -357,6 +358,7 @@ def _step_declarative_stage(
 def run_declarative_pipeline(
     repository_root: Path,
     options: tuple[str | None, str | None, str | None] = (None, None, None),
+    max_workers: int = 1,
 ) -> tuple[list[str], list[Finding]]:
     """Step through policy/pipeline.yaml stages and auto-routed Escalations."""
     pipeline = load_pipeline_policy(repository_root)
@@ -384,7 +386,7 @@ def run_declarative_pipeline(
         if matched is None:
             break
         produced, findings = _step_declarative_stage(
-            repository_root, matched[0], matched[1], options
+            repository_root, matched[0], matched[1], options, max_workers
         )
         if findings or not produced:
             return completed, findings
