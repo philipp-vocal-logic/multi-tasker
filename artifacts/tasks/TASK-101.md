@@ -2,16 +2,16 @@
 id: TASK-101
 title: Add TestContracts for Disjoint Intent Subgraphs and Superseded Context
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-040
-  - SPEC-040
+- REQ-040
+- SPEC-040
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-040.md
-  - artifacts/specifications/SPEC-040.md
+- artifacts/requirements/REQ-040.md
+- artifacts/specifications/SPEC-040.md
 write_files:
-  - tests/test_transitions_and_execution.py
+- tests/test_transitions_and_execution.py
 verification_cmd: python3 -m py_compile tests/test_transitions_and_execution.py
 ---
 ## Objective

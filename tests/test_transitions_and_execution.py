@@ -360,3 +360,39 @@ def test_modular_refactoring_and_file_size_ceilings(tmp_path: Path) -> None:
         prompt_text, errors = prompt_module.build_agent_prompt(tmp_path, role)
         assert not errors and "Refactoring Targets (Warning)" in prompt_text
         assert "src/large_module.py" in prompt_text
+
+
+@traces("REQ-040", "AC-01", "SPEC-040")
+@traces("REQ-040", "AC-02", "SPEC-040")
+@traces("REQ-040", "AC-03", "SPEC-040")
+def test_superseded_intent_subgraph_separation_and_inlined_spec_context(
+    tmp_path: Path,
+) -> None:
+    """Verify disjoint Intent subgraphs, trace supersedes, and SPEC context."""
+    from multi_tasker.domain.parser import load_artifacts_by_id
+    from multi_tasker.orchestrator.lineage import (
+        group_artifacts_by_intent,
+        trace_lineage,
+    )
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
+    from tests.test_lifecycle import _seed_supersession_fixture
+
+    req2_path = _seed_supersession_fixture(tmp_path)
+    _write_document(tmp_path / "src/domain/auth.py", "AUTH_MOD = 1\n")
+    _write_document(
+        tmp_path / "artifacts/specifications/SPEC-001.md",
+        "---\nid: SPEC-001\nstatus: approved\ntraces_to: [REQ-001]\n"
+        "covers_criteria: [REQ-001:AC-01]\n"
+        "target_files: {tests: [], implementation: [src/domain/auth.py]}\n---\n",
+    )
+    _write_document(
+        req2_path, req2_path.read_text("utf-8").replace("REQ-999", "REQ-001")
+    )
+    assert main(["approve", "REQ-002", "--root", str(tmp_path)]) == 0
+    groups = dict(group_artifacts_by_intent(load_artifacts_by_id(tmp_path)))
+    assert "REQ-001" in groups["INT-001"] and "REQ-002" not in groups["INT-001"]
+    assert "REQ-002" in groups["INT-002"] and "REQ-001" not in groups["INT-002"]
+    assert any("REQ-002" in line for line in trace_lineage(tmp_path, "REQ-001"))
+    spec_prompt, _ = build_agent_prompt(tmp_path, "specification-agent", "REQ-002")
+    for expected in ("Artifact `REQ-001`", "Artifact `SPEC-001`", "AUTH_MOD = 1"):
+        assert expected in spec_prompt
