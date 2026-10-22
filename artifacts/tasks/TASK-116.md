@@ -8,6 +8,7 @@ traces_to:
   - SPEC-046
 depends_on:
   - TASK-115
+  - TASK-117
 required_files:
   - tests/test_pipeline_combinations.py
   - src/multi_tasker/domain/parser.py
