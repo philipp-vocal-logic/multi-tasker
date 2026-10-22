@@ -3,7 +3,7 @@ id: TASK-130
 title: Add TestContracts for Ruff Failure, Unknown Execution Env, and Policy-Only
   Routing
 type: test_contract
-status: planned
+status: done
 traces_to:
 - REQ-050
 - SPEC-050

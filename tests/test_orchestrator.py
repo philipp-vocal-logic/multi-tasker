@@ -204,6 +204,7 @@ def test_parallel_scheduler_and_dirty_subgraph(
 
 
 @traces("REQ-002", "AC-04", "SPEC-002")
+@traces("REQ-050", "AC-03", "SPEC-050")
 @pytest.mark.parametrize(
     ("category", "reroutes", "expected_actor", "expected_status"),
     [
@@ -223,6 +224,16 @@ def test_escalation_router_and_loop_prevention(
     expected_status: str,
 ) -> None:
     """Verify deterministic Escalation routing and 1-reroute loop cap."""
+    from multi_tasker.orchestrator import router as router_module
+
+    assert not hasattr(router_module, "CATEGORY_ROUTES")
+    real_lifecycle = (
+        Path(__file__).resolve().parent.parent / "policy/artifact_lifecycle.yaml"
+    )
+    _write_document(
+        tmp_path / "policy/artifact_lifecycle.yaml",
+        real_lifecycle.read_text(encoding="utf-8"),
+    )
     escalation_relative = "artifacts/escalations/ESC-001.md"
     _write_document(tmp_path / escalation_relative, "no frontmatter\n")
     invalid = route_escalation(tmp_path, escalation_relative)

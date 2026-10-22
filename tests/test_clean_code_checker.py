@@ -86,12 +86,26 @@ def _assert_linter_fail_fast_and_fail_clear(
     failed_mypy = check_clean_code(tmp_path)
     assert failed_mypy[0].rule_id == "CODE_MYPY"
     assert "fatal mypy flag error" in failed_mypy[0].message
+    clean_configuration["linters"]["mypy"]["enabled"] = False
+    clean_configuration["linters"]["ruff"] = {
+        "enabled": True,
+        "format_cmd": ["python3", "-c", "pass"],
+        "cmd": [
+            "python3",
+            "-c",
+            "import sys; sys.stderr.write('fatal ruff flag error\\n'); sys.exit(2)",
+        ],
+    }
+    _write_document(policy_file, yaml.safe_dump(clean_configuration))
+    failed_ruff = check_clean_code(tmp_path)
+    assert failed_ruff[0].rule_id == "CODE_RUFF"
 
 
 @traces("REQ-001", "AC-03", "SPEC-001")
 @traces("REQ-001", "AC-05", "SPEC-001")
 @traces("REQ-049", "AC-01", "SPEC-049")
 @traces("REQ-049", "AC-02", "SPEC-049")
+@traces("REQ-050", "AC-01", "SPEC-050")
 def test_output_contract_mypy_and_toggle_sensitivity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

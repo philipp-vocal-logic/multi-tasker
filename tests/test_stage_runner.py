@@ -73,7 +73,25 @@ def _seed_approved_requirement(tmp_path: Path) -> None:
     )
 
 
+def _assert_unknown_execution_env_rejected(tmp_path: Path, capsys: Any) -> None:
+    """Verify unknown --environment fails fast with CLI_UNKNOWN_EXEC_ENV."""
+    bad_stage = [
+        "run",
+        "--agent",
+        "specification-agent",
+        "--target",
+        "REQ-001",
+        "--environment",
+        "unknown-env",
+        "--root",
+        str(tmp_path),
+    ]
+    assert main(bad_stage) == 1
+    assert "[CLI_UNKNOWN_EXEC_ENV]" in capsys.readouterr().out
+
+
 @traces("REQ-013", "AC-02", "SPEC-013")
+@traces("REQ-050", "AC-02", "SPEC-050")
 def test_configurable_worktree_stage_execution_and_toggle(
     tmp_path: Path, capsys: Any
 ) -> None:
@@ -112,6 +130,9 @@ def test_configurable_worktree_stage_execution_and_toggle(
     execution_path.write_text(yaml.safe_dump(execution), encoding="utf-8")
     assert main(run_args) == 1
     assert "[CLI_AGENT_WORKTREE_DISABLED]" in capsys.readouterr().out
+    execution["agents"]["specification-agent"]["worktree_execution"] = True
+    execution_path.write_text(yaml.safe_dump(execution), encoding="utf-8")
+    _assert_unknown_execution_env_rejected(tmp_path, capsys)
     assert REPOSITORY_ROOT.is_dir()
 
 

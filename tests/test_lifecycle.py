@@ -56,6 +56,7 @@ def _seed_policies(root: Path) -> None:
         "artifact_limits.yaml": {"artifacts": {}},
         "artifact_lifecycle.yaml": {
             "state_transitions": real_lifecycle.get("state_transitions", {}),
+            "escalation_routes": real_lifecycle.get("escalation_routes", {}),
         },
         "traceability.yaml": {"traceability_rules": traceability_rules},
     }
