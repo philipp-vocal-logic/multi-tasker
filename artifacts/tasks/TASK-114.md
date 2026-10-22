@@ -2,22 +2,23 @@
 id: TASK-114
 title: Update Planner Decomposition Contract for Single-Concern Test Modules
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-045
-  - SPEC-045
+- REQ-045
+- SPEC-045
 depends_on:
-  - TASK-111
-  - TASK-112
-  - TASK-113
+- TASK-111
+- TASK-112
+- TASK-113
 required_files:
-  - tests/test_schemas_checker.py
-  - tests/test_prompt_builder.py
-  - tests/test_task_runner.py
-  - src/multi_tasker/orchestrator/prompt_context.py
+- tests/test_schemas_checker.py
+- tests/test_prompt_builder.py
+- tests/test_task_runner.py
+- src/multi_tasker/orchestrator/prompt_context.py
 write_files:
-  - src/multi_tasker/orchestrator/prompt_context.py
-verification_cmd: "pytest -o pythonpath=src -q tests/test_schemas_checker.py tests/test_prompt_builder.py tests/test_task_runner.py"
+- src/multi_tasker/orchestrator/prompt_context.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_schemas_checker.py tests/test_prompt_builder.py
+  tests/test_task_runner.py
 ---
 ## Objective
 Update `render_decomposition_contract` in `src/multi_tasker/orchestrator/prompt_context.py` so `planner-agent` decomposes multi-concern specifications into single-concern tasks without `_and_` test filenames.

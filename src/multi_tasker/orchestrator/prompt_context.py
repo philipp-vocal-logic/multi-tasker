@@ -116,14 +116,17 @@ def render_decomposition_contract(agent_role: str, next_id: str | None) -> list[
         ]
     if agent_role == "planner-agent":
         return [
-            f"- **Planner Decomposition Contract**: Author a `type: test_contract` "
-            f"Task (`id: {next_id}`, `traces_to: [REQ-NNN, SPEC-NNN]`, `write_files` "
-            "covering `SPEC` `target_files.tests`, `verification_cmd: python3 -m "
-            'py_compile <test_file>`, decorating tests with `@traces("REQ-NNN", '
-            '"AC-XX", "SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: '
-            f"[REQ-NNN, SPEC-NNN]`, `depends_on: [{next_id}]`, `required_files: "
-            "[<test_file>]`, `write_files` covering `SPEC` "
-            "`target_files.implementation`, `verification_cmd: pytest -q <test_file>`)."
+            f"- **Planner Decomposition Contract**: Author single-concern "
+            f"`type: test_contract` Task(s) (`id: {next_id}`, `traces_to: "
+            "[REQ-NNN, SPEC-NNN]`, `write_files` covering `SPEC` "
+            "`target_files.tests` without `_and_` test filenames, "
+            "`verification_cmd: python3 -m py_compile <test_file>`, "
+            'decorating tests with `@traces("REQ-NNN", "AC-XX", '
+            '"SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: '
+            f"[REQ-NNN, SPEC-NNN]`, `depends_on: [{next_id}]`, "
+            "`required_files: [<test_file>]`, `write_files` covering "
+            "`SPEC` `target_files.implementation`, "
+            "`verification_cmd: pytest -q <test_file>`)."
         ]
     return []
 
