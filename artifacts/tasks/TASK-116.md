@@ -9,6 +9,7 @@ traces_to:
 depends_on:
   - TASK-115
   - TASK-117
+  - TASK-118
 required_files:
   - tests/test_pipeline_combinations.py
   - src/multi_tasker/domain/parser.py
