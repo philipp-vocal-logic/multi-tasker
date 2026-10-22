@@ -265,7 +265,7 @@ def _configure_scenario_repository(
 ) -> None:
     """Bootstrap repo and apply scenario stage_gates."""
     bootstrap_evaluation_repository(repository_root, "Build calculation service.")
-    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    pipeline_path = repository_root / "policy" / "artifact_lifecycle.yaml"
     pipeline = load_yaml_file(pipeline_path)
     for stage in pipeline.get("stages", []):
         stage_id = str(stage.get("id", ""))
@@ -273,7 +273,7 @@ def _configure_scenario_repository(
             stage["approval_gate"] = scenario.stage_gates[stage_id]
     pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
     msg = "INT-001: Configure scenario pipeline [traces: INT-001]"
-    commit_traceable_change(repository_root, ["policy/pipeline.yaml"], msg)
+    commit_traceable_change(repository_root, ["policy/artifact_lifecycle.yaml"], msg)
 
 
 def _execute_scripted_turn(

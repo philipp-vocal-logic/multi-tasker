@@ -27,7 +27,7 @@ def _configure_single_cycle_review_pipeline(tmp_path: Path) -> None:
         False
     )
     trace_path.write_text(yaml.safe_dump(trace_policy), encoding="utf-8")
-    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline_path = tmp_path / "policy" / "artifact_lifecycle.yaml"
     pipeline = load_yaml_file(pipeline_path)
     assert pipeline["stages"][1]["approval_gate"] == "review-agent"
     assert pipeline["stages"][2]["approval_gate"] == "review-agent"

@@ -16,6 +16,7 @@ from tests.test_interaction_logging import REPOSITORY_ROOT, _seed_test_repositor
 
 
 @traces("REQ-013", "AC-01", "SPEC-013")
+@traces("REQ-048", "AC-01", "SPEC-048")
 def test_per_agent_model_precedence_and_policy_validation(tmp_path: Path) -> None:
     """Verify gemini-4-argon role defaults, 4-tier precedence, and policy checks."""
     _seed_test_repository(tmp_path)
@@ -46,10 +47,10 @@ def test_per_agent_model_precedence_and_policy_validation(tmp_path: Path) -> Non
         tmp_path, intent_doc, (None, "custom-cli-model", None), "planner-agent"
     )
     assert cli_override[2] == "custom-cli-model"
-    permissions_path = tmp_path / "policy" / "permissions.yaml"
-    permissions = load_yaml_file(permissions_path)
-    permissions["agents"]["planner-agent"]["worktree_execution"] = "not-a-bool"
-    permissions_path.write_text(yaml.safe_dump(permissions), encoding="utf-8")
+    execution_path = tmp_path / "policy" / "agent_execution.yaml"
+    execution = load_yaml_file(execution_path)
+    execution["agents"]["planner-agent"]["worktree_execution"] = "not-a-bool"
+    execution_path.write_text(yaml.safe_dump(execution), encoding="utf-8")
     findings = check_permissions(tmp_path)
     assert any(item.rule_id == "PERM_INVALID_EXEC_ENV" for item in findings)
 
@@ -105,10 +106,10 @@ def test_configurable_worktree_stage_execution_and_toggle(
     assert main(run_args) == 0
     assert capsys.readouterr().out.strip() == "SPEC-001"
     assert (tmp_path / "artifacts" / "specifications" / "SPEC-001.md").is_file()
-    permissions_path = tmp_path / "policy" / "permissions.yaml"
-    permissions = load_yaml_file(permissions_path)
-    permissions["agents"]["specification-agent"]["worktree_execution"] = False
-    permissions_path.write_text(yaml.safe_dump(permissions), encoding="utf-8")
+    execution_path = tmp_path / "policy" / "agent_execution.yaml"
+    execution = load_yaml_file(execution_path)
+    execution["agents"]["specification-agent"]["worktree_execution"] = False
+    execution_path.write_text(yaml.safe_dump(execution), encoding="utf-8")
     assert main(run_args) == 1
     assert "[CLI_AGENT_WORKTREE_DISABLED]" in capsys.readouterr().out
     assert REPOSITORY_ROOT.is_dir()
@@ -121,7 +122,7 @@ def test_pipeline_policy_validation_and_configurable_escalation_routing(
     """Verify check_schemas validates pipeline.yaml and router uses policy routes."""
     _seed_test_repository(tmp_path)
     assert check_schemas(tmp_path) == []
-    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline_path = tmp_path / "policy" / "artifact_lifecycle.yaml"
     pipeline = load_yaml_file(pipeline_path)
     pipeline["stages"][0]["approval_gate"] = "invalid-gate"
     pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
@@ -205,7 +206,7 @@ def _enable_auto_gates_and_seed_escalation(tmp_path: Path) -> None:
         False
     )
     trace_path.write_text(yaml.safe_dump(trace_policy), encoding="utf-8")
-    pipeline_path = tmp_path / "policy" / "pipeline.yaml"
+    pipeline_path = tmp_path / "policy" / "artifact_lifecycle.yaml"
     pipeline = load_yaml_file(pipeline_path)
     for stage in pipeline["stages"]:
         stage["approval_gate"] = "auto"

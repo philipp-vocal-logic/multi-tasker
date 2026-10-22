@@ -29,30 +29,33 @@ def _write_document(path: Path, text: str) -> None:
 
 def _seed_policies(root: Path) -> None:
     """Write minimal valid policy/*.yaml files into root."""
-    real_permissions = load_yaml_file(REPOSITORY_ROOT / "policy/permissions.yaml")
-    real_schemas = load_yaml_file(REPOSITORY_ROOT / "policy/schemas.yaml")
+    real_permissions = load_yaml_file(REPOSITORY_ROOT / "policy/agent_permissions.yaml")
+    real_lifecycle = load_yaml_file(REPOSITORY_ROOT / "policy/artifact_lifecycle.yaml")
     permissions: dict[str, Any] = {
-        "clean_repo_invariants": {"require_empty_git_status_before_worktree": False},
         "global_forbidden_write": ["policy/**"],
         "agents": real_permissions.get("agents", {}),
+    }
+    execution = {
+        "clean_repo_invariants": {"require_empty_git_status_before_worktree": False}
     }
     traceability_rules = {
         "require_files_declared_in_spec_target_files": False,
         "require_spec_target_files_covered_by_tasks": False,
     }
     configurations: dict[str, dict[str, Any]] = {
-        "permissions.yaml": permissions,
+        "agent_permissions.yaml": permissions,
+        "agent_execution.yaml": execution,
         "glossary.yaml": {"enforcement": {}, "terms": []},
-        "limits.yaml": {"source_code": {}},
-        "clean_code.yaml": {"linters": {"ruff": {"enabled": False}}, "ast_rules": {}},
-        "architecture.yaml": {
+        "code_limits.yaml": {"source_code": {}},
+        "code_quality.yaml": {"linters": {"ruff": {"enabled": False}}, "ast_rules": {}},
+        "code_architecture.yaml": {
             "dependency_rules": {},
             "layers": [{"name": "tests", "paths": ["tests/**"]}],
         },
-        "schemas.yaml": {
-            "state_transitions": real_schemas.get("state_transitions", {}),
-            "artifacts": {},
-            "schemas": {},
+        "artifact_schemas.yaml": {"schemas": {}},
+        "artifact_limits.yaml": {"artifacts": {}},
+        "artifact_lifecycle.yaml": {
+            "state_transitions": real_lifecycle.get("state_transitions", {}),
         },
         "traceability.yaml": {"traceability_rules": traceability_rules},
     }
@@ -300,12 +303,12 @@ def test_initialize_presets_and_invalid_preset_finding(
     """Verify default python preset, multi-tasker preset, and CLI_INVALID_PRESET."""
     python_root = tmp_path / "python_project"
     assert main(["initialize", "--root", str(python_root)]) == 0
-    python_arch = (python_root / "policy" / "architecture.yaml").read_text("utf-8")
+    python_arch = (python_root / "policy" / "code_architecture.yaml").read_text("utf-8")
     assert "src/domain/**" in python_arch
     assert "src/multi_tasker/domain/**" not in python_arch
     mt_root = tmp_path / "mt_project"
     assert main(["initialize", "--preset", "multi-tasker", "--root", str(mt_root)]) == 0
-    mt_arch = (mt_root / "policy" / "architecture.yaml").read_text("utf-8")
+    mt_arch = (mt_root / "policy" / "code_architecture.yaml").read_text("utf-8")
     assert "src/multi_tasker/domain/**" in mt_arch
     bad_root = tmp_path / "bad_project"
     assert main(["initialize", "--preset", "invalid", "--root", str(bad_root)]) == 1

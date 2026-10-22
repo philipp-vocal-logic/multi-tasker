@@ -29,7 +29,7 @@ def _seed_test_repository(target_root: Path) -> None:
         (target_root / "policy" / policy_file.name).write_text(
             content, encoding="utf-8"
         )
-    clean_path = target_root / "policy" / "clean_code.yaml"
+    clean_path = target_root / "policy" / "code_quality.yaml"
     clean_policy = load_yaml_file(clean_path)
     clean_policy["linters"]["ruff"]["enabled"] = False
     clean_policy["linters"]["mypy"]["enabled"] = False
@@ -167,11 +167,11 @@ def test_context_mode_policy_validation_and_precedence(tmp_path: Path) -> None:
     prompt_module = importlib.import_module("multi_tasker.orchestrator.prompt_builder")
     assert not hasattr(prompt_module, "resolve_context_mode")
     assert not hasattr(prompt_module, "VALID_CONTEXT_MODES")
-    permissions_path = tmp_path / "policy" / "permissions.yaml"
-    permissions = load_yaml_file(permissions_path)
-    assert "default_context_mode" not in permissions.get("execution_environments", {})
-    permissions["execution_environments"]["default_environment"] = "missing"
-    permissions_path.write_text(yaml.safe_dump(permissions), encoding="utf-8")
+    execution_path = tmp_path / "policy" / "agent_execution.yaml"
+    execution = load_yaml_file(execution_path)
+    assert "default_context_mode" not in execution.get("execution_environments", {})
+    execution["execution_environments"]["default_environment"] = "missing"
+    execution_path.write_text(yaml.safe_dump(execution), encoding="utf-8")
     findings = check_permissions(tmp_path)
     assert any(item.rule_id == "PERM_INVALID_EXEC_ENV" for item in findings)
 
@@ -187,18 +187,18 @@ def _write_file(path: Path, text: str) -> None:
 def test_initialize_scaffolds_default_policies_and_gitignore(tmp_path: Path) -> None:
     """Verify mt initialize scaffolds policy/*.yaml, .gitignore, and AGENTS.md."""
     custom_limits = "source_code:\n  max_file_lines: 777\n"
-    _write_file(tmp_path / "policy/limits.yaml", custom_limits)
+    _write_file(tmp_path / "policy/code_limits.yaml", custom_limits)
     _write_file(tmp_path / ".gitignore", "__pycache__/\n")
     assert main(["initialize", "--root", str(tmp_path)]) == 0
-    assert (tmp_path / "policy/limits.yaml").read_text("utf-8") == custom_limits
-    architecture = load_yaml_file(tmp_path / "policy/architecture.yaml")
+    assert (tmp_path / "policy/code_limits.yaml").read_text("utf-8") == custom_limits
+    architecture = load_yaml_file(tmp_path / "policy/code_architecture.yaml")
     assert "multi_tasker" in architecture.get("allowed_third_party_packages", [])
     gitignore_lines = (tmp_path / ".gitignore").read_text("utf-8").splitlines()
     for entry in ("__pycache__/", ".worktrees/", ".report/", ".mt_prompt.md"):
         assert entry in gitignore_lines
     agents_guide = (tmp_path / "AGENTS.md").read_text("utf-8")
     for expected in (
-        "policy/architecture.yaml",
+        "policy/code_architecture.yaml",
         "PERM_POLICY_MODIFIED",
         "from multi_tasker.domain.models import traces",
     ):
@@ -231,7 +231,7 @@ def test_architecture_custom_package_and_worktree_pythonpath(tmp_path: Path) -> 
         ],
     }
     _write_file(
-        tmp_path / "policy/architecture.yaml", yaml.safe_dump(architecture_policy)
+        tmp_path / "policy/code_architecture.yaml", yaml.safe_dump(architecture_policy)
     )
     _write_file(
         tmp_path / "app/core/first.py",

@@ -2,7 +2,7 @@
 id: TASK-124
 title: Update Lifecycle, Stage, and Pipeline TestContracts for Separated Policy Files
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-048
 - SPEC-048

@@ -100,11 +100,11 @@ def _seed_git_task_repository(root: Path, task_body: str) -> Path:
     """Initialize a Git repository with strict clean-worktree policy and a Task."""
     assert main(["initialize", "--root", str(root)]) == 0
     _seed_policies(root)
-    permissions = load_yaml_file(root / "policy/permissions.yaml")
-    permissions["clean_repo_invariants"]["require_empty_git_status_before_worktree"] = (
+    execution = load_yaml_file(root / "policy/agent_execution.yaml")
+    execution["clean_repo_invariants"]["require_empty_git_status_before_worktree"] = (
         True
     )
-    _write_document(root / "policy/permissions.yaml", yaml.safe_dump(permissions))
+    _write_document(root / "policy/agent_execution.yaml", yaml.safe_dump(execution))
     _write_document(root / "tests/helper_mod.py", "VALUE = 1\n")
     task_file = root / "artifacts/tasks/TASK-001.md"
     _write_document(task_file, task_body)
@@ -224,8 +224,10 @@ def test_execution_environment_and_model_resolution(
 def test_atomic_approve_and_failed_run_preserve_clean_base(tmp_path: Path) -> None:
     """Verify failed mt approve and failed mt run do not mutate BaseBranch files."""
     _seed_minimal_policies(tmp_path)
-    real_schemas = load_yaml_file(REPOSITORY_ROOT / "policy/schemas.yaml")
-    _write_document(tmp_path / "policy/schemas.yaml", yaml.safe_dump(real_schemas))
+    real_schemas = load_yaml_file(REPOSITORY_ROOT / "policy/artifact_schemas.yaml")
+    _write_document(
+        tmp_path / "policy/artifact_schemas.yaml", yaml.safe_dump(real_schemas)
+    )
     requirement_file = tmp_path / "artifacts/requirements/REQ-001.md"
     _write_document(requirement_file, "---\nid: REQ-001\nstatus: draft\n---\n")
     assert main(["approve", "REQ-001", "--root", str(tmp_path)]) == 1
@@ -273,7 +275,7 @@ def test_modular_refactoring_and_file_size_ceilings(tmp_path: Path) -> None:
         assert callable(getattr(code_git_trace, func_name, None))
         assert not hasattr(traceability_module, func_name)
     root = Path(__file__).resolve().parent.parent
-    limits_policy = load_yaml_file(root / "policy" / "limits.yaml")["source_code"]
+    limits_policy = load_yaml_file(root / "policy" / "code_limits.yaml")["source_code"]
     max_lines = int(limits_policy["max_file_lines"])
     assert max_lines == 500 and int(limits_policy["refactor_target_file_lines"]) == 400
     for folder in ("src", "tests"):
