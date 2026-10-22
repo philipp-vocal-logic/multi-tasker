@@ -125,3 +125,55 @@ def test_stage_agent_escalation_persistence_routing_and_rejection(
     )
     assert not (tmp_path / "artifacts/escalations/ESC-009.md").exists()
     assert any(item.rule_id != "GATE_TASK_ESCALATED" for item in bad_findings)
+
+
+@traces("REQ-043", "AC-01", "SPEC-043")
+@traces("REQ-043", "AC-02", "SPEC-043")
+@traces("REQ-043", "AC-03", "SPEC-043")
+def test_declarative_pipeline_max_workers_forwarding_and_failure_halt(
+    tmp_path: Path,
+) -> None:
+    """Verify mt run --pipeline forwards max_workers, defaults to 1, and halts."""
+    from multi_tasker.cli.main import main
+    from multi_tasker.domain.models import Finding
+    from multi_tasker.orchestrator import stage_runner
+
+    _seed_test_repository(tmp_path)
+    for idx, mod_name in ((1, "src/a.py"), (2, "src/b.py")):
+        (tmp_path / "artifacts" / "tasks" / f"TASK-00{idx}.md").write_text(
+            f"---\nid: TASK-00{idx}\ntitle: Parallel Task {idx}\n"
+            "type: implementation\nstatus: ready\ntraces_to: [SPEC-001]\n"
+            f"depends_on: []\nrequired_files: []\nwrite_files: [{mod_name}]\n"
+            "verification_cmd: pytest\n---\n"
+            "## Objective\nObj.\n\n## Scoped Instructions\nInst.\n",
+            encoding="utf-8",
+        )
+    recorded_workers: list[int] = []
+    original_runner = stage_runner.run_scheduled_tasks
+
+    def fake_scheduled(
+        root: Path,
+        max_workers: int = 1,
+        cmd: str | None = None,
+        model: str | None = None,
+        env: str | None = None,
+    ) -> tuple[list[str], list[Finding]]:
+        _ = (root, cmd, model, env)
+        recorded_workers.append(max_workers)
+        if max_workers == 3:
+            return [], [Finding("verification_cmd", 1, "GATE_VERIFY_CMD_FAILED", "err")]
+        return ["TASK-001", "TASK-002"], []
+
+    stage_runner.run_scheduled_tasks = fake_scheduled
+    try:
+        done_default, err_default = stage_runner.run_declarative_pipeline(tmp_path)
+        assert done_default == ["TASK-001", "TASK-002"] and err_default == []
+        assert recorded_workers[-1] == 1
+        run_two = ["run", "--pipeline", "--max-workers", "2", "--root", str(tmp_path)]
+        assert main(run_two) == 0
+        assert recorded_workers[-1] == 2
+        run_three = ["run", "--pipeline", "--max-workers", "3", "--root", str(tmp_path)]
+        assert main(run_three) == 1
+        assert recorded_workers[-1] == 3
+    finally:
+        stage_runner.run_scheduled_tasks = original_runner
