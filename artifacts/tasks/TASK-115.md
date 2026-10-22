@@ -2,16 +2,16 @@
 id: TASK-115
 title: Add Data-Driven E2E Pipeline Combination TestContracts
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-046
-  - SPEC-046
+- REQ-046
+- SPEC-046
 depends_on: []
 required_files:
-  - artifacts/requirements/REQ-046.md
-  - artifacts/specifications/SPEC-046.md
+- artifacts/requirements/REQ-046.md
+- artifacts/specifications/SPEC-046.md
 write_files:
-  - tests/test_pipeline_combinations.py
+- tests/test_pipeline_combinations.py
 verification_cmd: python3 -m py_compile tests/test_pipeline_combinations.py
 ---
 ## Objective
