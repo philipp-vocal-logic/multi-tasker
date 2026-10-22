@@ -22,8 +22,8 @@ from multi_tasker.orchestrator.lifecycle import (
     bootstrap_evaluation_repository,
     create_intent,
     initialize_repository,
-    resolve_escalation,
 )
+from multi_tasker.orchestrator.router import resolve_escalation
 from multi_tasker.orchestrator.lineage import trace_lineage
 from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
 from multi_tasker.orchestrator.scheduler import (

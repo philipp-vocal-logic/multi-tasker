@@ -24,10 +24,7 @@ from multi_tasker.orchestrator.interaction_logger import (
     merge_worktree_task_logs,
     record_task_event,
 )
-from multi_tasker.orchestrator.lifecycle import (
-    approve_stage_artifact,
-    evaluate_review_verdict,
-)
+from multi_tasker.orchestrator.lifecycle import approve_stage_artifact
 from multi_tasker.orchestrator.merge_gate import (
     GateOutcome,
     GateRequest,
@@ -39,6 +36,7 @@ from multi_tasker.orchestrator.prompt_builder import (
 )
 from multi_tasker.orchestrator.router import (
     CATEGORY_ROUTES,
+    evaluate_review_verdict,
     find_actionable_stage_target,
 )
 from multi_tasker.orchestrator.task_runner import run_scheduled_tasks

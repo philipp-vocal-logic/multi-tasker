@@ -4,12 +4,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from multi_tasker.checkers.runner import run_checks
+from multi_tasker.domain.models import ArtifactDocument, Finding
 from multi_tasker.domain.parser import (
     load_artifacts_by_id,
     load_pipeline_policy,
+    load_state_transitions,
     parse_artifact_file,
+    update_artifact_frontmatter,
 )
-from multi_tasker.orchestrator.scheduler import select_parallel_batch
+from multi_tasker.orchestrator.scheduler import (
+    compute_dirty_subgraph,
+    select_parallel_batch,
+)
+from multi_tasker.orchestrator.worktree import commit_traceable_change
 
 
 @dataclass(frozen=True)
@@ -126,3 +134,132 @@ def find_actionable_stage_target(
         ):
             return artifact_id
     return None
+
+
+def check_transition(
+    repository_root: Path, document: ArtifactDocument, target_state: str
+) -> list[Finding]:
+    """Validate artifact status transition against schemas or permissions policy."""
+    current_state = str(document.frontmatter.get("status", ""))
+    if not current_state:
+        return []
+    transitions = load_state_transitions(repository_root)
+    allowed = transitions.get(document.artifact_type, {}).get(current_state)
+    if isinstance(allowed, set) and target_state not in allowed:
+        message = f"Invalid state transition '{current_state}' -> '{target_state}'."
+        return [Finding(document.path, 1, "PERM_INVALID_STATE_TRANSITION", message)]
+    return []
+
+
+def _create_review_escalation(
+    repository_root: Path, artifact_id: str, rev_path: str
+) -> list[Finding]:
+    """Create an awaiting_human review_exhausted Escalation and block artifact_id."""
+    by_id = load_artifacts_by_id(repository_root)
+    esc_nums = [
+        int(key.split("-")[1])
+        for key in by_id
+        if key.startswith("ESC-") and key.split("-")[1].isdigit()
+    ]
+    esc_id = f"ESC-{max(esc_nums, default=0) + 1:03d}"
+    esc_rel = f"artifacts/escalations/{esc_id}.md"
+    (repository_root / esc_rel).write_text(
+        f"---\nid: {esc_id}\nsource_agent: orchestrator\n"
+        f"task_or_stage: {artifact_id}\naffected_artifacts: [{artifact_id}]\n"
+        "reason_category: review_exhausted\nstatus: awaiting_human\n"
+        "resolved_by: null\n---\n"
+        f"## Blocking Problem\nReview cycles exhausted for {artifact_id}.\n",
+        encoding="utf-8",
+    )
+    target_doc = by_id.get(artifact_id)
+    if target_doc is not None:
+        update_artifact_frontmatter(
+            repository_root / target_doc.path, {"status": "blocked"}
+        )
+    changed = [
+        esc_rel,
+        *([target_doc.path] if target_doc is not None else []),
+    ]
+    subject = (
+        f"{esc_id}: Escalate {artifact_id} review [traces: {artifact_id}, {esc_id}]"
+    )
+    commit_traceable_change(repository_root, changed, subject)
+    message = f"Review cycles exhausted for '{artifact_id}' ({esc_id})."
+    return [Finding(rev_path, 1, "STAGE_REVIEW_EXHAUSTED", message)]
+
+
+def evaluate_review_verdict(
+    repository_root: Path, artifact_id: str, rev_id: str
+) -> list[Finding]:
+    """Check REV verdict for artifact_id and emit Finding or escalation on fail."""
+    by_id = load_artifacts_by_id(repository_root)
+    rev_doc = by_id.get(rev_id)
+    if rev_doc is None or rev_doc.frontmatter.get("verdict") == "pass":
+        return []
+    fail_count = sum(
+        1
+        for doc in by_id.values()
+        if doc.artifact_type == "REV"
+        and doc.frontmatter.get("verdict") == "fail"
+        and artifact_id
+        in {str(item) for item in doc.frontmatter.get("target_artifacts", [])}
+    )
+    bounds = load_pipeline_policy(repository_root).get("execution_bounds", {})
+    if fail_count >= int(bounds.get("max_review_cycles", 2)):
+        return _create_review_escalation(repository_root, artifact_id, rev_doc.path)
+    message = f"Review '{rev_id}' rejected '{artifact_id}'."
+    return [Finding(rev_doc.path, 1, "STAGE_REVIEW_REJECTED", message)]
+
+
+def _mark_dirty_subgraph(
+    repository_root: Path,
+    by_identifier: dict[str, ArtifactDocument],
+    changed_id: str,
+) -> None:
+    """Mark downstream approved SPEC and done TASK artifacts as needs_update."""
+    for dirty_id in compute_dirty_subgraph(repository_root, changed_id):
+        doc = by_identifier.get(dirty_id)
+        if doc and doc.frontmatter.get("status") in {"approved", "done"}:
+            update_artifact_frontmatter(
+                repository_root / doc.path, {"status": "needs_update"}
+            )
+
+
+def resolve_escalation(
+    repository_root: Path, escalation_id: str, resolved_by: str
+) -> list[Finding]:
+    """Resolve an Escalation with a Decision or Task and propagate dirty flags."""
+    by_identifier = load_artifacts_by_id(repository_root)
+    escalation = by_identifier.get(escalation_id)
+    resolution = by_identifier.get(resolved_by)
+    if escalation is None or escalation.artifact_type != "ESC":
+        message = f"Escalation '{escalation_id}' not found."
+        return [Finding(escalation_id, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
+    if resolution is None or resolution.artifact_type not in {"DEC", "TASK"}:
+        message = f"Resolving Decision or Task '{resolved_by}' not found."
+        return [Finding(resolved_by, 1, "CLI_ARTIFACT_NOT_FOUND", message)]
+    errors = check_transition(repository_root, escalation, "resolved")
+    if (
+        resolution.artifact_type == "DEC"
+        and resolution.frontmatter.get("status") != "approved"
+    ):
+        errors.extend(check_transition(repository_root, resolution, "approved"))
+    if errors:
+        return errors
+    findings = run_checks(
+        repository_root,
+        ["glossary", "schemas", "traceability"],
+        target_paths=[resolution.path],
+    )
+    if findings:
+        return findings
+    if resolution.artifact_type == "DEC":
+        update_artifact_frontmatter(
+            repository_root / resolution.path, {"status": "approved"}
+        )
+    update_artifact_frontmatter(
+        repository_root / escalation.path,
+        {"status": "resolved", "resolved_by": resolved_by},
+    )
+    _mark_dirty_subgraph(repository_root, by_identifier, resolved_by)
+    return []

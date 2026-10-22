@@ -2,7 +2,7 @@
 id: TASK-104
 title: Move Review Verdict and Escalation Resolution from Lifecycle to Router
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-041
 - SPEC-041
