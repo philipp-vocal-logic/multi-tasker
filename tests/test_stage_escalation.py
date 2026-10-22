@@ -79,7 +79,7 @@ def _seed_stage_escalation_targets(tmp_path: Path) -> str:
         "'---\\nid: ESC-001\\nsource_agent: requirement-agent\\n"
         "task_or_stage: INT-001\\naffected_artifacts: [INT-001]\\n"
         "reason_category: ambiguity\\nstatus: open\\nresolved_by: null\\n---\\n"
-        "## Blocking Problem\\nNeed clarification on intent scope.\\n')\""
+        "## Blocking Problem\\nRequire clarification on intent scope.\\n')\""
     )
 
 
