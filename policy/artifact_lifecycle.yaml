@@ -1,0 +1,97 @@
+# Artifact Lifecycle State Transitions, Declarative Pipeline Stages & Escalation Routing Policy
+# Enforced deterministically by `mt check schemas` and `mt check permissions` and executed by `mt run --pipeline`.
+version: 1
+
+state_transitions:
+  INT:
+    open: ["processing", "processed"]
+    processing: ["open", "processed"]
+    processed: []
+  REQ:
+    draft: ["in_review", "awaiting_human", "blocked", "approved"]
+    in_review: ["draft", "blocked", "awaiting_human", "approved"]
+    awaiting_human: ["draft", "approved"]
+    blocked: ["draft"]
+    approved: ["needs_update", "deprecated"]
+    needs_update: ["draft"]
+    deprecated: []
+  SPEC:
+    draft: ["in_review", "blocked", "approved"]
+    in_review: ["draft", "blocked", "approved"]
+    blocked: ["draft"]
+    approved: ["needs_update", "deprecated"]
+    needs_update: ["draft"]
+    deprecated: []
+  TASK:
+    planned: ["ready", "in_progress"]
+    ready: ["in_progress"]
+    in_progress: ["planned", "in_review", "blocked", "done"]
+    in_review: ["in_progress", "blocked", "done"]
+    blocked: ["planned", "ready"]
+    done: ["needs_update"]
+    needs_update: ["planned"]
+  ESC:
+    open: ["routed_to_agent", "awaiting_human", "resolved"]
+    routed_to_agent: ["awaiting_human", "resolved"]
+    awaiting_human: ["resolved"]
+    resolved: []
+  DEC:
+    draft: ["approved"]
+    approved: ["superseded"]
+    superseded: []
+
+execution_bounds:
+  max_steps_per_run: 20
+  max_auto_reroutes: 1
+  max_review_cycles: 2
+
+stages:
+  - id: "intent_to_requirement"
+    trigger_type: "INT"
+    trigger_states: ["open"]
+    downstream_type: "REQ"
+    agent_role: "requirement-agent"
+    approval_gate: "human"
+
+  - id: "requirement_to_specification"
+    trigger_type: "REQ"
+    trigger_states: ["approved", "needs_update"]
+    downstream_type: "SPEC"
+    agent_role: "specification-agent"
+    approval_gate: "review-agent"
+
+  - id: "specification_to_tasks"
+    trigger_type: "SPEC"
+    trigger_states: ["approved", "needs_update"]
+    downstream_type: "TASK"
+    agent_role: "planner-agent"
+    approval_gate: "review-agent"
+
+  - id: "execute_tasks"
+    trigger_type: "TASK"
+    trigger_states: ["planned", "ready"]
+    downstream_type: "TASK"
+    agent_role: "worker-agent"
+    approval_gate: "auto"
+
+escalation_routes:
+  infeasible_scope:
+    target_actor: "planner-agent"
+    next_status: "routed_to_agent"
+    action: "rescope_task"
+  test_contract_defect:
+    target_actor: "review-agent"
+    next_status: "routed_to_agent"
+    action: "verify_test_contract"
+  ambiguity:
+    target_actor: "human"
+    next_status: "awaiting_human"
+    action: "require_decision"
+  rule_conflict:
+    target_actor: "human"
+    next_status: "awaiting_human"
+    action: "require_decision"
+  review_exhausted:
+    target_actor: "human"
+    next_status: "awaiting_human"
+    action: "require_decision"

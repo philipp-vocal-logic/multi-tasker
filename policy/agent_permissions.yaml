@@ -1,0 +1,83 @@
+# Agent Read/Write & State-Based Permission Policy
+# Enforced deterministically by `mt check permissions` on a verified clean Worktree against BaseBranch.
+version: 1
+
+global_forbidden_write:
+  - "policy/**"
+  - ".git/**"
+  - "artifacts/intents/INT-*.md"     # Exclusively created by Human via `mt intent`
+  - "artifacts/decisions/DEC-*.md"   # Exclusively authored/approved by Human via `mt resolve`
+
+escalation_exclusivity:
+  # When an agent emits an Escalation, ZERO other files may be created or modified in that Worktree.
+  forbid_domain_writes_when_escalating: true
+  max_escalation_files_per_run: 1
+
+agents:
+  requirement-agent:
+    read_scope:
+      - "**/*"
+    allowed_write:
+      - path: "artifacts/requirements/REQ-*.md"
+        allow_create: true
+        allowed_existing_states: ["draft", "needs_update"]
+        allowed_target_states: ["draft", "in_review"]
+    escalation_write:
+      - path: "artifacts/escalations/ESC-*.md"
+        allow_create: true
+        allowed_existing_states: []
+        allowed_target_states: ["open"]
+
+  specification-agent:
+    read_scope:
+      - "**/*"
+    allowed_write:
+      - path: "artifacts/specifications/SPEC-*.md"
+        allow_create: true
+        allowed_existing_states: ["draft", "needs_update"]
+        allowed_target_states: ["draft", "in_review"]
+    escalation_write:
+      - path: "artifacts/escalations/ESC-*.md"
+        allow_create: true
+        allowed_existing_states: []
+        allowed_target_states: ["open"]
+
+  planner-agent:
+    read_scope:
+      - "**/*"
+    allowed_write:
+      - path: "artifacts/tasks/TASK-*.md"
+        allow_create: true
+        allowed_existing_states: ["planned", "blocked", "needs_update"]
+        allowed_target_states: ["planned", "ready"]
+    escalation_write:
+      - path: "artifacts/escalations/ESC-*.md"
+        allow_create: true
+        allowed_existing_states: []
+        allowed_target_states: ["open"]
+
+  worker-agent:
+    read_scope:
+      - "**/*"
+    allowed_write:
+      - path: "$TASK_WRITE_FILES"
+        allow_create: true
+        require_task_state: "in_progress"
+        task_type_path_constraints:
+          test_contract: ["tests/**"]
+          implementation: ["src/**"]
+        forbid_locked_test_contracts: true
+    escalation_write:
+      - path: "artifacts/escalations/ESC-*.md"
+        allow_create: true
+        allowed_existing_states: []
+        allowed_target_states: ["open"]
+
+  review-agent:
+    read_scope:
+      - "**/*"
+    allowed_write:
+      - path: "artifacts/reviews/REV-*.md"
+        allow_create: true
+        allowed_existing_states: []  # Append-only; prior ReviewRecords are never modified
+    escalation_write: []

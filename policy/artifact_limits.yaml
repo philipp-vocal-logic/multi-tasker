@@ -1,0 +1,71 @@
+# Artifact Section Structure, Word & Collection Sizing Limits Policy
+# Enforced deterministically by `mt check schemas`.
+version: 1
+
+artifacts:
+  INT:
+    max_body_words: 150
+
+  REQ:
+    max_acceptance_criteria: 5
+    max_criterion_words: 45
+    required_sections:
+      - "Statement"
+      - "Impact Analysis"
+    sections:
+      Statement:
+        max_words: 60
+        max_lines: 6
+      Impact Analysis:
+        max_words: 120
+        max_lines: 12
+
+  SPEC:
+    required_sections:
+      - "Design Overview"
+      - "Public Interfaces"
+      - "Test Contract Mapping"
+    sections:
+      Design Overview:
+        max_words: 150
+        max_lines: 15
+      Public Interfaces:
+        max_lines: 60
+      Test Contract Mapping:
+        max_words: 150
+        max_lines: 20
+
+  TASK:
+    max_write_files: 8
+    max_required_files: 10
+    required_sections:
+      - "Objective"
+      - "Scoped Instructions"
+    sections:
+      Objective:
+        max_words: 50
+        max_lines: 5
+      Scoped Instructions:
+        max_words: 120
+        max_lines: 15
+
+  ESC:
+    required_sections:
+      - "Blocking Problem"
+    sections:
+      Blocking Problem:
+        max_words: 80
+        max_lines: 8
+        single_paragraph_only: true
+
+  DEC:
+    required_sections:
+      - "Resolution"
+    sections:
+      Resolution:
+        max_words: 100
+        max_lines: 10
+
+  REV:
+    max_finding_words: 30
+    max_findings_per_record: 10

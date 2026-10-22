@@ -13,15 +13,15 @@ Never edit `src/**`, `tests/**`, or completed (`done`) `TASK-NNN.md` artifacts a
 3. **Specification (`SPEC-NNN`)**: Author `artifacts/specifications/SPEC-NNN.md` (`status: draft`, `traces_to: [REQ-NNN]`), mapping all `REQ-NNN:AC-XX` criteria and declaring `target_files.tests` and `target_files.implementation`, and run `./mt approve SPEC-NNN` (transitions `SPEC-NNN` to `approved`).
 4. **Tasks (`TASK-NNN`)**:
    - Create a `type: test_contract` Task (`write_files` under `tests/**` only) with `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")` tests.
-   - Create `type: implementation` Tasks (`depends_on` the `test_contract` Task, `write_files` under `src/**` only, respecting `max_write_files` and `max_required_files` in `policy/schemas.yaml`).
-5. **Isolated Execution, Review Gates & Diagnostics (`./mt run`)**: Execute planned Tasks (`./mt run`), individual agent stages (`./mt run --agent <role> --target <id>`), or the full declarative pipeline (`./mt run --pipeline`, governed by `policy/pipeline.yaml` `approval_gate` and `escalation_routes` with append-only `REV-*.md` verdicts) through the `Worktree` and `MergeGate` so each stage or Task produces a dedicated, scope-verified commit. Inspect `.report/logs/tasks/<TARGET-ID>.jsonl` and `.report/logs/events.jsonl` to diagnose agent subprocess, in-`Worktree` CLI, or `MergeGate` failures.
+   - Create `type: implementation` Tasks (`depends_on` the `test_contract` Task, `write_files` under `src/**` only, respecting `max_write_files` and `max_required_files` in `policy/artifact_limits.yaml` and `policy/artifact_schemas.yaml`).
+5. **Isolated Execution, Review Gates & Diagnostics (`./mt run`)**: Execute planned Tasks (`./mt run`), individual agent stages (`./mt run --agent <role> --target <id>`), or the full declarative pipeline (`./mt run --pipeline`, governed by `policy/artifact_lifecycle.yaml` `approval_gate` and `escalation_routes` with append-only `REV-*.md` verdicts) through the `Worktree` and `MergeGate` so each stage or Task produces a dedicated, scope-verified commit. Inspect `.report/logs/tasks/<TARGET-ID>.jsonl` and `.report/logs/events.jsonl` to diagnose agent subprocess, in-`Worktree` CLI, or `MergeGate` failures.
 
 ## 3. Architecture, Sizing Limits & Anti-Loop Rules
 - **Zero-Noise Gate (`./mt check all`)**: All policies, artifacts, tests, and Git commits must pass `./mt check all` with a zero exit code and empty `stdout`.
-- **Layer Boundaries (`policy/architecture.yaml`)**:
+- **Layer Boundaries (`policy/code_architecture.yaml`)**:
   ```mermaid
   flowchart RL
       tests["tests"] --> cli["cli"] --> orchestrator["orchestrator"] --> checkers["checkers"] --> domain["domain"]
   ```
-- **Dynamic Policy Configuration (`policy/limits.yaml`, `policy/clean_code.yaml`, `policy/schemas.yaml`, `policy/permissions.yaml`, `policy/pipeline.yaml`)**: All file, function, argument, complexity, docstring, inline comment, artifact section, per-role model, stage approval gate, and escalation/review bounds are governed exclusively by `policy/*.yaml` (inspect active values via `./mt prompt <role>` or `./mt documentation`).
+- **Dynamic Policy Configuration (`policy/code_limits.yaml`, `policy/code_quality.yaml`, `policy/artifact_schemas.yaml`, `policy/artifact_limits.yaml`, `policy/artifact_lifecycle.yaml`, `policy/agent_permissions.yaml`, `policy/agent_execution.yaml`)**: All file, function, argument, complexity, docstring, inline comment, artifact section, per-role model, stage approval gate, and escalation/review bounds are governed exclusively by `policy/*.yaml` (inspect active values via `./mt prompt <role>` or `./mt documentation`).
 - **Decompose, Never Line-Golf (One-Strike Circuit Breaker)**: `mt check clean_code` formats Python files in-place via `ruff format --quiet` before `mt check limits` measures lines. If an edit fails `LIMIT_FILE_LINES`, `LIMIT_FUNC_LINES`, or `CODE_C901` once, stop editing in-place and extract a helper function or module immediately.

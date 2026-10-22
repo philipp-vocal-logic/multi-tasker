@@ -1,0 +1,37 @@
+# Agent Runtime Execution, LLM Models & Clean Worktree Invariants Policy
+# Validated by `mt check permissions` and enforced by Orchestrator Worktree/Stage runners.
+version: 1
+
+clean_repo_invariants:
+  require_empty_git_status_before_worktree: true
+  require_empty_git_status_before_merge: true
+  verify_policy_dir_sha256_unchanged: true
+  chmod_readonly_paths_in_worktree:
+    - "policy"
+
+execution_environments:
+  default_environment: "agy"
+  default_model: "gemini-3.8-flash-high"
+  environments:
+    agy: "agy --mode accept-edits --dangerously-skip-permissions --model {model} --print \"Execute Task {task_id} following {prompt_file}\""
+
+agents:
+  requirement-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
+
+  specification-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
+
+  planner-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true
+
+  worker-agent:
+    model: "gemini-3.8-flash-high"
+    worktree_execution: true
+
+  review-agent:
+    model: "gemini-4-argon"
+    worktree_execution: true

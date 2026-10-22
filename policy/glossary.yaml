@@ -305,7 +305,7 @@ terms:
     category: "enforcement"
     definition: >
       The deterministic verification barrier in the Orchestrator that validates a clean
-      Worktree against `policy/permissions.yaml`, `mt check`, `verification_cmd`, and
+      Worktree against `policy/agent_permissions.yaml`, `mt check`, `verification_cmd`, and
       ReviewRecord approval before fast-forward merging onto the BaseBranch.
     allowed_forms: ["MergeGate", "MergeGates", "Merge Gate", "Merge Gates", "merge_gate"]
     code_identifiers: ["MergeGate", "merge_gate"]
@@ -343,7 +343,7 @@ terms:
   - canonical: "WriteScope"
     category: "enforcement"
     definition: >
-      The explicit set of file paths or globs (`allowed_write` in `policy/permissions.yaml`
+      The explicit set of file paths or globs (`allowed_write` in `policy/agent_permissions.yaml`
       or `write_files` in `TASK-NNN.md`) that an agent is permitted to create or modify.
     allowed_forms: ["WriteScope", "Write Scope", "write_scope", "write_files", "allowed_write"]
     code_identifiers: ["WriteScope", "write_scope", "write_files", "allowed_write"]

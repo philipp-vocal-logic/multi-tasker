@@ -1,0 +1,197 @@
+# Artifact Frontmatter JSON Schemas & Path Globs Policy
+# Enforced deterministically by `mt check schemas` via PyYAML and stdlib JSON-Schema validation.
+version: 1
+
+schemas:
+  INT:
+    path_glob: "artifacts/intents/INT-*.md"
+    json_schema:
+      type: "object"
+      required: ["id", "status", "created_at"]
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^INT-[0-9]{3,}$" }
+        status: { type: "string", enum: ["open", "processing", "processed"] }
+        created_at: { type: "string" }
+
+  REQ:
+    path_glob: "artifacts/requirements/REQ-*.md"
+    json_schema:
+      type: "object"
+      required: ["id", "title", "status", "traces_to", "decisions", "acceptance_criteria", "version"]
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^REQ-[0-9]{3,}$" }
+        title: { type: "string", minLength: 5, maxLength: 100 }
+        status:
+          type: "string"
+          enum: ["draft", "in_review", "awaiting_human", "blocked", "approved", "needs_update", "deprecated"]
+        traces_to:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^INT-[0-9]{3,}$" }
+        decisions:
+          type: "array"
+          items: { type: "string", pattern: "^DEC-[0-9]{3,}$" }
+        supersedes:
+          type: "array"
+          items: { type: "string", pattern: "^REQ-[0-9]{3,}$" }
+        acceptance_criteria:
+          type: "array"
+          minItems: 1
+          maxItems: 5
+          items:
+            type: "object"
+            required: ["id", "given", "when", "then"]
+            additionalProperties: false
+            properties:
+              id: { type: "string", pattern: "^AC-[0-9]{2,}$" }
+              given: { type: "string", minLength: 3 }
+              when: { type: "string", minLength: 3 }
+              then: { type: "string", minLength: 3 }
+        version: { type: "integer", minimum: 1 }
+
+  SPEC:
+    path_glob: "artifacts/specifications/SPEC-*.md"
+    json_schema:
+      type: "object"
+      required: ["id", "title", "status", "traces_to", "covers_criteria", "decisions", "target_files"]
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^SPEC-[0-9]{3,}$" }
+        title: { type: "string", minLength: 5, maxLength: 100 }
+        status:
+          type: "string"
+          enum: ["draft", "in_review", "blocked", "approved", "needs_update", "deprecated"]
+        traces_to:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^REQ-[0-9]{3,}$" }
+        covers_criteria:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^REQ-[0-9]{3,}:AC-[0-9]{2,}$" }
+        decisions:
+          type: "array"
+          items: { type: "string", pattern: "^DEC-[0-9]{3,}$" }
+        target_files:
+          type: "object"
+          required: ["tests", "implementation"]
+          additionalProperties: false
+          properties:
+            tests:
+              type: "array"
+              minItems: 1
+              items: { type: "string", pattern: "^tests/.+\\.py$" }
+            implementation:
+              type: "array"
+              minItems: 1
+              items: { type: "string", pattern: "^src/.+\\.py$" }
+
+  TASK:
+    path_glob: "artifacts/tasks/TASK-*.md"
+    json_schema:
+      type: "object"
+      required:
+        - "id"
+        - "title"
+        - "type"
+        - "status"
+        - "traces_to"
+        - "depends_on"
+        - "required_files"
+        - "write_files"
+        - "verification_cmd"
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^TASK-[0-9]{3,}$" }
+        title: { type: "string", minLength: 5, maxLength: 100 }
+        type: { type: "string", enum: ["test_contract", "implementation"] }
+        status:
+          type: "string"
+          enum: ["planned", "ready", "in_progress", "in_review", "blocked", "done", "needs_update"]
+        traces_to:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^(REQ|SPEC)-[0-9]{3,}$" }
+        depends_on:
+          type: "array"
+          items: { type: "string", pattern: "^TASK-[0-9]{3,}$" }
+        required_files:
+          type: "array"
+          maxItems: 10
+          items: { type: "string" }
+        write_files:
+          type: "array"
+          minItems: 1
+          maxItems: 8
+          items: { type: "string" }
+        verification_cmd: { type: "string", minLength: 3 }
+        model: { type: "string", minLength: 3 }
+        execution_environment: { type: "string", minLength: 2 }
+
+  ESC:
+    path_glob: "artifacts/escalations/ESC-*.md"
+    json_schema:
+      type: "object"
+      required:
+        - "id"
+        - "source_agent"
+        - "task_or_stage"
+        - "affected_artifacts"
+        - "reason_category"
+        - "status"
+        - "resolved_by"
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^ESC-[0-9]{3,}$" }
+        source_agent:
+          type: "string"
+          enum: ["requirement-agent", "specification-agent", "planner-agent", "worker-agent", "orchestrator"]
+        task_or_stage: { type: "string" }
+        affected_artifacts:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^(INT|REQ|SPEC|TASK)-[0-9]{3,}$" }
+        reason_category:
+          type: "string"
+          enum: ["ambiguity", "rule_conflict", "infeasible_scope", "test_contract_defect", "review_exhausted"]
+        status: { type: "string", enum: ["open", "routed_to_agent", "awaiting_human", "resolved"] }
+        resolved_by:
+          type: ["string", "null"]
+          pattern: "^(DEC|TASK)-[0-9]{3,}$"
+
+  DEC:
+    path_glob: "artifacts/decisions/DEC-*.md"
+    json_schema:
+      type: "object"
+      required: ["id", "resolves", "applies_to", "status"]
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^DEC-[0-9]{3,}$" }
+        resolves: { type: "string", pattern: "^ESC-[0-9]{3,}$" }
+        applies_to:
+          type: "array"
+          minItems: 1
+          items: { type: "string", pattern: "^(REQ|SPEC|TASK)-[0-9]{3,}$" }
+        status: { type: "string", enum: ["draft", "approved", "superseded"] }
+
+  REV:
+    path_glob: "artifacts/reviews/REV-*.md"
+    json_schema:
+      type: "object"
+      required: ["id", "target_artifacts", "stage", "verdict", "findings"]
+      additionalProperties: false
+      properties:
+        id: { type: "string", pattern: "^REV-[A-Z0-9-]+$" }
+        target_artifacts:
+          type: "array"
+          minItems: 1
+          items: { type: "string" }
+        stage:
+          type: "string"
+          enum: ["requirement", "specification", "task_plan", "test_contract", "implementation"]
+        verdict: { type: "string", enum: ["pass", "fail"] }
+        findings:
+          type: "array"
+          items: { type: "string" }
