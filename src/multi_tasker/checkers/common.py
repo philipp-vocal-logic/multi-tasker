@@ -133,26 +133,30 @@ def format_python_files(
     repository_root: Path,
     targets: list[str],
     ruff_configuration: dict[str, Any],
-) -> None:
+) -> list[Finding]:
     """Format target Python files in-place using ruff format when enabled."""
     format_command = [
         str(part)
         for part in ruff_configuration.get("format_cmd", ["ruff", "format", "--quiet"])
     ]
     executable = format_command[0] if format_command else "ruff"
-    if (
-        not targets
-        or not ruff_configuration.get("enabled", True)
-        or not shutil.which(executable)
-    ):
-        return
-    subprocess.run(
+    if not targets or not ruff_configuration.get("enabled", True):
+        return []
+    if not shutil.which(executable):
+        message = f"Linter executable '{executable}' not found in PATH."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_LINTER_MISSING", message)]
+    process = subprocess.run(
         [*format_command, *targets],
         cwd=repository_root,
         capture_output=True,
         text=True,
         check=False,
     )
+    if process.returncode != 0:
+        lines = (process.stderr or process.stdout).strip().splitlines()
+        detail = lines[-1] if lines else f"ruff format exited {process.returncode}."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_RUFF", detail)]
+    return []
 
 
 def extract_test_traces(

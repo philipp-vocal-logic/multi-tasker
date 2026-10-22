@@ -35,22 +35,27 @@ def _run_ruff(
     if not shutil.which(executable):
         message = f"Linter executable '{executable}' not found in PATH."
         return [Finding("policy/code_quality.yaml", 1, "CODE_LINTER_MISSING", message)]
-    format_python_files(repository_root, targets, ruff_configuration)
+    format_findings = format_python_files(repository_root, targets, ruff_configuration)
+    if format_findings:
+        return format_findings
     rules = ",".join(
         str(rule) for rule in ruff_configuration.get("select_rules", ["E", "F"])
     )
     max_complexity = int(ruff_configuration.get("max_mccabe_complexity", 8))
-    command = [
-        *base_command,
-        f"--select={rules}",
-        "--ignore=ANN401",
-        f"--config=lint.mccabe.max-complexity={max_complexity}",
-        *targets,
-    ]
     process = subprocess.run(
-        command, cwd=repository_root, capture_output=True, text=True, check=False
+        [
+            *base_command,
+            f"--select={rules}",
+            "--ignore=ANN401",
+            f"--config=lint.mccabe.max-complexity={max_complexity}",
+            *targets,
+        ],
+        cwd=repository_root,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    return [
+    findings = [
         Finding(
             Path(match.group(1)).as_posix(),
             int(match.group(2)),
@@ -60,6 +65,11 @@ def _run_ruff(
         for raw_line in process.stdout.splitlines()
         if (match := RUFF_LINE_REGEX.match(raw_line.strip()))
     ]
+    if process.returncode != 0 and not findings:
+        lines = (process.stderr or process.stdout).strip().splitlines()
+        detail = lines[-1] if lines else f"ruff exited with code {process.returncode}."
+        return [Finding("policy/code_quality.yaml", 1, "CODE_RUFF", detail)]
+    return findings
 
 
 def _run_mypy(

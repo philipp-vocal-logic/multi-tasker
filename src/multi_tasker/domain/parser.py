@@ -154,17 +154,10 @@ def update_artifact_frontmatter(absolute_path: Path, updates: dict[str, Any]) ->
 
 
 def load_state_transitions(
-    repository_root: Path, fallback_policy: dict[str, Any] | None = None
+    repository_root: Path,
 ) -> dict[str, dict[str, set[str]]]:
     """Extract state_transitions table from policy/artifact_lifecycle.yaml."""
-    lifecycle_path = repository_root / "policy" / "artifact_lifecycle.yaml"
-    source_policy = (
-        load_yaml_file(lifecycle_path)
-        if lifecycle_path.exists()
-        else (fallback_policy or {})
-    )
-    fallback_transitions = (fallback_policy or {}).get("state_transitions", {})
-    raw_transitions = source_policy.get("state_transitions", fallback_transitions)
+    raw_transitions = load_pipeline_policy(repository_root).get("state_transitions", {})
     return {
         str(artifact_type): {
             str(source): {str(target) for target in targets}

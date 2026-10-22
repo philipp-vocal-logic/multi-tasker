@@ -246,7 +246,7 @@ def _evaluate_role_permissions(
 ) -> list[Finding]:
     """Evaluate global forbidden, read_scope, escalation, and write rules."""
     task_id, states = context
-    state_context = (states, load_state_transitions(repository_root, policy))
+    state_context = (states, load_state_transitions(repository_root))
     forbidden: list[str] = policy.get("global_forbidden_write", [])
     read_globs = [str(item) for item in agent_configuration.get("read_scope", ["**/*"])]
     findings = [

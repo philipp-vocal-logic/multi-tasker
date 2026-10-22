@@ -2,7 +2,7 @@
 id: TASK-131
 title: Implement Fail-Clear Ruff Execution and Remove State Transition Fallback Shim
 type: implementation
-status: planned
+status: done
 traces_to:
 - REQ-050
 - SPEC-050
