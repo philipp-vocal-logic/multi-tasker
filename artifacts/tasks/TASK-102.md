@@ -9,13 +9,13 @@ traces_to:
 depends_on:
   - TASK-101
 required_files:
-  - tests/test_lifecycle.py
+  - tests/test_transitions_and_execution.py
   - artifacts/requirements/REQ-040.md
   - artifacts/specifications/SPEC-040.md
 write_files:
   - src/multi_tasker/orchestrator/lineage.py
   - src/multi_tasker/orchestrator/prompt_context.py
-verification_cmd: pytest -o pythonpath=src -q tests/test_lifecycle.py -k superseded_intent_subgraph
+verification_cmd: pytest -o pythonpath=src -q tests/test_transitions_and_execution.py -k superseded_intent_subgraph
 ---
 ## Objective
 Keep `group_artifacts_by_intent` subgraphs disjoint across `supersedes` links in `lineage.py` and inline superseded `Requirement`/`Specification`/`target_files` context in `prompt_context.py`.

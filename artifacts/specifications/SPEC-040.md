@@ -11,7 +11,7 @@ covers_criteria:
 decisions: []
 target_files:
   tests:
-  - tests/test_lifecycle.py
+  - tests/test_transitions_and_execution.py
   implementation:
   - src/multi_tasker/orchestrator/lineage.py
   - src/multi_tasker/orchestrator/prompt_context.py
@@ -30,6 +30,6 @@ def _collect_superseded_context(
 ```
 
 ## Test Contract Mapping
-- `REQ-040:AC-01` -> `tests/test_lifecycle.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
-- `REQ-040:AC-02` -> `tests/test_lifecycle.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
-- `REQ-040:AC-03` -> `tests/test_lifecycle.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
+- `REQ-040:AC-01` -> `tests/test_transitions_and_execution.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
+- `REQ-040:AC-02` -> `tests/test_transitions_and_execution.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
+- `REQ-040:AC-03` -> `tests/test_transitions_and_execution.py::test_superseded_intent_subgraph_separation_and_inlined_spec_context`
