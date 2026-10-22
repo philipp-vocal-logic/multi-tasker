@@ -17,7 +17,7 @@ write_files:
   - src/multi_tasker/checkers/traceability_checker.py
   - src/multi_tasker/orchestrator/prompt_context.py
   - src/multi_tasker/orchestrator/lineage.py
-verification_cmd: pytest -q tests/test_lifecycle.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_lifecycle.py -k requirement_supersession
 ---
 ## Objective
 Implement `supersedes` auto-deprecation in `lifecycle.py`, `deprecated` upstream reference checks in `traceability_checker.py`, and `deprecated` `Requirement` filtering in `prompt_context.py` and `lineage.py`.
