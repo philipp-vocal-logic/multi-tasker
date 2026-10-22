@@ -244,31 +244,43 @@ def _collect_superseded_context(
     return docs, file_lines
 
 
-def render_target_context_section(
-    repository_root: Path,
+def _collect_review_feedback_docs(
     target_document: ArtifactDocument,
     by_identifier: dict[str, ArtifactDocument],
-) -> list[str]:
-    """Render target artifact, upstream artifacts, and required/write/target files."""
-    lines = ["## 4. Scoped Target & Upstream Context", ""]
-    superseded_docs, superseded_files = _collect_superseded_context(
-        repository_root, target_document, by_identifier
-    )
-    upstream_ids = [
-        *target_document.frontmatter.get("traces_to", []),
-        *target_document.frontmatter.get("decisions", []),
+) -> list[ArtifactDocument]:
+    """Return rejected downstream draft artifacts and failed REV documents."""
+    target_id = str(target_document.frontmatter.get("id", ""))
+    downstream_drafts = [
+        doc
+        for _, doc in sorted(by_identifier.items())
+        if str(doc.frontmatter.get("status", "")) in {"draft", "blocked"}
+        and target_id in {str(ref) for ref in doc.frontmatter.get("traces_to", [])}
     ]
-    context_docs = [
-        target_document,
-        *(
-            by_identifier[str(item)]
-            for item in upstream_ids
-            if str(item) in by_identifier
-        ),
-        *superseded_docs,
+    relevant_ids = {
+        target_id,
+        *(str(doc.frontmatter.get("id", "")) for doc in downstream_drafts),
+    }
+    failed_reviews = [
+        doc
+        for _, doc in sorted(by_identifier.items())
+        if doc.artifact_type == "REV"
+        and doc.frontmatter.get("verdict") == "fail"
+        and relevant_ids
+        & {str(ref) for ref in doc.frontmatter.get("target_artifacts", [])}
     ]
-    rendered_paths = {document.path for document in context_docs}
-    for document in context_docs:
+    return [*downstream_drafts, *failed_reviews]
+
+
+def _render_artifact_blocks(
+    repository_root: Path, candidates: list[ArtifactDocument]
+) -> tuple[list[str], set[str]]:
+    """Render deduplicated Markdown artifact blocks and return rendered paths."""
+    lines: list[str] = []
+    rendered_paths: set[str] = set()
+    for document in candidates:
+        if document.path in rendered_paths:
+            continue
+        rendered_paths.add(document.path)
         artifact_id = str(document.frontmatter.get("id", document.path))
         raw = (repository_root / document.path).read_text("utf-8").strip()
         lines.extend(
@@ -281,7 +293,43 @@ def render_target_context_section(
                 "",
             ]
         )
-    lines.extend(_render_existing_requirements_catalog(target_document, by_identifier))
+    return lines, rendered_paths
+
+
+def render_target_context_section(
+    repository_root: Path,
+    target_document: ArtifactDocument,
+    by_identifier: dict[str, ArtifactDocument],
+) -> list[str]:
+    """Render target artifact, upstream artifacts, and required/write/target files."""
+    superseded_docs, superseded_files = _collect_superseded_context(
+        repository_root, target_document, by_identifier
+    )
+    upstream_ids = [
+        *target_document.frontmatter.get("traces_to", []),
+        *target_document.frontmatter.get("decisions", []),
+        *target_document.frontmatter.get("affected_artifacts", []),
+        *target_document.frontmatter.get("target_artifacts", []),
+    ]
+    candidates = [
+        target_document,
+        *(
+            by_identifier[str(item)]
+            for item in upstream_ids
+            if str(item) in by_identifier
+        ),
+        *superseded_docs,
+        *_collect_review_feedback_docs(target_document, by_identifier),
+    ]
+    artifact_lines, rendered_paths = _render_artifact_blocks(
+        repository_root, candidates
+    )
+    lines = [
+        "## 4. Scoped Target & Upstream Context",
+        "",
+        *artifact_lines,
+        *_render_existing_requirements_catalog(target_document, by_identifier),
+    ]
     for path in target_document.frontmatter.get("required_files", []):
         rel_path = str(path)
         if rel_path not in rendered_paths and (repository_root / rel_path).is_file():

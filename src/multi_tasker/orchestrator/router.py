@@ -122,10 +122,22 @@ def find_actionable_stage_target(
     trigger_states = {str(item) for item in stage.get("trigger_states", [])}
     downstream_type = str(stage.get("downstream_type", ""))
     by_id = load_artifacts_by_id(repository_root)
+    failed_targets = {
+        str(target)
+        for doc in by_id.values()
+        if doc.artifact_type == "REV" and doc.frontmatter.get("verdict") == "fail"
+        for target in doc.frontmatter.get("target_artifacts", [])
+    }
+    retry_pending = {
+        doc_id
+        for doc_id, doc in by_id.items()
+        if doc_id in failed_targets
+        and str(doc.frontmatter.get("status", "")) in {"draft", "blocked"}
+    }
     covered = {
         str(upstream)
-        for doc in by_id.values()
-        if doc.artifact_type == downstream_type
+        for doc_id, doc in by_id.items()
+        if doc.artifact_type == downstream_type and doc_id not in retry_pending
         for upstream in doc.frontmatter.get("traces_to", [])
     }
     for artifact_id, doc in sorted(by_id.items()):
@@ -297,3 +309,73 @@ def finalize_stage_escalation(
         f"Stage '{target_id}' escalated to '{route.target_actor}' ({route.action})."
     )
     return [], [Finding(escalation_path, 1, "GATE_TASK_ESCALATED", message)]
+
+
+def dispatch_routed_escalation(
+    repository_root: Path,
+    pipeline: dict[str, Any],
+    options: tuple[str | None, str | None, str | None],
+    stage_executor: Any,
+) -> tuple[list[str], list[Finding]] | None:
+    """Dispatch the first routed_to_agent Escalation via stage_executor."""
+    for esc_id, document in sorted(load_artifacts_by_id(repository_root).items()):
+        if (
+            document.artifact_type != "ESC"
+            or document.frontmatter.get("status") != "routed_to_agent"
+        ):
+            continue
+        category = str(document.frontmatter.get("reason_category", "ambiguity"))
+        routes: dict[str, Any] = pipeline.get("escalation_routes", {})
+        actor = str(
+            routes.get(category, {}).get(
+                "target_actor", CATEGORY_ROUTES.get(category, ("human",))[0]
+            )
+        )
+        if actor == "human":
+            update_artifact_frontmatter(
+                repository_root / document.path, {"status": "awaiting_human"}
+            )
+            commit_traceable_change(
+                repository_root,
+                [document.path],
+                f"{esc_id}: Route escalation to human [traces: {esc_id}]",
+            )
+            return None
+        produced, findings = stage_executor(repository_root, actor, esc_id, options)
+        next_state = "awaiting_human" if findings else "resolved"
+        resolved_by = (
+            produced[0]
+            if not findings and produced and produced[0].startswith(("DEC-", "TASK-"))
+            else None
+        )
+        update_artifact_frontmatter(
+            repository_root / document.path,
+            {"status": next_state, "resolved_by": resolved_by},
+        )
+        commit_traceable_change(
+            repository_root,
+            [document.path],
+            f"{esc_id}: Resolve escalation via {actor} [traces: {esc_id}]",
+        )
+        return [esc_id, *produced], findings
+    return None
+
+
+def reset_rejected_stage_artifacts(repository_root: Path, produced: list[str]) -> None:
+    """Reset review-rejected REQ/SPEC to draft and TASK to blocked on BaseBranch."""
+    by_id = load_artifacts_by_id(repository_root)
+    changed: list[str] = []
+    for artifact_id in produced:
+        doc = by_id.get(artifact_id)
+        if doc and doc.artifact_type in {"REQ", "SPEC", "TASK"}:
+            reset_state = "blocked" if doc.artifact_type == "TASK" else "draft"
+            update_artifact_frontmatter(
+                repository_root / doc.path, {"status": reset_state}
+            )
+            changed.append(doc.path)
+    if changed and produced:
+        subject = (
+            f"{produced[0]}: Reset rejected stage artifact "
+            f"[traces: {', '.join(produced)}]"
+        )
+        commit_traceable_change(repository_root, changed, subject)

@@ -15,7 +15,6 @@ from multi_tasker.domain.parser import (
     load_yaml_file,
     normalize_new_stage_artifacts,
     parse_artifact_file,
-    update_artifact_frontmatter,
 )
 from multi_tasker.orchestrator.documentation_generator import (
     write_repository_documentation,
@@ -35,10 +34,11 @@ from multi_tasker.orchestrator.prompt_builder import (
     resolve_task_execution,
 )
 from multi_tasker.orchestrator.router import (
-    CATEGORY_ROUTES,
+    dispatch_routed_escalation,
     evaluate_review_verdict,
     finalize_stage_escalation,
     find_actionable_stage_target,
+    reset_rejected_stage_artifacts,
 )
 from multi_tasker.orchestrator.task_runner import run_scheduled_tasks
 from multi_tasker.orchestrator.worktree import (
@@ -91,7 +91,9 @@ def _detect_stage_changes(
         for path, text in before_snapshot.items()
         if Path(path).stem != target_id and not any(tag in text for tag in editable)
     }
-    return normalize_new_stage_artifacts(worktree_path, locked_ids, changed)
+    return normalize_new_stage_artifacts(
+        worktree_path, locked_ids, changed, before_snapshot
+    )
 
 
 def _prepare_stage_invocation(
@@ -277,50 +279,6 @@ def run_agent_stage(
         remove_worktree(repository_root, worktree_path)
 
 
-def _dispatch_routed_escalation(
-    repository_root: Path,
-    pipeline: dict[str, Any],
-    options: tuple[str | None, str | None, str | None],
-) -> tuple[list[str], list[Finding]] | None:
-    """Dispatch the first routed_to_agent Escalation in an isolated Worktree."""
-    for esc_id, document in sorted(load_artifacts_by_id(repository_root).items()):
-        if (
-            document.artifact_type != "ESC"
-            or document.frontmatter.get("status") != "routed_to_agent"
-        ):
-            continue
-        category = str(document.frontmatter.get("reason_category", "ambiguity"))
-        routes: dict[str, Any] = pipeline.get("escalation_routes", {})
-        actor = str(
-            routes.get(category, {}).get(
-                "target_actor", CATEGORY_ROUTES.get(category, ("human",))[0]
-            )
-        )
-        if actor == "human":
-            update_artifact_frontmatter(
-                repository_root / document.path, {"status": "awaiting_human"}
-            )
-            commit_traceable_change(
-                repository_root,
-                [document.path],
-                f"{esc_id}: Route escalation to human [traces: {esc_id}]",
-            )
-            return None
-        produced, findings = run_agent_stage(repository_root, actor, esc_id, options)
-        next_state = "awaiting_human" if findings else "resolved"
-        update_artifact_frontmatter(
-            repository_root / document.path,
-            {"status": next_state, "resolved_by": produced[0] if produced else esc_id},
-        )
-        commit_traceable_change(
-            repository_root,
-            [document.path],
-            f"{esc_id}: Resolve escalation via {actor} [traces: {esc_id}]",
-        )
-        return produced, findings
-    return None
-
-
 def _step_declarative_stage(
     repository_root: Path,
     stage: dict[str, Any],
@@ -355,6 +313,29 @@ def _step_declarative_stage(
     return produced, []
 
 
+def _handle_pipeline_step_outcome(
+    repository_root: Path, produced: list[str], findings: list[Finding]
+) -> tuple[list[str], list[Finding], bool]:
+    """Handle review rejections and auto-routed escalations between pipeline steps."""
+    if not findings:
+        return produced, [], bool(produced)
+    rule_ids = {item.rule_id for item in findings}
+    if rule_ids == {"STAGE_REVIEW_REJECTED"}:
+        reset_rejected_stage_artifacts(repository_root, produced)
+        return [], [], True
+    if rule_ids == {"GATE_TASK_ESCALATED"}:
+        routed_ids = [
+            str(doc.frontmatter["id"])
+            for item in findings
+            if (doc := parse_artifact_file(repository_root / item.path, item.path)[0])
+            is not None
+            and doc.frontmatter.get("status") == "routed_to_agent"
+        ]
+        if routed_ids and len(routed_ids) == len(findings):
+            return [*produced, *routed_ids], [], True
+    return produced, findings, False
+
+
 def run_declarative_pipeline(
     repository_root: Path,
     options: tuple[str | None, str | None, str | None] = (None, None, None),
@@ -376,7 +357,9 @@ def run_declarative_pipeline(
             None,
         )
         if matched is None or matched[0].get("trigger_type") in {"SPEC", "TASK"}:
-            esc_result = _dispatch_routed_escalation(repository_root, pipeline, options)
+            esc_result = dispatch_routed_escalation(
+                repository_root, pipeline, options, run_agent_stage
+            )
             if esc_result is not None:
                 produced, findings = esc_result
                 if findings:
@@ -385,10 +368,13 @@ def run_declarative_pipeline(
                 continue
         if matched is None:
             break
-        produced, findings = _step_declarative_stage(
+        raw_produced, raw_findings = _step_declarative_stage(
             repository_root, matched[0], matched[1], options, max_workers
         )
-        if findings or not produced:
-            return completed, findings
-        completed.extend(produced)
+        step_done, step_err, should_continue = _handle_pipeline_step_outcome(
+            repository_root, raw_produced, raw_findings
+        )
+        completed.extend(step_done)
+        if not should_continue:
+            return completed, step_err
     return completed, []

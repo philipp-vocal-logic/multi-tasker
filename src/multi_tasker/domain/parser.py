@@ -1,5 +1,7 @@
 """YAML and Markdown frontmatter parser and artifact repository utilities."""
 
+import copy
+import functools
 from pathlib import Path
 from typing import Any
 
@@ -18,11 +20,17 @@ ARTIFACT_DIRECTORY_TO_TYPE: dict[str, str] = {
 }
 
 
+@functools.lru_cache(maxsize=512)
+def _cached_yaml_load(raw_text: str) -> Any:
+    """Parse YAML text once and cache the raw structure."""
+    return yaml.safe_load(raw_text)
+
+
 def load_yaml_file(path: Path) -> dict[str, Any]:
     """Load a YAML file and return a dictionary."""
-    raw_content = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw_content = _cached_yaml_load(path.read_text(encoding="utf-8"))
     if isinstance(raw_content, dict):
-        return raw_content
+        return copy.deepcopy(raw_content)
     return {}
 
 
@@ -96,7 +104,7 @@ def parse_artifact_file(
         return None, [Finding(relative_path, 1, "TRACE_FRONTMATTER_MISSING", message)]
     body_start, frontmatter_text, body_text = split_result
     try:
-        frontmatter_data = yaml.safe_load(frontmatter_text)
+        frontmatter_data = copy.deepcopy(_cached_yaml_load(frontmatter_text))
     except yaml.YAMLError as error:
         message = f"Invalid YAML frontmatter: {error}"
         return None, [Finding(relative_path, 1, "TRACE_YAML_INVALID", message)]
@@ -302,24 +310,10 @@ def _rewrite_normalized_artifact(
     return new_relative
 
 
-def normalize_new_stage_artifacts(
-    worktree_path: Path, existing_ids: set[str], changed_files: list[str]
-) -> list[str]:
-    """Renumber newly created stage artifacts that collide with existing_ids."""
-    batch: list[tuple[str, ArtifactDocument | None]] = [
-        (
-            rel,
-            parse_artifact_file(worktree_path / rel, rel)[0]
-            if (worktree_path / rel).is_file()
-            else None,
-        )
-        for rel in changed_files
-    ]
-    occupied = set(existing_ids) | {
-        doc_id
-        for doc_id, doc in load_artifacts_by_id(worktree_path).items()
-        if doc.path not in set(changed_files)
-    }
+def _allocate_stage_id_mapping(
+    batch: list[tuple[str, ArtifactDocument | None]], occupied: set[str]
+) -> dict[str, str]:
+    """Allocate non-colliding sequential IDs for newly authored stage artifacts."""
     id_mapping: dict[str, str] = {}
     for rel, document in batch:
         if document is None or document.artifact_type == "UNKNOWN":
@@ -338,11 +332,39 @@ def normalize_new_stage_artifacts(
         else:
             id_mapping[raw_id] = raw_id
             occupied.add(raw_id)
+    return id_mapping
+
+
+def normalize_new_stage_artifacts(
+    worktree_path: Path,
+    existing_ids: set[str],
+    changed_files: list[str],
+    before_snapshot: dict[str, str] | None = None,
+) -> list[str]:
+    """Renumber newly created stage artifacts that collide with existing_ids."""
+    batch: list[tuple[str, ArtifactDocument | None]] = [
+        (
+            rel,
+            parse_artifact_file(worktree_path / rel, rel)[0]
+            if (worktree_path / rel).is_file()
+            else None,
+        )
+        for rel in changed_files
+    ]
+    occupied = set(existing_ids) | {
+        doc_id
+        for doc_id, doc in load_artifacts_by_id(worktree_path).items()
+        if doc.path not in set(changed_files)
+    }
+    id_mapping = _allocate_stage_id_mapping(batch, occupied)
     if all(old == new for old, new in id_mapping.items()):
         return changed_files
     for rel, document in batch:
         if document is not None and document.artifact_type != "UNKNOWN":
-            (worktree_path / rel).unlink(missing_ok=True)
+            if before_snapshot and rel in before_snapshot:
+                (worktree_path / rel).write_text(before_snapshot[rel], encoding="utf-8")
+            else:
+                (worktree_path / rel).unlink(missing_ok=True)
     return [
         _rewrite_normalized_artifact(worktree_path, rel, document, id_mapping)
         if document is not None and document.artifact_type != "UNKNOWN"
