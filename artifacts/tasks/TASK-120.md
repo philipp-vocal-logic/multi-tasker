@@ -8,6 +8,7 @@ traces_to:
   - SPEC-047
 depends_on:
   - TASK-119
+  - TASK-121
 required_files:
   - tests/test_pipeline_combinations.py
   - src/multi_tasker/orchestrator/merge_gate.py
