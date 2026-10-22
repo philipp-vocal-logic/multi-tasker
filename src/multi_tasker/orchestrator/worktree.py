@@ -29,11 +29,11 @@ def compute_policy_sha256(repository_root: Path) -> str:
 
 
 def _load_clean_invariants(repository_root: Path) -> dict[str, Any]:
-    """Load clean_repo_invariants from policy/permissions.yaml."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
-    if not permissions_path.exists():
+    """Load clean_repo_invariants from policy/agent_execution.yaml."""
+    execution_path = repository_root / "policy" / "agent_execution.yaml"
+    if not execution_path.exists():
         return {}
-    invariants = load_yaml_file(permissions_path).get("clean_repo_invariants", {})
+    invariants = load_yaml_file(execution_path).get("clean_repo_invariants", {})
     return invariants if isinstance(invariants, dict) else {}
 
 
@@ -56,7 +56,9 @@ def verify_clean_repository(
         if actual != expected_policy_sha256:
             message = "policy/** SHA-256 digest does not match trusted BaseBranch."
             findings.append(
-                Finding("policy/permissions.yaml", 1, "GATE_POLICY_TAMPERED", message)
+                Finding(
+                    "policy/agent_execution.yaml", 1, "GATE_POLICY_TAMPERED", message
+                )
             )
     return findings
 

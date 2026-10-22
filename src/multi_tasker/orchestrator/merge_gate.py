@@ -114,7 +114,9 @@ def evaluate_merge_gate(request: GateRequest) -> GateOutcome:
         request.worktree_path
     ):
         message = "Worktree policy/** digest differs from trusted BaseBranch."
-        finding = Finding("policy/permissions.yaml", 1, "GATE_POLICY_TAMPERED", message)
+        finding = Finding(
+            "policy/agent_execution.yaml", 1, "GATE_POLICY_TAMPERED", message
+        )
         return GateOutcome(False, False, None, [finding])
     changed = (
         request.changed_files

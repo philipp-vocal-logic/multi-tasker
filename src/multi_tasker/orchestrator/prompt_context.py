@@ -11,6 +11,16 @@ from multi_tasker.domain.parser import load_yaml_file
 MAX_PROMPT_LINE_LENGTH: int = 88
 
 
+def load_artifact_schemas_and_limits(repository_root: Path) -> dict[str, Any]:
+    """Load merged schemas and artifacts dicts from policy/artifact_*.yaml."""
+    schemas_path = repository_root / "policy" / "artifact_schemas.yaml"
+    limits_path = repository_root / "policy" / "artifact_limits.yaml"
+    return {
+        **(load_yaml_file(schemas_path) if schemas_path.exists() else {}),
+        **(load_yaml_file(limits_path) if limits_path.exists() else {}),
+    }
+
+
 def wrap_prompt_lines(lines: list[str]) -> list[str]:
     """Wrap synthesized Markdown lines outside code fences to MAX_PROMPT_LINE_LENGTH."""
     wrapped: list[str] = []
@@ -72,7 +82,7 @@ def _format_layer_entry(item: dict[str, Any]) -> str:
 
 def render_architecture_layers(repository_root: Path) -> list[str]:
     """Render defined layer names, path globs, and allowed_internal_imports."""
-    arch_path = repository_root / "policy" / "architecture.yaml"
+    arch_path = repository_root / "policy" / "code_architecture.yaml"
     if not arch_path.exists():
         return []
     layers = load_yaml_file(arch_path).get("layers", [])
@@ -87,7 +97,7 @@ def render_architecture_layers(repository_root: Path) -> list[str]:
 def _render_worker_limits_and_ast(repository_root: Path) -> list[str]:
     """Render Source Limits (including max_line_length) and Clean Code AST Rules."""
     lines: list[str] = []
-    limits_path = repository_root / "policy" / "limits.yaml"
+    limits_path = repository_root / "policy" / "code_limits.yaml"
     if limits_path.exists():
         source_limits = load_yaml_file(limits_path).get("source_code", {})
         limit_items = [
@@ -95,7 +105,7 @@ def _render_worker_limits_and_ast(repository_root: Path) -> list[str]:
             *(f"`{key}={val}`" for key, val in source_limits.items()),
         ]
         lines.append(f"- **Source Limits**: {', '.join(limit_items)}")
-    clean_path = repository_root / "policy" / "clean_code.yaml"
+    clean_path = repository_root / "policy" / "code_quality.yaml"
     if clean_path.exists():
         ast_rules = load_yaml_file(clean_path).get("ast_rules", {})
         pairs = ", ".join(f"`{key}={val}`" for key, val in ast_rules.items())

@@ -52,16 +52,16 @@ _SNAPSHOT_MTIME_NS = 1_000_000_000
 
 
 def is_worktree_agent_enabled(repository_root: Path, agent_role: str) -> bool:
-    """Return True if agent_role has worktree_execution enabled in permissions.yaml."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
-    if not permissions_path.exists():
+    """Return True if agent_role has worktree_execution enabled."""
+    execution_path = repository_root / "policy" / "agent_execution.yaml"
+    if not execution_path.exists():
         return True
-    agents: dict[str, Any] = load_yaml_file(permissions_path).get("agents", {})
+    agents: dict[str, Any] = load_yaml_file(execution_path).get("agents", {})
     role_config = agents.get(agent_role)
     return (
         bool(role_config.get("worktree_execution", True))
         if isinstance(role_config, dict)
-        else False
+        else True
     )
 
 
@@ -232,18 +232,20 @@ def _validate_stage_request(
     repository_root: Path, agent_role: str, target_id: str
 ) -> tuple[ArtifactDocument | None, list[Finding]]:
     """Validate agent_role, worktree_execution flag, and target_id existence."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
+    permissions_path = repository_root / "policy" / "agent_permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     if agent_role not in permissions.get("agents", {}):
         message = f"Unknown agent role '{agent_role}'."
         return None, [
-            Finding("policy/permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message)
+            Finding(
+                "policy/agent_permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message
+            )
         ]
     if not is_worktree_agent_enabled(repository_root, agent_role):
         message = f"Agent '{agent_role}' has worktree_execution disabled."
         return None, [
             Finding(
-                "policy/permissions.yaml", 1, "CLI_AGENT_WORKTREE_DISABLED", message
+                "policy/agent_execution.yaml", 1, "CLI_AGENT_WORKTREE_DISABLED", message
             )
         ]
     target_document = load_artifacts_by_id(repository_root).get(target_id)

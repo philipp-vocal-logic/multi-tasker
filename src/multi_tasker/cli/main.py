@@ -150,7 +150,7 @@ def _dispatch_run_target(
         message = "Agent 'worker-agent' has worktree_execution disabled."
         return [], [
             Finding(
-                "policy/permissions.yaml", 1, "CLI_AGENT_WORKTREE_DISABLED", message
+                "policy/agent_execution.yaml", 1, "CLI_AGENT_WORKTREE_DISABLED", message
             )
         ]
     return run_scheduled_tasks(

@@ -110,7 +110,8 @@ def _scaffold_default_policies_and_gitignore(
             if not destination.exists():
                 content = (
                     yaml.safe_dump(DEFAULT_PYTHON_ARCHITECTURE, sort_keys=False)
-                    if template_path.name == "architecture.yaml" and preset == "python"
+                    if template_path.name == "code_architecture.yaml"
+                    and preset == "python"
                     else template_path.read_text(encoding="utf-8")
                 )
                 destination.write_text(content, encoding="utf-8")
@@ -142,7 +143,9 @@ def initialize_repository(
     """Initialize policy/, artifacts/ subdirectories, and a Git repository."""
     if preset not in VALID_PRESETS:
         message = f"Unknown preset '{preset}' (expected: {', '.join(VALID_PRESETS)})."
-        return [Finding("policy/architecture.yaml", 1, "CLI_INVALID_PRESET", message)]
+        return [
+            Finding("policy/code_architecture.yaml", 1, "CLI_INVALID_PRESET", message)
+        ]
     (repository_root / "policy").mkdir(parents=True, exist_ok=True)
     for folder in ARTIFACT_DIRECTORY_TO_TYPE:
         (repository_root / "artifacts" / folder).mkdir(parents=True, exist_ok=True)
@@ -316,14 +319,14 @@ def approve_stage_artifact(repository_root: Path, artifact_id: str) -> None:
 def bootstrap_evaluation_repository(repository_root: Path, intent_text: str) -> str:
     """Initialize a Git repository with auto INT gate and commit baseline INT-001."""
     initialize_repository(repository_root)
-    pipeline_path = repository_root / "policy" / "pipeline.yaml"
+    pipeline_path = repository_root / "policy" / "artifact_lifecycle.yaml"
     if pipeline_path.is_file():
         pipeline = load_yaml_file(pipeline_path)
         for stage in pipeline.get("stages", []):
             if stage.get("id") in {"intent_to_requirement", "specification_to_tasks"}:
                 stage["approval_gate"] = "auto"
         pipeline_path.write_text(yaml.safe_dump(pipeline), encoding="utf-8")
-    clean_path = repository_root / "policy" / "clean_code.yaml"
+    clean_path = repository_root / "policy" / "code_quality.yaml"
     if clean_path.is_file() and not (repository_root / "pyproject.toml").is_file():
         clean_policy = load_yaml_file(clean_path)
         clean_policy["linters"]["ruff"]["enabled"] = False

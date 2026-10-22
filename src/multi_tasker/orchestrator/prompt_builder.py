@@ -12,6 +12,7 @@ from multi_tasker.domain.parser import (
 )
 from multi_tasker.orchestrator.prompt_context import (
     MAX_PROMPT_LINE_LENGTH,
+    load_artifact_schemas_and_limits,
     render_code_and_glossary_section,
     render_decomposition_contract,
     render_target_context_section,
@@ -238,11 +239,8 @@ def _build_execution_steps(
     """Build concrete role-specific 3-step Execution Steps for agent_role."""
     target_id = str(target_doc.frontmatter.get("id", "")) if target_doc else "<task_id>"
     write_paths = _resolve_stage_write_paths(agent_role, target_doc, next_id)
-    ver_cmd = (
-        str(target_doc.frontmatter.get("verification_cmd", "")).strip()
-        if target_doc
-        else ""
-    )
+    raw_cmd = target_doc.frontmatter.get("verification_cmd", "") if target_doc else ""
+    ver_cmd = str(raw_cmd).strip()
     task_flag = f"--task {target_id} " if agent_role == "worker-agent" else ""
     suffix = f" && {ver_cmd}" if agent_role == "worker-agent" and ver_cmd else ""
     verify_cmd = (
@@ -281,8 +279,7 @@ def _assemble_prompt_sections(
     target_doc: ArtifactDocument | None = None,
 ) -> list[str]:
     """Assemble permissions, mission, execution steps, schemas, and vocabulary."""
-    schemas_path = repository_root / "policy" / "schemas.yaml"
-    schemas_policy = load_yaml_file(schemas_path) if schemas_path.exists() else {}
+    schemas_policy = load_artifact_schemas_and_limits(repository_root)
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role)
     next_id = _resolve_next_prompt_id(repository_root, primary_type, target_doc)
     output_contract = (
@@ -321,13 +318,15 @@ def build_agent_prompt(
     target_id: str | None = None,
 ) -> tuple[str, list[Finding]]:
     """Synthesize a deterministic self-contained role prompt from policy and target."""
-    permissions_path = repository_root / "policy" / "permissions.yaml"
+    permissions_path = repository_root / "policy" / "agent_permissions.yaml"
     permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
     agents: dict[str, Any] = permissions.get("agents", {})
     if agent_role not in agents:
         message = f"Unknown agent role '{agent_role}'."
         return "", [
-            Finding("policy/permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message)
+            Finding(
+                "policy/agent_permissions.yaml", 1, "CLI_UNKNOWN_AGENT_ROLE", message
+            )
         ]
     by_id = load_artifacts_by_id(repository_root)
     target_doc = by_id.get(target_id) if target_id else None
@@ -351,10 +350,10 @@ def resolve_task_execution(
 ) -> tuple[str | None, str, str]:
     """Resolve (command_template, environment_name, model_name) for an agent run."""
     agent_command, model_override, environment_override = options
-    permissions_path = repository_root / "policy" / "permissions.yaml"
-    permissions = load_yaml_file(permissions_path) if permissions_path.exists() else {}
-    execution_config: dict[str, Any] = permissions.get("execution_environments", {})
-    role_config: dict[str, Any] = permissions.get("agents", {}).get(agent_role, {})
+    execution_path = repository_root / "policy" / "agent_execution.yaml"
+    execution = load_yaml_file(execution_path) if execution_path.exists() else {}
+    execution_config: dict[str, Any] = execution.get("execution_environments", {})
+    role_config: dict[str, Any] = execution.get("agents", {}).get(agent_role, {})
     default_env = str(execution_config.get("default_environment", "agy"))
     default_model = str(execution_config.get("default_model", "gemini-3.8-flash-high"))
     role_model = str(role_config.get("model", "")).strip()
