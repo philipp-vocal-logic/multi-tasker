@@ -2,18 +2,18 @@
 id: TASK-121
 title: Order Empty Stage Diff Assertion Before Untracked Module Creation in TestContract
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-047
-  - SPEC-047
+- REQ-047
+- SPEC-047
 depends_on:
-  - TASK-119
+- TASK-119
 required_files:
-  - artifacts/requirements/REQ-047.md
-  - artifacts/specifications/SPEC-047.md
-  - tests/test_pipeline_combinations.py
+- artifacts/requirements/REQ-047.md
+- artifacts/specifications/SPEC-047.md
+- tests/test_pipeline_combinations.py
 write_files:
-  - tests/test_pipeline_combinations.py
+- tests/test_pipeline_combinations.py
 verification_cmd: python3 -m py_compile tests/test_pipeline_combinations.py
 ---
 ## Objective

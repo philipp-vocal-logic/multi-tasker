@@ -390,9 +390,9 @@ def test_worktree_pythonpath_precedence_and_identical_review_retry(
         tmp_path, int_doc, tmp_path / ".mt_prompt.md", ctx
     )
     assert s_env["PYTHONPATH"] == expected and w_env["PYTHONPATH"] == expected
+    before_empty = stage_runner._snapshot_artifacts(tmp_path)
+    assert stage_runner._detect_stage_changes(tmp_path, before_empty, "INT-001") == []
     (tmp_path / "src/domain").mkdir(parents=True, exist_ok=True)
     (tmp_path / "src/domain/mod.py").write_text("VAL = 7\n", encoding="utf-8")
     cmd = "python3 -c 'import domain.mod; assert domain.mod.VAL == 7'"
     assert merge_gate._run_verification_command(tmp_path, cmd) == []
-    before_empty = stage_runner._snapshot_artifacts(tmp_path)
-    assert stage_runner._detect_stage_changes(tmp_path, before_empty, "INT-001") == []
