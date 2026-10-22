@@ -48,6 +48,8 @@ from multi_tasker.orchestrator.worktree import (
     remove_worktree,
 )
 
+_SNAPSHOT_MTIME_NS = 1_000_000_000
+
 
 def is_worktree_agent_enabled(repository_root: Path, agent_role: str) -> bool:
     """Return True if agent_role has worktree_execution enabled in permissions.yaml."""
@@ -64,27 +66,41 @@ def is_worktree_agent_enabled(repository_root: Path, agent_role: str) -> bool:
 
 
 def _snapshot_artifacts(root: Path) -> dict[str, str]:
-    """Map relative artifact paths under root/artifacts to their text content."""
+    """Map relative artifact paths to text and mark REV/ESC with sentinel mtime."""
     artifacts_dir = root / "artifacts"
     if not artifacts_dir.exists():
         return {}
-    return {
-        path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
-        for path in sorted(artifacts_dir.rglob("*.md"))
-        if path.is_file()
-    }
+    snapshot: dict[str, str] = {}
+    for path in sorted(artifacts_dir.rglob("*.md")):
+        if not path.is_file():
+            continue
+        snapshot[path.relative_to(root).as_posix()] = path.read_text(encoding="utf-8")
+        if path.stem.startswith(("REV-", "ESC-")):
+            os.utime(path, ns=(_SNAPSHOT_MTIME_NS, _SNAPSHOT_MTIME_NS))
+    return snapshot
 
 
 def _detect_stage_changes(
     worktree_path: Path, before_snapshot: dict[str, str], target_id: str = ""
 ) -> list[str]:
     """Return modified or created relative paths inside worktree_path."""
-    git_changed = get_git_changed_files(worktree_path)
-    changed = git_changed or [
-        path
-        for path, content in sorted(_snapshot_artifacts(worktree_path).items())
-        if before_snapshot.get(path) != content
+    artifacts_dir = worktree_path / "artifacts"
+    artifact_changed = [
+        rel
+        for path in (
+            sorted(artifacts_dir.rglob("*.md")) if artifacts_dir.exists() else []
+        )
+        if path.is_file()
+        and (rel := path.relative_to(worktree_path).as_posix())
+        and (
+            before_snapshot.get(rel) != path.read_text(encoding="utf-8")
+            or (
+                path.stem.startswith(("REV-", "ESC-"))
+                and path.stat().st_mtime_ns != _SNAPSHOT_MTIME_NS
+            )
+        )
     ]
+    changed = sorted(set(get_git_changed_files(worktree_path)) | set(artifact_changed))
     editable = ("status: draft", "status: needs_update", "status: blocked")
     locked_ids = {
         Path(path).stem
@@ -116,7 +132,7 @@ def _prepare_stage_invocation(
     )
     environment = {
         **os.environ,
-        "PYTHONPATH": str(worktree_path),
+        "PYTHONPATH": f"{worktree_path / 'src'}{os.pathsep}{worktree_path}",
         "MT_AGENT_ROLE": agent_role,
         "MT_TASK_ID": target_id,
         "MT_PROMPT_FILE": str(prompt_file),

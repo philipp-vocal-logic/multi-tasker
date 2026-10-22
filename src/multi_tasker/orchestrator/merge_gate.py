@@ -65,7 +65,8 @@ def _run_verification_command(
 ) -> list[Finding]:
     """Execute deterministic verification_command and emit a Finding on failure."""
     arguments = shlex.split(command_string)
-    environment = {**os.environ, "PYTHONPATH": str(worktree_path)}
+    python_path = f"{worktree_path / 'src'}{os.pathsep}{worktree_path}"
+    environment = {**os.environ, "PYTHONPATH": python_path}
     try:
         process = subprocess.run(
             arguments,
