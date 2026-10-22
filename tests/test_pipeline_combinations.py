@@ -40,81 +40,68 @@ class PipelineScenario:
     expected_states: dict[str, str]
 
 
-def _req_doc(status: str = "in_review") -> str:
-    """Build a valid REQ-001 Markdown artifact string."""
+_REQ_MD = (
+    "---\nid: REQ-001\ntitle: Calculation Service Requirement\n"
+    "status: in_review\ntraces_to: [INT-001]\ndecisions: []\n"
+    "acceptance_criteria:\n  - id: AC-01\n    given: Input numbers\n"
+    "    when: Added together\n    then: Returns sum\n"
+    "version: 1\n---\n## Statement\nProvide addition helper.\n\n"
+    "## Impact Analysis\nAdds src/domain/calc.py and tests/test_calc.py.\n"
+)
+
+_SPEC_MD = (
+    "---\nid: SPEC-001\ntitle: Calculation Service Specification\n"
+    "status: in_review\ntraces_to: [REQ-001]\n"
+    "covers_criteria: [REQ-001:AC-01]\ndecisions: []\n"
+    "target_files:\n  tests: [tests/test_calc.py]\n"
+    "  implementation: [src/domain/calc.py]\n---\n"
+    "## Design Overview\nImplement add_values in src/domain/calc.py.\n\n"
+    "## Public Interfaces\ndef add_values(left: int, right: int) -> int\n\n"
+    "## Test Contract Mapping\n- REQ-001:AC-01 -> tests/test_calc.py\n"
+)
+
+
+def _task_md(task_id: str, is_impl: bool = False) -> str:
+    """Build a valid test_contract or implementation TASK Markdown string."""
+    kind = "implementation" if is_impl else "test_contract"
+    deps = "[TASK-001]" if is_impl else "[]"
+    req_f = "[tests/test_calc.py]" if is_impl else "[]"
+    out_f = "src/domain/calc.py" if is_impl else "tests/test_calc.py"
+    cmd = (
+        "pytest -q tests/test_calc.py"
+        if is_impl
+        else "python3 -m py_compile tests/test_calc.py"
+    )
     return (
-        f"---\nid: REQ-001\ntitle: Calculation Service Requirement\n"
-        f"status: {status}\ntraces_to: [INT-001]\ndecisions: []\n"
-        "acceptance_criteria:\n"
-        "  - id: AC-01\n    given: Input numbers\n"
-        "    when: Added together\n    then: Returns sum\n"
-        "version: 1\n---\n## Statement\nProvide addition helper.\n\n"
-        "## Impact Analysis\nAdds src/domain/calc.py and tests/test_calc.py.\n"
+        f"---\nid: {task_id}\ntitle: Task {task_id} Calculation Work\n"
+        f"type: {kind}\nstatus: ready\ntraces_to: [REQ-001, SPEC-001]\n"
+        f"depends_on: {deps}\nrequired_files: {req_f}\n"
+        f"write_files: [{out_f}]\nverification_cmd: {cmd}\n---\n"
+        f"## Objective\nRun {task_id}.\n\n## Scoped Instructions\nWrite {out_f}.\n"
     )
 
 
-def _spec_doc(status: str = "in_review") -> str:
-    """Build a valid SPEC-001 Markdown artifact string."""
-    return (
-        f"---\nid: SPEC-001\ntitle: Calculation Service Specification\n"
-        f"status: {status}\ntraces_to: [REQ-001]\n"
-        "covers_criteria: [REQ-001:AC-01]\ndecisions: []\n"
-        "target_files:\n  tests: [tests/test_calc.py]\n"
-        "  implementation: [src/domain/calc.py]\n---\n"
-        "## Design Overview\nImplement add_values in src/domain/calc.py.\n\n"
-        "## Public Interfaces\ndef add_values(left: int, right: int) -> int\n\n"
-        "## Test Contract Mapping\n- REQ-001:AC-01 -> tests/test_calc.py\n"
-    )
-
-
-def _task_one_doc(status: str = "ready") -> str:
-    """Build a valid test_contract TASK-001 Markdown artifact string."""
-    return (
-        f"---\nid: TASK-001\ntitle: Add Calculation TestContract\n"
-        f"type: test_contract\nstatus: {status}\n"
-        "traces_to: [REQ-001, SPEC-001]\ndepends_on: []\n"
-        "required_files: []\nwrite_files: [tests/test_calc.py]\n"
-        "verification_cmd: python3 -m py_compile tests/test_calc.py\n---\n"
-        "## Objective\nWrite test_calc.py.\n\n"
-        "## Scoped Instructions\nDecorate test_add_values with @traces.\n"
-    )
-
-
-def _task_two_doc(status: str = "ready") -> str:
-    """Build a valid implementation TASK-002 Markdown artifact string."""
-    return (
-        f"---\nid: TASK-002\ntitle: Implement Calculation Module\n"
-        f"type: implementation\nstatus: {status}\n"
-        "traces_to: [REQ-001, SPEC-001]\ndepends_on: [TASK-001]\n"
-        "required_files: [tests/test_calc.py]\n"
-        "write_files: [src/domain/calc.py]\n"
-        "verification_cmd: pytest -q tests/test_calc.py\n---\n"
-        "## Objective\nImplement add_values.\n\n"
-        "## Scoped Instructions\nCreate src/domain/calc.py.\n"
-    )
-
-
-def _rev_doc(rev_id: str, target_id: str, stage: str, verdict: str) -> str:
-    """Build a valid REV Markdown artifact string."""
+def _rev_md(verdict: str) -> str:
+    """Build a valid REV-001 Markdown artifact string for SPEC-001."""
     finding = "  - Missing edge case coverage in specification\n"
-    findings_block = f"findings:\n{finding}" if verdict == "fail" else "findings: []\n"
+    block = f"findings:\n{finding}" if verdict == "fail" else "findings: []\n"
     return (
-        f"---\nid: {rev_id}\ntarget_artifacts: [{target_id}]\n"
-        f"stage: {stage}\nverdict: {verdict}\n{findings_block}---\n"
+        f"---\nid: REV-001\ntarget_artifacts: [SPEC-001]\n"
+        f"stage: specification\nverdict: {verdict}\n{block}---\n"
     )
 
 
-def _esc_doc(esc_id: str, role: str, target_id: str, category: str) -> str:
-    """Build a valid ESC Markdown artifact string."""
+def _esc_md(esc_id: str) -> str:
+    """Build a valid worker-agent infeasible_scope ESC Markdown string."""
     return (
-        f"---\nid: {esc_id}\nsource_agent: {role}\n"
-        f"task_or_stage: {target_id}\naffected_artifacts: [{target_id}]\n"
-        f"reason_category: {category}\nstatus: open\nresolved_by: null\n---\n"
+        f"---\nid: {esc_id}\nsource_agent: worker-agent\n"
+        "task_or_stage: TASK-001\naffected_artifacts: [TASK-001]\n"
+        "reason_category: infeasible_scope\nstatus: open\nresolved_by: null\n---\n"
         "## Blocking Problem\nScope requires task decomposition adjustment.\n"
     )
 
 
-_TEST_FILE_CODE = (
+_TEST_PY = (
     '"""TestContract for calculation module."""\n\n'
     "from multi_tasker.domain.models import traces\n"
     "from src.domain.calc import add_values\n\n\n"
@@ -124,120 +111,128 @@ _TEST_FILE_CODE = (
     "    assert add_values(2, 3) == 5\n"
 )
 
-_IMPL_FILE_CODE = (
+_IMPL_PY = (
     '"""Calculation domain module."""\n\n\n'
     "def add_values(left: int, right: int) -> int:\n"
     '    """Return sum of left and right integers."""\n'
     "    return left + right\n"
 )
 
-_BASE_TURNS: tuple[MockTurn, ...] = (
-    MockTurn(
-        "requirement-agent",
-        "INT-001",
-        1,
-        ("Requirement Decomposition Contract", "### Artifact `INT-001`"),
-        {"artifacts/requirements/REQ-001.md": _req_doc()},
-    ),
-    MockTurn(
-        "specification-agent",
-        "REQ-001",
-        1,
-        ("### Artifact `REQ-001`",),
-        {"artifacts/specifications/SPEC-001.md": _spec_doc()},
-    ),
-    MockTurn(
-        "planner-agent",
-        "SPEC-001",
-        1,
-        ("Planner Decomposition Contract", "### Artifact `SPEC-001`"),
-        {
-            "artifacts/tasks/TASK-001.md": _task_one_doc(),
-            "artifacts/tasks/TASK-002.md": _task_two_doc(),
-        },
-    ),
-    MockTurn(
-        "worker-agent",
-        "TASK-001",
-        1,
-        ("### Artifact `TASK-001`", "### Write File `tests/test_calc.py`"),
-        {"tests/test_calc.py": _TEST_FILE_CODE},
-    ),
-    MockTurn(
-        "worker-agent",
-        "TASK-002",
-        1,
-        ("### Artifact `TASK-002`", "### Required File `tests/test_calc.py`"),
-        {"src/domain/calc.py": _IMPL_FILE_CODE},
-    ),
+_T_REQ = MockTurn(
+    "requirement-agent",
+    "INT-001",
+    1,
+    ("Requirement Decomposition Contract", "### Artifact `INT-001`"),
+    {"artifacts/requirements/REQ-001.md": _REQ_MD},
+)
+_T_SPEC = MockTurn(
+    "specification-agent",
+    "REQ-001",
+    1,
+    ("### Artifact `REQ-001`",),
+    {"artifacts/specifications/SPEC-001.md": _SPEC_MD},
+)
+_T_PLAN = MockTurn(
+    "planner-agent",
+    "SPEC-001",
+    1,
+    ("Planner Decomposition Contract", "### Artifact `SPEC-001`"),
+    {
+        "artifacts/tasks/TASK-001.md": _task_md("TASK-001", False),
+        "artifacts/tasks/TASK-002.md": _task_md("TASK-002", True),
+    },
+)
+_T_WORK1 = MockTurn(
+    "worker-agent",
+    "TASK-001",
+    1,
+    ("### Artifact `TASK-001`", "### Write File `tests/test_calc.py`"),
+    {"tests/test_calc.py": _TEST_PY},
+)
+_T_WORK2 = MockTurn(
+    "worker-agent",
+    "TASK-002",
+    1,
+    ("### Artifact `TASK-002`", "### Required File `tests/test_calc.py`"),
+    {"src/domain/calc.py": _IMPL_PY},
+)
+_BASE = (_T_REQ, _T_SPEC, _T_PLAN, _T_WORK1, _T_WORK2)
+_REV_PATH = "artifacts/reviews/REV-001.md"
+_SPEC_PATH = "artifacts/specifications/SPEC-001.md"
+_T_REV_F1 = MockTurn(
+    "review-agent",
+    "SPEC-001",
+    1,
+    ("Semantic Review Rubric",),
+    {_REV_PATH: _rev_md("fail")},
+)
+_T_REV_P2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("pass")})
+_T_REV_F2 = MockTurn("review-agent", "SPEC-001", 2, (), {_REV_PATH: _rev_md("fail")})
+_T_SPEC_2 = MockTurn(
+    "specification-agent",
+    "REQ-001",
+    2,
+    ("### Artifact `REV-001`", "Missing edge case coverage in specification"),
+    {_SPEC_PATH: _SPEC_MD},
+)
+_T_ESC1 = MockTurn(
+    "worker-agent",
+    "TASK-001",
+    1,
+    (),
+    {"artifacts/escalations/ESC-001.md": _esc_md("ESC-001")},
+)
+_T_ESC2 = MockTurn(
+    "worker-agent",
+    "TASK-001",
+    2,
+    (),
+    {"artifacts/escalations/ESC-002.md": _esc_md("ESC-002")},
+)
+_T_RESCOPE = MockTurn(
+    "planner-agent",
+    "ESC-001",
+    1,
+    ("### Artifact `ESC-001`", "### Artifact `TASK-001`"),
+    {"artifacts/tasks/TASK-001.md": _task_md("TASK-001", False)},
+)
+_T_WORK1_2 = MockTurn(
+    "worker-agent", "TASK-001", 2, (), {"tests/test_calc.py": _TEST_PY}
+)
+_T_TAMPER = MockTurn(
+    "worker-agent", "TASK-002", 1, (), {"tests/test_calc.py": "# tampered test\n"}
 )
 
-_AUTO_GATES = {
+_AUTO = {
     "intent_to_requirement": "auto",
     "requirement_to_specification": "auto",
     "specification_to_tasks": "auto",
     "execute_tasks": "auto",
 }
-_REV_SPEC_GATES = {**_AUTO_GATES, "requirement_to_specification": "review-agent"}
-_HUMAN_REQ_GATES = {**_AUTO_GATES, "intent_to_requirement": "human"}
-
-_REV_FAIL_TURN = MockTurn(
-    "review-agent",
-    "SPEC-001",
-    1,
-    ("Semantic Review Rubric", "### Artifact `SPEC-001`"),
-    {
-        "artifacts/reviews/REV-001.md": _rev_doc(
-            "REV-001", "SPEC-001", "specification", "fail"
-        )
-    },
-)
-_SPEC_RETRY_TURN = MockTurn(
-    "specification-agent",
-    "REQ-001",
-    2,
-    ("### Artifact `REV-001`", "Missing edge case coverage in specification"),
-    {"artifacts/specifications/SPEC-001.md": _spec_doc()},
-)
-_WORKER_ESC_ONE = MockTurn(
-    "worker-agent",
-    "TASK-001",
-    1,
-    ("### Artifact `TASK-001`",),
-    {
-        "artifacts/escalations/ESC-001.md": _esc_doc(
-            "ESC-001", "worker-agent", "TASK-001", "infeasible_scope"
-        )
-    },
-)
-_PLANNER_RESCOPE = MockTurn(
-    "planner-agent",
-    "ESC-001",
-    1,
-    ("### Artifact `ESC-001`", "### Artifact `TASK-001`"),
-    {"artifacts/tasks/TASK-001.md": _task_one_doc("ready")},
-)
+_REV_SPEC = {**_AUTO, "requirement_to_specification": "review-agent"}
+_HUMAN_REQ = {**_AUTO, "intent_to_requirement": "human"}
+_ALL_DONE = {
+    "INT-001": "processed",
+    "REQ-001": "approved",
+    "SPEC-001": "approved",
+    "TASK-001": "done",
+    "TASK-002": "done",
+}
 
 PIPELINE_SCENARIOS: tuple[PipelineScenario, ...] = (
     PipelineScenario(
         "all_auto_gates_e2e_success",
-        _AUTO_GATES,
-        _BASE_TURNS,
+        _AUTO,
+        _BASE,
         0,
         ("REQ-001", "SPEC-001", "TASK-001", "TASK-002"),
         (),
-        {
-            "INT-001": "processed",
-            "REQ-001": "approved",
-            "SPEC-001": "approved",
-            "TASK-001": "done",
-            "TASK-002": "done",
-        },
+        _ALL_DONE,
     ),
     PipelineScenario(
         "human_gate_pauses_after_requirement_stage",
-        _HUMAN_REQ_GATES,
-        (_BASE_TURNS[0],),
+        _HUMAN_REQ,
+        (_T_REQ,),
         0,
         ("REQ-001",),
         (),
@@ -245,54 +240,17 @@ PIPELINE_SCENARIOS: tuple[PipelineScenario, ...] = (
     ),
     PipelineScenario(
         "review_reject_cycle_1_recovers_on_cycle_2_with_inlined_feedback",
-        _REV_SPEC_GATES,
-        (
-            *_BASE_TURNS,
-            _REV_FAIL_TURN,
-            _SPEC_RETRY_TURN,
-            MockTurn(
-                "review-agent",
-                "SPEC-001",
-                2,
-                ("### Artifact `SPEC-001`",),
-                {
-                    "artifacts/reviews/REV-001.md": _rev_doc(
-                        "REV-001", "SPEC-001", "specification", "pass"
-                    )
-                },
-            ),
-        ),
+        _REV_SPEC,
+        (*_BASE, _T_REV_F1, _T_SPEC_2, _T_REV_P2),
         0,
         ("REQ-001", "SPEC-001", "REV-002", "TASK-001", "TASK-002"),
         (),
-        {
-            "INT-001": "processed",
-            "REQ-001": "approved",
-            "SPEC-001": "approved",
-            "TASK-001": "done",
-            "TASK-002": "done",
-        },
+        _ALL_DONE,
     ),
     PipelineScenario(
         "review_reject_reaches_max_cycles_and_emits_review_exhausted_esc",
-        _REV_SPEC_GATES,
-        (
-            _BASE_TURNS[0],
-            _BASE_TURNS[1],
-            _REV_FAIL_TURN,
-            _SPEC_RETRY_TURN,
-            MockTurn(
-                "review-agent",
-                "SPEC-001",
-                2,
-                ("### Artifact `SPEC-001`",),
-                {
-                    "artifacts/reviews/REV-001.md": _rev_doc(
-                        "REV-001", "SPEC-001", "specification", "fail"
-                    )
-                },
-            ),
-        ),
+        _REV_SPEC,
+        (_T_REQ, _T_SPEC, _T_REV_F1, _T_SPEC_2, _T_REV_F2),
         1,
         (),
         ("STAGE_REVIEW_EXHAUSTED",),
@@ -300,20 +258,8 @@ PIPELINE_SCENARIOS: tuple[PipelineScenario, ...] = (
     ),
     PipelineScenario(
         "worker_infeasible_scope_auto_reroutes_to_planner_and_completes",
-        _AUTO_GATES,
-        (
-            *_BASE_TURNS[:3],
-            _WORKER_ESC_ONE,
-            _PLANNER_RESCOPE,
-            MockTurn(
-                "worker-agent",
-                "TASK-001",
-                2,
-                ("### Artifact `TASK-001`",),
-                {"tests/test_calc.py": _TEST_FILE_CODE},
-            ),
-            _BASE_TURNS[4],
-        ),
+        _AUTO,
+        (*_BASE[:3], _T_ESC1, _T_RESCOPE, _T_WORK1_2, _T_WORK2),
         0,
         ("REQ-001", "SPEC-001", "ESC-001", "TASK-001", "TASK-002"),
         (),
@@ -321,23 +267,8 @@ PIPELINE_SCENARIOS: tuple[PipelineScenario, ...] = (
     ),
     PipelineScenario(
         "worker_reroute_cap_exceeded_routes_second_escalation_to_human",
-        _AUTO_GATES,
-        (
-            *_BASE_TURNS[:3],
-            _WORKER_ESC_ONE,
-            _PLANNER_RESCOPE,
-            MockTurn(
-                "worker-agent",
-                "TASK-001",
-                2,
-                (),
-                {
-                    "artifacts/escalations/ESC-002.md": _esc_doc(
-                        "ESC-002", "worker-agent", "TASK-001", "infeasible_scope"
-                    )
-                },
-            ),
-        ),
+        _AUTO,
+        (*_BASE[:3], _T_ESC1, _T_RESCOPE, _T_ESC2),
         1,
         (),
         ("GATE_TASK_ESCALATED",),
@@ -345,17 +276,8 @@ PIPELINE_SCENARIOS: tuple[PipelineScenario, ...] = (
     ),
     PipelineScenario(
         "merge_gate_locked_test_contract_violation_preserves_base_branch",
-        _AUTO_GATES,
-        (
-            *_BASE_TURNS[:4],
-            MockTurn(
-                "worker-agent",
-                "TASK-002",
-                1,
-                (),
-                {"tests/test_calc.py": "# tampered test\n"},
-            ),
-        ),
+        _AUTO,
+        (*_BASE[:4], _T_TAMPER),
         1,
         (),
         ("PERM_LOCKED_TEST_CONTRACT", "PERM_OUTSIDE_WRITE_SCOPE"),

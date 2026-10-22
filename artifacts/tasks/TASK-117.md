@@ -2,16 +2,16 @@
 id: TASK-117
 title: Compact E2E Pipeline Combination Test Suite Under 400 Lines
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-046
-  - SPEC-046
+- REQ-046
+- SPEC-046
 depends_on:
-  - TASK-115
+- TASK-115
 required_files:
-  - tests/test_pipeline_combinations.py
+- tests/test_pipeline_combinations.py
 write_files:
-  - tests/test_pipeline_combinations.py
+- tests/test_pipeline_combinations.py
 verification_cmd: pytest -q tests/test_task_runner.py -k test_modular_refactoring_and_file_size_ceilings
 ---
 ## Objective
