@@ -5,7 +5,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from multi_tasker.checkers.common import collect_repository_files, parse_python_ast
+from multi_tasker.checkers.common import (
+    collect_repository_files,
+    load_source_extensions,
+    parse_python_ast,
+)
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -206,8 +210,12 @@ def check_glossary(
         else []
     )
     findings: list[Finding] = []
+    source_extensions = load_source_extensions(repository_root)
     target_files = collect_repository_files(
-        repository_root, target_paths, ("artifacts", "src", "tests"), {".md", ".py"}
+        repository_root,
+        target_paths,
+        ("artifacts", "src", "tests"),
+        {".md", *source_extensions},
     )
     for absolute_path in target_files:
         relative_path = absolute_path.relative_to(repository_root).as_posix()

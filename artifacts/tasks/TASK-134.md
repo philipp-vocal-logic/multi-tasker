@@ -2,7 +2,7 @@
 id: TASK-134
 title: Implement Policy-Driven Extensions, Ephemeral Globs, Forbidden Calls, and Test Globs
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-051
 - SPEC-051

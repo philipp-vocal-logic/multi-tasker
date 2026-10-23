@@ -6,7 +6,11 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from multi_tasker.checkers.common import collect_repository_files, parse_python_ast
+from multi_tasker.checkers.common import (
+    collect_repository_files,
+    load_source_extensions,
+    parse_python_ast,
+)
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -201,7 +205,10 @@ def _scan_architecture_files(
     graph: dict[str, set[str]] = {}
     module_to_path: dict[str, str] = {}
     for absolute_path in collect_repository_files(
-        repository_root, target_paths, _extract_layer_folders(layers), {".py"}
+        repository_root,
+        target_paths,
+        _extract_layer_folders(layers),
+        load_source_extensions(repository_root),
     ):
         relative_path = absolute_path.relative_to(repository_root).as_posix()
         source_code = absolute_path.read_text(encoding="utf-8")

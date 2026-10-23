@@ -6,7 +6,11 @@ import tokenize
 from pathlib import Path
 from typing import Any
 
-from multi_tasker.checkers.common import collect_repository_files, parse_python_ast
+from multi_tasker.checkers.common import (
+    collect_repository_files,
+    load_source_extensions,
+    parse_python_ast,
+)
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -151,7 +155,10 @@ def check_limits(
     source_configuration: dict[str, Any] = policy.get("source_code", {})
     findings: list[Finding] = []
     target_files = collect_repository_files(
-        repository_root, target_paths, ("src", "tests"), {".py"}
+        repository_root,
+        target_paths,
+        ("src", "tests"),
+        load_source_extensions(repository_root),
     )
     for absolute_path in target_files:
         relative_path = absolute_path.relative_to(repository_root).as_posix()
@@ -175,7 +182,10 @@ def collect_refactoring_targets(
     max_file_lines = int(source_config.get("max_file_lines", 500))
     hints: list[Finding] = []
     for absolute_path in collect_repository_files(
-        repository_root, target_paths, ("src", "tests"), {".py"}
+        repository_root,
+        target_paths,
+        ("src", "tests"),
+        load_source_extensions(repository_root),
     ):
         relative_path = absolute_path.relative_to(repository_root).as_posix()
         line_count = len(absolute_path.read_text(encoding="utf-8").splitlines())

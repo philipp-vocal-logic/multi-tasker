@@ -13,6 +13,7 @@ from typing import Any
 from multi_tasker.checkers.common import (
     collect_repository_files,
     format_python_files,
+    load_source_extensions,
     parse_python_ast,
 )
 from multi_tasker.domain.models import Finding
@@ -167,13 +168,15 @@ def _check_function_ast(
     return findings
 
 
-def _is_forbidden_print(node: ast.AST, relative_path: str, forbid_print: bool) -> bool:
-    """Return True if node is a forbidden print() call inside src/."""
+def _is_forbidden_call(
+    node: ast.AST, relative_path: str, forbidden_calls: set[str]
+) -> bool:
+    """Return True if node is a forbidden function call inside src/."""
     return (
-        forbid_print
+        bool(forbidden_calls)
         and isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "print"
+        and node.func.id in forbidden_calls
         and relative_path.startswith("src/")
     )
 
@@ -181,12 +184,14 @@ def _is_forbidden_print(node: ast.AST, relative_path: str, forbid_print: bool) -
 def _check_general_ast(
     tree: ast.AST, relative_path: str, ast_configuration: dict[str, Any]
 ) -> list[Finding]:
-    """Check AST nodes for bare except, print() in src/, short names, and functions."""
+    """Check AST nodes for bare except, forbidden calls, short names, and functions."""
     findings: list[Finding] = []
     minimum_length = int(ast_configuration.get("min_identifier_length", 3))
     allowed_short = set(ast_configuration.get("allowed_single_char_names", ["_"]))
     forbid_bare = bool(ast_configuration.get("forbid_bare_except", True))
-    forbid_print = bool(ast_configuration.get("forbid_print_in_src", True))
+    forbidden_calls = {
+        str(item) for item in ast_configuration.get("forbidden_calls_in_src", ["print"])
+    }
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             findings.extend(_check_function_ast(node, relative_path, ast_configuration))
@@ -195,7 +200,7 @@ def _check_general_ast(
             findings.append(
                 Finding(relative_path, node.lineno, "CODE_BARE_EXCEPT", message)
             )
-        elif _is_forbidden_print(node, relative_path, forbid_print):
+        elif _is_forbidden_call(node, relative_path, forbidden_calls):
             message = "Use sys.stdout.write instead of print() in src/."
             line_number = getattr(node, "lineno", 1)
             findings.append(
@@ -249,8 +254,12 @@ def check_clean_code(
         message = "Missing policy/code_quality.yaml."
         return [Finding("policy/code_quality.yaml", 1, "CODE_POLICY_MISSING", message)]
     policy = load_yaml_file(configuration_path)
+    _ = policy.get("language", "python")
     python_files = collect_repository_files(
-        repository_root, target_paths, ("src", "tests"), {".py"}
+        repository_root,
+        target_paths,
+        ("src", "tests"),
+        load_source_extensions(repository_root),
     )
     relative_targets = [
         file_path.relative_to(repository_root).as_posix() for file_path in python_files

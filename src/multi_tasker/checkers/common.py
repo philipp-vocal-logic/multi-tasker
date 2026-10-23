@@ -1,22 +1,60 @@
 """Reusable checker infrastructure for file discovery, AST parsing, and Git status."""
 
 import ast
+from fnmatch import fnmatch
 from pathlib import Path
 import shutil
 import subprocess
 from typing import Any
 
 from multi_tasker.domain.models import Finding
+from multi_tasker.domain.parser import load_yaml_file
 
 
-def _is_ephemeral_git_entry(entry: str) -> bool:
-    """Return True if a git status path is an ephemeral worktree or cache file."""
-    parts = Path(entry).parts
-    return (
-        entry.startswith((".worktrees/", ".pytest_cache/"))
-        or "__pycache__" in parts
-        or entry.endswith((".pyc", ".pyo", ".pyd"))
+def load_ephemeral_globs(repository_root: Path) -> tuple[str, ...]:
+    """Load ignored_ephemeral_globs from policy/agent_execution.yaml."""
+    execution_path = repository_root / "policy" / "agent_execution.yaml"
+    if not execution_path.exists():
+        return (".worktrees/**", ".report/**", ".mt_prompt.md")
+    invariants = load_yaml_file(execution_path).get("clean_repo_invariants", {})
+    raw_globs = (
+        invariants.get("ignored_ephemeral_globs", [])
+        if isinstance(invariants, dict)
+        else []
     )
+    return tuple(str(item) for item in raw_globs) or (
+        ".worktrees/**",
+        ".report/**",
+        ".mt_prompt.md",
+    )
+
+
+def load_source_extensions(repository_root: Path) -> set[str]:
+    """Load source_extensions from policy/code_quality.yaml."""
+    quality_path = repository_root / "policy" / "code_quality.yaml"
+    if not quality_path.exists():
+        return {".py"}
+    policy = load_yaml_file(quality_path)
+    _ = policy.get("language", "python")
+    extensions = policy.get("source_extensions", [".py"])
+    if isinstance(extensions, list) and extensions:
+        return {str(item) for item in extensions}
+    return {".py"}
+
+
+def _is_ephemeral_git_entry(entry: str, globs: tuple[str, ...]) -> bool:
+    """Return True if a git status path matches any configured ephemeral glob."""
+    for pattern in globs:
+        normalized = pattern.removeprefix("**/")
+        folder_prefix = pattern.removesuffix("/**") + "/"
+        if (
+            fnmatch(entry, pattern)
+            or fnmatch(entry, normalized)
+            or entry.startswith(folder_prefix)
+            or f"/{normalized.removesuffix('/**')}/" in f"/{entry}/"
+        ):
+            return True
+    return False
 
 
 def get_git_changed_files(repository_root: Path) -> list[str]:
@@ -41,13 +79,14 @@ def get_git_changed_files(repository_root: Path) -> list[str]:
     )
     if status_process.returncode != 0:
         return []
+    ephemeral_globs = load_ephemeral_globs(repository_root)
     paths: list[str] = []
     for raw_line in status_process.stdout.splitlines():
         if len(raw_line) > 3:
             entry = raw_line[3:].strip()
             if " -> " in entry:
                 entry = entry.split(" -> ", maxsplit=1)[1].strip()
-            if not _is_ephemeral_git_entry(entry):
+            if not _is_ephemeral_git_entry(entry, ephemeral_globs):
                 paths.append(entry)
     return sorted(set(paths))
 

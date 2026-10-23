@@ -10,6 +10,7 @@ from multi_tasker.checkers.common import (
     extract_test_traces,
     get_git_commit_files,
     get_git_commit_subjects,
+    load_source_extensions,
     parse_python_ast,
 )
 from multi_tasker.domain.models import ArtifactDocument, Finding
@@ -59,10 +60,11 @@ def _scan_test_contracts(
         return set(), []
     decorator_name = str(rules.get("test_decorator_name", "traces"))
     signature = rules.get("test_decorator_signature", ["req_id", "ac_id", "spec_id"])
+    test_glob = str(rules.get("test_file_glob", "test_*.py"))
     argument_count = len(signature) if isinstance(signature, list) else 3
     covered_pairs, findings = set(), []
     function_types = (ast.FunctionDef, ast.AsyncFunctionDef)
-    for python_path in sorted(test_directory.rglob("test_*.py")):
+    for python_path in sorted(test_directory.rglob(test_glob)):
         relative = python_path.relative_to(repository_root).as_posix()
         tree, errors = parse_python_ast(
             python_path.read_text(encoding="utf-8"), relative, "TRACE_TEST_SYNTAX"
@@ -175,7 +177,10 @@ def check_specification_target_files(
     findings: list[Finding] = []
     if declared and rules.get("require_files_declared_in_spec_target_files", True):
         for file_path in collect_repository_files(
-            repository_root, target_paths, ("src", "tests"), {".py"}
+            repository_root,
+            target_paths,
+            ("src", "tests"),
+            load_source_extensions(repository_root),
         ):
             relative = file_path.relative_to(repository_root).as_posix()
             if Path(relative).name != "__init__.py" and relative not in declared:
