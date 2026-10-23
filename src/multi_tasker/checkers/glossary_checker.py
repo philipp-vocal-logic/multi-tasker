@@ -10,6 +10,7 @@ from multi_tasker.checkers.common import (
     load_source_extensions,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import extract_non_python_identifiers
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -118,7 +119,7 @@ def _check_identifier_casing(
     identifier_items: list[tuple[str, int]],
     terms: list[dict[str, Any]],
 ) -> list[Finding]:
-    """Verify Python AST identifiers match canonical or code_identifiers casing."""
+    """Verify source identifiers match canonical or code_identifiers casing."""
     allowed_by_lower: dict[str, set[str]] = {}
     for entry in terms:
         canonical = str(entry.get("canonical", ""))
@@ -148,7 +149,7 @@ def _check_identifier_synonyms(
     identifier_items: list[tuple[str, int]],
     terms: list[dict[str, Any]],
 ) -> list[Finding]:
-    """Verify Python AST identifiers do not contain forbidden synonym tokens."""
+    """Verify source identifiers do not contain forbidden synonym tokens."""
     rules = _build_synonym_rules(terms)
     findings: list[Finding] = []
     for identifier, line_number in identifier_items:
@@ -173,14 +174,17 @@ def _check_python_identifiers(
     terms: list[dict[str, Any]],
     enforcement: dict[str, Any],
 ) -> list[Finding]:
-    """Verify Python AST identifiers against forbidden synonyms and casing."""
+    """Verify source identifiers against forbidden synonyms and casing."""
     source_code = absolute_path.read_text(encoding="utf-8")
-    tree, syntax_errors = parse_python_ast(
-        source_code, relative_path, "GLOSSARY_SYNTAX_ERR"
-    )
-    if syntax_errors or tree is None:
-        return syntax_errors
-    identifier_items = _extract_ast_identifiers(tree)
+    if not relative_path.endswith(".py"):
+        identifier_items = extract_non_python_identifiers(source_code, relative_path)
+    else:
+        tree, syntax_errors = parse_python_ast(
+            source_code, relative_path, "GLOSSARY_SYNTAX_ERR"
+        )
+        if syntax_errors or tree is None:
+            return syntax_errors
+        identifier_items = _extract_ast_identifiers(tree)
     findings: list[Finding] = []
     if enforcement.get("fail_on_forbidden_synonym", True):
         findings.extend(
@@ -225,7 +229,7 @@ def check_glossary(
             "check_markdown_prose", True
         ):
             findings.extend(_check_markdown_file(absolute_path, relative_path, rules))
-        elif absolute_path.suffix == ".py" and enforcement.get(
+        elif absolute_path.suffix in source_extensions and enforcement.get(
             "check_code_identifiers", True
         ):
             findings.extend(

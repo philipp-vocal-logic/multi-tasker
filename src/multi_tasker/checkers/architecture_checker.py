@@ -11,6 +11,11 @@ from multi_tasker.checkers.common import (
     load_source_extensions,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import (
+    NON_PYTHON_STDLIB,
+    extract_non_python_imports,
+    path_to_language_module,
+)
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -111,7 +116,7 @@ def _check_single_import(
             message = f"Layer '{layer_name}' cannot import '{module_name}'."
             return Finding(relative_path, line_number, "ARCH_FORBIDDEN_IMPORT", message)
         return None
-    stdlib_modules = sys.stdlib_module_names
+    stdlib_modules = sys.stdlib_module_names | NON_PYTHON_STDLIB
     if top_package not in stdlib_modules and top_package not in allowed_packages:
         message = (
             f"Third-party package '{top_package}' is not in "
@@ -170,12 +175,8 @@ def _detect_cycles(
 
 
 def _path_to_module(relative_path: str) -> str:
-    """Convert relative .py path to dotted module name."""
-    without_extension = relative_path.removesuffix(".py")
-    parts = Path(without_extension).parts
-    if parts and parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
+    """Convert relative source path to dotted module name."""
+    return path_to_language_module(relative_path)
 
 
 def _extract_graph_edges(
@@ -190,6 +191,21 @@ def _extract_graph_edges(
                 if candidate.startswith(prefixes):
                     edges.add(candidate)
     return edges
+
+
+def _parse_file_imports_and_edges(
+    source_code: str, relative_path: str, prefixes: tuple[str, ...]
+) -> tuple[list[tuple[str, int]], set[str], list[Finding]]:
+    """Parse imports and internal graph edges for Python, C, or Rust files."""
+    if not relative_path.endswith(".py"):
+        imports = extract_non_python_imports(source_code, relative_path)
+        edges = {imported for imported, _ in imports if imported.startswith(prefixes)}
+        return imports, edges, []
+    tree, errors = parse_python_ast(source_code, relative_path, "ARCH_SYNTAX_ERR")
+    if errors or tree is None:
+        return [], set(), errors
+    imports = _extract_imports(tree, relative_path)
+    return imports, _extract_graph_edges(tree, imports, prefixes), []
 
 
 def _scan_architecture_files(
@@ -212,18 +228,19 @@ def _scan_architecture_files(
     ):
         relative_path = absolute_path.relative_to(repository_root).as_posix()
         source_code = absolute_path.read_text(encoding="utf-8")
-        tree, errors = parse_python_ast(source_code, relative_path, "ARCH_SYNTAX_ERR")
-        if errors or tree is None:
+        imports, edges, errors = _parse_file_imports_and_edges(
+            source_code, relative_path, prefixes
+        )
+        if errors:
             findings.extend(errors)
             continue
-        imports = _extract_imports(tree, relative_path)
         layer = _find_layer(relative_path, layers)
         findings.extend(
             _check_file_imports(relative_path, imports, layer, package_sets, rules)
         )
         module_name = _path_to_module(relative_path)
-        module_to_path[module_name] = relative_path
-        graph[module_name] = _extract_graph_edges(tree, imports, prefixes)
+        module_to_path.setdefault(module_name, relative_path)
+        graph.setdefault(module_name, set()).update(edges)
     return findings, graph, module_to_path
 
 

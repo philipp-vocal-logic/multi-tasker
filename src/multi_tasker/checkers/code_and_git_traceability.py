@@ -13,6 +13,7 @@ from multi_tasker.checkers.common import (
     load_source_extensions,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import extract_non_python_test_functions
 from multi_tasker.domain.models import ArtifactDocument, Finding
 
 DEFAULT_COMMIT_PATTERN = (
@@ -25,6 +26,30 @@ ARTIFACT_ID_REGEX = re.compile(
 )
 
 
+def _validate_trace_tags(
+    func_name: str,
+    line_number: int,
+    relative: str,
+    decorator_name: str,
+    tags: list[tuple[str, str, str]],
+    by_identifier: dict[str, ArtifactDocument],
+) -> tuple[set[tuple[str, str]], list[Finding]]:
+    """Validate extracted (req_id, ac_id, spec_id) tags on a single test function."""
+    if not tags:
+        message = f"Test '{func_name}' missing @{decorator_name}."
+        return set(), [Finding(relative, line_number, "TRACE_UNTAGGED_TEST", message)]
+    pairs = {
+        (f"{req_id}:{criterion_id}", spec_id) for req_id, criterion_id, spec_id in tags
+    }
+    message = f"Test '{func_name}' references unknown ID."
+    findings = [
+        Finding(relative, line_number, "TRACE_INVALID_TAG", message)
+        for req_id, _, spec_id in tags
+        if req_id not in by_identifier or spec_id not in by_identifier
+    ]
+    return pairs, findings
+
+
 def _check_test_function(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
     relative: str,
@@ -32,21 +57,45 @@ def _check_test_function(
     argument_count: int,
     by_identifier: dict[str, ArtifactDocument],
 ) -> tuple[set[tuple[str, str]], list[Finding]]:
-    """Validate @traces decorator tags on a single test function."""
+    """Validate @traces decorator tags on a single Python test function."""
     tags = extract_test_traces(node, decorator_name, argument_count)
-    if not tags:
-        message = f"Test '{node.name}' missing @{decorator_name}."
-        return set(), [Finding(relative, node.lineno, "TRACE_UNTAGGED_TEST", message)]
-    pairs = {
-        (f"{req_id}:{criterion_id}", spec_id) for req_id, criterion_id, spec_id in tags
-    }
-    message = f"Test '{node.name}' references unknown ID."
-    findings = [
-        Finding(relative, node.lineno, "TRACE_INVALID_TAG", message)
-        for req_id, _, spec_id in tags
-        if req_id not in by_identifier or spec_id not in by_identifier
-    ]
-    return pairs, findings
+    return _validate_trace_tags(
+        node.name, node.lineno, relative, decorator_name, tags, by_identifier
+    )
+
+
+def _scan_single_test_file(
+    test_path: Path,
+    relative: str,
+    decorator_name: str,
+    argument_count: int,
+    by_identifier: dict[str, ArtifactDocument],
+) -> tuple[set[tuple[str, str]], list[Finding]]:
+    """Scan a single Python, C, or Rust test file for @traces test functions."""
+    source_code = test_path.read_text(encoding="utf-8")
+    covered_pairs: set[tuple[str, str]] = set()
+    findings: list[Finding] = []
+    if not relative.endswith(".py"):
+        for func_name, line_no, tags in extract_non_python_test_functions(
+            source_code, relative, decorator_name, argument_count
+        ):
+            pairs, node_findings = _validate_trace_tags(
+                func_name, line_no, relative, decorator_name, tags, by_identifier
+            )
+            covered_pairs.update(pairs)
+            findings.extend(node_findings)
+        return covered_pairs, findings
+    tree, errors = parse_python_ast(source_code, relative, "TRACE_TEST_SYNTAX")
+    findings.extend(errors)
+    function_types = (ast.FunctionDef, ast.AsyncFunctionDef)
+    for node in ast.walk(tree) if tree else ():
+        if isinstance(node, function_types) and node.name.startswith("test_"):
+            pairs, node_findings = _check_test_function(
+                node, relative, decorator_name, argument_count, by_identifier
+            )
+            covered_pairs.update(pairs)
+            findings.extend(node_findings)
+    return covered_pairs, findings
 
 
 def _scan_test_contracts(
@@ -63,20 +112,13 @@ def _scan_test_contracts(
     test_glob = str(rules.get("test_file_glob", "test_*.py"))
     argument_count = len(signature) if isinstance(signature, list) else 3
     covered_pairs, findings = set(), []
-    function_types = (ast.FunctionDef, ast.AsyncFunctionDef)
-    for python_path in sorted(test_directory.rglob(test_glob)):
-        relative = python_path.relative_to(repository_root).as_posix()
-        tree, errors = parse_python_ast(
-            python_path.read_text(encoding="utf-8"), relative, "TRACE_TEST_SYNTAX"
+    for test_path in sorted(test_directory.rglob(test_glob)):
+        relative = test_path.relative_to(repository_root).as_posix()
+        pairs, file_findings = _scan_single_test_file(
+            test_path, relative, decorator_name, argument_count, by_identifier
         )
-        findings.extend(errors)
-        for node in ast.walk(tree) if tree else ():
-            if isinstance(node, function_types) and node.name.startswith("test_"):
-                pairs, node_findings = _check_test_function(
-                    node, relative, decorator_name, argument_count, by_identifier
-                )
-                covered_pairs.update(pairs)
-                findings.extend(node_findings)
+        covered_pairs.update(pairs)
+        findings.extend(file_findings)
     return covered_pairs, findings
 
 

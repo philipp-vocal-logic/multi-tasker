@@ -2,7 +2,7 @@
 id: TASK-137
 title: Implement Multi-Language Support Across Checkers for ANSI C and Rust
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-052
 - SPEC-052
@@ -22,7 +22,8 @@ write_files:
 - src/multi_tasker/checkers/limits_checker.py
 - src/multi_tasker/checkers/glossary_checker.py
 - src/multi_tasker/checkers/code_and_git_traceability.py
-verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_pipeline.py -k checkers
+verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_pipeline.py
+  -k checkers
 ---
 ## Objective
 Add `src/multi_tasker/checkers/language_support.py` and integrate `.c`, `.h`, and `.rs` analysis into all five source code checkers.

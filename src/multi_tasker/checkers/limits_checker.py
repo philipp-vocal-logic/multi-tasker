@@ -1,4 +1,4 @@
-"""Python source code conciseness and sizing checker (`mt check limits`)."""
+"""Source code conciseness and sizing checker (`mt check limits`)."""
 
 import ast
 import io
@@ -11,6 +11,7 @@ from multi_tasker.checkers.common import (
     load_source_extensions,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import check_non_python_file_limits
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -119,11 +120,15 @@ def _check_comment_blocks(
 def _check_python_file_limits(
     absolute_path: Path, relative_path: str, source_configuration: dict[str, Any]
 ) -> list[Finding]:
-    """Enforce file lines, AST limits, and comment limits on a Python file."""
+    """Enforce file lines, AST limits, and comment limits on a source file."""
     source_code = absolute_path.read_text(encoding="utf-8")
+    _ = int(source_configuration.get("refactor_target_file_lines", 400))
+    if not relative_path.endswith(".py"):
+        return check_non_python_file_limits(
+            source_code, relative_path, source_configuration
+        )
     lines = source_code.splitlines()
     max_file_lines = int(source_configuration.get("max_file_lines", 500))
-    _ = int(source_configuration.get("refactor_target_file_lines", 400))
     findings: list[Finding] = []
     if len(lines) > max_file_lines:
         message = f"File has {len(lines)} lines (max: {max_file_lines})."
@@ -146,7 +151,7 @@ def _check_python_file_limits(
 def check_limits(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/code_limits.yaml across Python source and test files."""
+    """Enforce policy/code_limits.yaml across source and test files."""
     limits_path = repository_root / "policy" / "code_limits.yaml"
     if not limits_path.exists():
         message = "Missing policy/code_limits.yaml."

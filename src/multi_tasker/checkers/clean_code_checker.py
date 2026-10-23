@@ -16,6 +16,7 @@ from multi_tasker.checkers.common import (
     load_source_extensions,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import check_non_python_clean_code
 from multi_tasker.domain.models import Finding
 from multi_tasker.domain.parser import load_yaml_file
 
@@ -245,42 +246,55 @@ def _check_comment_markers(
     return findings
 
 
+def _check_single_source_file(
+    source_code: str, relative_path: str, ast_configuration: dict[str, Any]
+) -> list[Finding]:
+    """Run AST and comment checks on a single Python, C, or Rust source file."""
+    if not relative_path.endswith(".py"):
+        return check_non_python_clean_code(
+            source_code, relative_path, ast_configuration
+        )
+    tree, syntax_errors = parse_python_ast(
+        source_code, relative_path, "CODE_SYNTAX_ERR"
+    )
+    if syntax_errors or tree is None:
+        return syntax_errors
+    return [
+        *_check_general_ast(tree, relative_path, ast_configuration),
+        *_check_comment_markers(source_code, relative_path, ast_configuration),
+    ]
+
+
 def check_clean_code(
     repository_root: Path, target_paths: list[str] | None = None
 ) -> list[Finding]:
-    """Enforce policy/code_quality.yaml across Python source and test files."""
+    """Enforce policy/code_quality.yaml across source and test files."""
     configuration_path = repository_root / "policy" / "code_quality.yaml"
     if not configuration_path.exists():
         message = "Missing policy/code_quality.yaml."
         return [Finding("policy/code_quality.yaml", 1, "CODE_POLICY_MISSING", message)]
     policy = load_yaml_file(configuration_path)
     _ = policy.get("language", "python")
-    python_files = collect_repository_files(
+    source_files = collect_repository_files(
         repository_root,
         target_paths,
         ("src", "tests"),
         load_source_extensions(repository_root),
     )
     relative_targets = [
-        file_path.relative_to(repository_root).as_posix() for file_path in python_files
+        file_path.relative_to(repository_root).as_posix() for file_path in source_files
     ]
+    python_targets = [path for path in relative_targets if path.endswith(".py")]
     ruff_configuration: dict[str, Any] = policy.get("linters", {}).get("ruff", {})
     mypy_configuration: dict[str, Any] = policy.get("linters", {}).get("mypy", {})
     ast_configuration: dict[str, Any] = policy.get("ast_rules", {})
-    findings = _run_ruff(repository_root, relative_targets, ruff_configuration)
-    findings.extend(_run_mypy(repository_root, relative_targets, mypy_configuration))
+    findings = _run_ruff(repository_root, python_targets, ruff_configuration)
+    findings.extend(_run_mypy(repository_root, python_targets, mypy_configuration))
     for absolute_path, relative_path in zip(
-        python_files, relative_targets, strict=True
+        source_files, relative_targets, strict=True
     ):
         source_code = absolute_path.read_text(encoding="utf-8")
-        tree, syntax_errors = parse_python_ast(
-            source_code, relative_path, "CODE_SYNTAX_ERR"
-        )
-        if syntax_errors or tree is None:
-            findings.extend(syntax_errors)
-            continue
-        findings.extend(_check_general_ast(tree, relative_path, ast_configuration))
         findings.extend(
-            _check_comment_markers(source_code, relative_path, ast_configuration)
+            _check_single_source_file(source_code, relative_path, ast_configuration)
         )
     return sorted(set(findings))
