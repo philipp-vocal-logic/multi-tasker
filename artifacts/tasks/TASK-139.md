@@ -2,7 +2,7 @@
 id: TASK-139
 title: Add Greenfield Multi-Language Hardening TestContracts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-053
 - SPEC-053
