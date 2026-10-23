@@ -16,16 +16,17 @@ from multi_tasker.domain.parser import (
     load_yaml_file,
     update_artifact_frontmatter,
 )
-from multi_tasker.orchestrator.router import check_transition
 from multi_tasker.orchestrator.documentation_generator import (
     generate_external_agents_guide,
     write_repository_documentation,
 )
+from multi_tasker.orchestrator.language_presets import (
+    VALID_PRESETS,
+    apply_language_preset_policies,
+)
+from multi_tasker.orchestrator.router import check_transition
 from multi_tasker.orchestrator.scheduler import compute_dirty_subgraph
 from multi_tasker.orchestrator.worktree import commit_traceable_change
-
-
-VALID_PRESETS = ("python", "multi-tasker")
 
 DEFAULT_PYTHON_ARCHITECTURE: dict[str, object] = {
     "version": 1,
@@ -101,10 +102,11 @@ def _scaffold_default_policies_and_gitignore(
                 content = (
                     yaml.safe_dump(DEFAULT_PYTHON_ARCHITECTURE, sort_keys=False)
                     if template_path.name == "code_architecture.yaml"
-                    and preset == "python"
+                    and preset != "multi-tasker"
                     else template_path.read_text(encoding="utf-8")
                 )
                 destination.write_text(content, encoding="utf-8")
+    apply_language_preset_policies(repository_root, preset)
     gitignore_path = repository_root / ".gitignore"
     existing_text = (
         gitignore_path.read_text(encoding="utf-8") if gitignore_path.is_file() else ""

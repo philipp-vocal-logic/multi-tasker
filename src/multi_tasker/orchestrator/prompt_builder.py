@@ -10,6 +10,7 @@ from multi_tasker.domain.parser import (
     load_yaml_file,
     next_artifact_id,
 )
+from multi_tasker.orchestrator.language_presets import render_language_worker_contract
 from multi_tasker.orchestrator.prompt_context import (
     MAX_PROMPT_LINE_LENGTH,
     find_role_definition,
@@ -162,32 +163,9 @@ def _render_artifact_schema_block(
     ]
 
 
-def _render_worker_code_contract() -> list[str]:
-    """Render Python Source and TestContract output skeleton for worker-agent."""
-    return [
-        "### Python Source & `TestContract` Output Contract (`Allowed Write`)",
-        "```python",
-        '"""Single-paragraph module docstring within max_docstring_lines/words."""',
-        "",
-        "from multi_tasker.domain.models import traces",
-        "",
-        "",
-        '@traces("REQ-NNN", "AC-XX", "SPEC-NNN")',
-        "def test_example_behavior() -> None:",
-        '    """Single-paragraph docstring (return type, names >= 3 chars)."""',
-        "    expected_value = 1",
-        "    assert expected_value == 1",
-        "```",
-        "- **Scope & Imports**: Create or update only the exact path(s) in "
-        "`Allowed Write` (parent directories are created automatically; `src` and `.` "
-        "are on `PYTHONPATH`, so namespace imports work without extra `__init__.py` "
-        "files).",
-        "- **Docstrings & Types**: Keep every module, class, and function docstring "
-        "within `max_docstring_lines` and `max_docstring_words`; declare explicit "
-        "return types (`-> None`, `-> int`, etc.) and use identifiers "
-        "`>= min_identifier_length` chars.",
-        "",
-    ]
+def _render_worker_code_contract(repository_root: Path | None = None) -> list[str]:
+    """Render language-specific Source and TestContract skeleton for worker-agent."""
+    return render_language_worker_contract(repository_root)
 
 
 def _render_escalation_contract(
@@ -277,7 +255,7 @@ def _assemble_prompt_sections(
     output_contract = (
         _render_artifact_schema_block(primary_type, schemas_policy)
         if primary_type
-        else _render_worker_code_contract()
+        else _render_worker_code_contract(repository_root)
     )
     lines = [
         *_render_permissions_section(

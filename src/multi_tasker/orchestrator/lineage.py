@@ -14,6 +14,7 @@ from multi_tasker.checkers.common import (
     get_git_commit_subjects,
     parse_python_ast,
 )
+from multi_tasker.checkers.language_support import extract_non_python_test_functions
 from multi_tasker.domain.models import ArtifactDocument
 from multi_tasker.domain.parser import load_artifacts_by_id, load_yaml_file
 
@@ -72,16 +73,22 @@ def collect_test_trace_links(
     if not test_directory.exists():
         return []
     entries: list[tuple[str, str, str, str]] = []
-    test_glob = _load_test_file_glob(repository_root)
-    for python_path in sorted(test_directory.rglob(test_glob)):
-        relative_path = python_path.relative_to(repository_root).as_posix()
-        source_code = python_path.read_text(encoding="utf-8")
-        tree, syntax_errors = parse_python_ast(
-            source_code, relative_path, "TRACE_TEST_SYNTAX"
-        )
-        if syntax_errors or tree is None:
+    for test_path in sorted(
+        test_directory.rglob(_load_test_file_glob(repository_root))
+    ):
+        relative_path = test_path.relative_to(repository_root).as_posix()
+        source_code = test_path.read_text(encoding="utf-8")
+        if not relative_path.endswith(".py"):
+            entries.extend(
+                (req_id, ac_id, spec_id, f"{relative_path}:{func_name}")
+                for func_name, _, tags in extract_non_python_test_functions(
+                    source_code, relative_path
+                )
+                for req_id, ac_id, spec_id in tags
+            )
             continue
-        for node in ast.walk(tree):
+        tree, errors = parse_python_ast(source_code, relative_path, "TRACE_TEST_SYNTAX")
+        for node in ast.walk(tree) if tree and not errors else ():
             entries.extend(_extract_function_trace_links(node, relative_path))
     return entries
 
@@ -209,24 +216,14 @@ def trace_lineage(repository_root: Path, target: str) -> list[str]:
         status = frontmatter.get("status", frontmatter.get("verdict", "ok"))
         lines.append(f"{artifact_id} [{status}] ({by_identifier[artifact_id].path})")
     for (
-        requirement_id,
-        criterion_id,
-        specification_id,
+        req_id,
+        ac_id,
+        spec_id,
         location,
     ) in collect_test_trace_links(repository_root):
-        matches = {
-            requirement_id,
-            specification_id,
-            f"{requirement_id}:{criterion_id}",
-            location.split(":")[0],
-        }
-        if (
-            target in matches
-            or requirement_id in matched_ids
-            or specification_id in matched_ids
-        ):
-            pair = f"{requirement_id}:{criterion_id}, {specification_id}"
-            lines.append(f"TEST {location} -> {pair}")
+        matches = {req_id, spec_id, f"{req_id}:{ac_id}", location.split(":")[0]}
+        if target in matches or req_id in matched_ids or spec_id in matched_ids:
+            lines.append(f"TEST {location} -> {req_id}:{ac_id}, {spec_id}")
     lines.extend(
         _collect_matching_commit_lines(repository_root, {target, *matched_ids})
     )

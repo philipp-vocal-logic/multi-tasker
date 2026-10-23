@@ -2,7 +2,7 @@
 id: TASK-138
 title: Implement ANSI C and Rust Presets, Lineage Traces, and Role Prompt Synthesis
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-052
 - SPEC-052

@@ -7,6 +7,7 @@ from typing import Any
 from multi_tasker.checkers.limits_checker import collect_refactoring_targets
 from multi_tasker.domain.models import ArtifactDocument
 from multi_tasker.domain.parser import load_pipeline_policy, load_yaml_file
+from multi_tasker.orchestrator.language_presets import code_fence_for_path
 
 MAX_PROMPT_LINE_LENGTH: int = 88
 
@@ -214,7 +215,7 @@ def _render_code_file_block(
     lines = [f"### {heading_prefix} `{relative_path}`", f"Path: `{relative_path}`"]
     file_path = repository_root / relative_path
     if file_path.is_file():
-        fence = "markdown" if relative_path.endswith(".md") else "python"
+        fence = code_fence_for_path(relative_path)
         lines.extend([f"```{fence}", file_path.read_text("utf-8").strip(), "```"])
     else:
         lines.append(
