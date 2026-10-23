@@ -13,9 +13,7 @@ clean_repo_invariants:
     - ".report/**"
     - ".mt_prompt.md"
     - "**/__pycache__/**"
-    - "**/*.pyc"
-    - "**/*.pyo"
-    - "**/*.pyd"
+    - "**/*.py[cod]"
     - ".pytest_cache/**"
 
 execution_environments:
