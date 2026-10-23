@@ -2,7 +2,7 @@
 id: TASK-136
 title: Add Multi-Language Checker, Preset, and E2E Pipeline TestContracts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-052
 - SPEC-052
