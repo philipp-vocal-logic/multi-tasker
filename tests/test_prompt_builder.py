@@ -194,8 +194,10 @@ def test_intent_why_guidance_in_prompt_cli_and_agents_guide(
 
 
 @traces("REQ-045", "AC-02", "SPEC-045")
-def test_planner_single_concern_decomposition_contract() -> None:
+@traces("REQ-051", "AC-03", "SPEC-051")
+def test_planner_single_concern_decomposition_contract(tmp_path: Path) -> None:
     """Verify planner decomposition contract requires single-concern test files."""
+    from multi_tasker.orchestrator.prompt_builder import build_agent_prompt
     from multi_tasker.orchestrator.prompt_context import (
         render_decomposition_contract,
     )
@@ -204,3 +206,15 @@ def test_planner_single_concern_decomposition_contract() -> None:
     joined = " ".join(lines)
     assert "single-concern" in joined
     assert "_and_" in joined
+    assert "python3 -m py_compile <test_file>" in joined
+    assert "pytest -q <test_file>" in joined
+    assert main(["initialize", "--root", str(tmp_path)]) == 0
+    _write_document(
+        tmp_path / "policy/traceability.yaml",
+        "traceability_rules:\n"
+        "  test_contract_verification_cmd: 'gcc -std=c89 -fsyntax-only <test_file>'\n"
+        "  implementation_verification_cmd: './build/test_runner'\n",
+    )
+    custom, _ = build_agent_prompt(tmp_path, "planner-agent")
+    assert "gcc -std=c89 -fsyntax-only <test_file>" in " ".join(custom.split())
+    assert "./build/test_runner" in custom

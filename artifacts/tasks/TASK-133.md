@@ -2,7 +2,7 @@
 id: TASK-133
 title: Add TestContracts for Policy-Driven Extensions, Ephemeral Globs, Forbidden Calls, and Test Commands
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-051
 - SPEC-051

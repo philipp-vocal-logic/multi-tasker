@@ -18,6 +18,7 @@ def _write_document(path: Path, content: str) -> None:
 
 
 @traces("REQ-001", "AC-03", "SPEC-001")
+@traces("REQ-051", "AC-02", "SPEC-051")
 def test_clean_code_checker_violation_branches(tmp_path: Path) -> None:
     """Verify AST code rules (markers, return types, stubs, short names, print)."""
     assert check_clean_code(tmp_path)[0].rule_id == "CODE_POLICY_MISSING"
@@ -26,10 +27,13 @@ def test_clean_code_checker_violation_branches(tmp_path: Path) -> None:
         tmp_path / "policy" / "code_quality.yaml",
         yaml.safe_dump(
             {
+                "language": "python",
+                "source_extensions": [".py"],
                 "linters": {"ruff": {"enabled": True, "select_rules": ["F"]}},
                 "ast_rules": {
                     "forbidden_comment_markers": [marker],
                     "allowed_single_char_names": ["_"],
+                    "forbidden_calls_in_src": ["print"],
                 },
             }
         ),
@@ -106,6 +110,7 @@ def _assert_linter_fail_fast_and_fail_clear(
 @traces("REQ-049", "AC-01", "SPEC-049")
 @traces("REQ-049", "AC-02", "SPEC-049")
 @traces("REQ-050", "AC-01", "SPEC-050")
+@traces("REQ-051", "AC-02", "SPEC-051")
 def test_output_contract_mypy_and_toggle_sensitivity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -116,6 +121,8 @@ def test_output_contract_mypy_and_toggle_sensitivity(
         "import sys; sys.stdout.write('src/a.py:1: err: x\\nsrc/a.py:2: err: y\\n')",
     ]
     clean_configuration: dict[str, Any] = {
+        "language": "python",
+        "source_extensions": [".py"],
         "output_contract": {
             "silent_on_pass": False,
             "finding_format": "{rule_id}|{path}|{line}",
@@ -129,7 +136,7 @@ def test_output_contract_mypy_and_toggle_sensitivity(
             "forbid_todo_fixme_comments": False,
             "forbid_bare_except": False,
             "forbid_pass_only_functions_in_src": False,
-            "forbid_print_in_src": False,
+            "forbidden_calls_in_src": [],
             "require_explicit_return_types": False,
         },
     }

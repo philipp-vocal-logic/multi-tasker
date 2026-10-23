@@ -22,7 +22,7 @@ from multi_tasker.cli.main import main
 from multi_tasker.domain import parser as domain_parser
 from multi_tasker.domain.models import traces
 from multi_tasker.domain.parser import load_yaml_file
-from multi_tasker.orchestrator import worktree
+from multi_tasker.orchestrator import prompt_context, worktree
 from multi_tasker.orchestrator.merge_gate import GateRequest, evaluate_merge_gate
 from multi_tasker.orchestrator.router import route_escalation
 from multi_tasker.orchestrator.scheduler import (
@@ -39,6 +39,7 @@ from multi_tasker.orchestrator.worktree import (
 POLICY_CONSUMING_MODULES = (
     architecture_checker,
     clean_code_checker,
+    common,
     glossary_checker,
     limits_checker,
     permissions_checker,
@@ -46,6 +47,7 @@ POLICY_CONSUMING_MODULES = (
     traceability_checker,
     cli_output,
     domain_parser,
+    prompt_context,
     worktree,
 )
 
@@ -273,6 +275,8 @@ def _seed_extra_artifacts(root: Path) -> None:
 @traces("REQ-001", "AC-05", "SPEC-001")
 @traces("REQ-002", "AC-01", "SPEC-002")
 @traces("REQ-048", "AC-03", "SPEC-048")
+@traces("REQ-051", "AC-01", "SPEC-051")
+@traces("REQ-051", "AC-03", "SPEC-051")
 def test_all_policy_yaml_keys_are_enforced_and_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -297,6 +301,7 @@ def test_all_policy_yaml_keys_are_enforced_and_read(
             ),
         )
     assert main(["check", "all", "--root", str(tmp_path)]) == 0
+    assert main(["prompt", "planner-agent", "--root", str(tmp_path)]) == 0
     for role, path in (
         ("requirement-agent", "artifacts/requirements/REQ-001.md"),
         ("specification-agent", "artifacts/specifications/SPEC-001.md"),

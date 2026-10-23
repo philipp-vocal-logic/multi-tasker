@@ -65,12 +65,15 @@ def _seed_policies(root: Path) -> None:
 
 
 @traces("REQ-003", "AC-01", "SPEC-003")
+@traces("REQ-051", "AC-01", "SPEC-051")
 def test_initialize_and_intent_creation_with_git(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Verify `mt initialize`, `mt intent`, and Git worktree/status integration."""
     assert main(["initialize", "--root", str(tmp_path)]) == 0
     assert (tmp_path / ".git").exists() and (tmp_path / "artifacts/intents").is_dir()
+    gitignore_text = (tmp_path / ".gitignore").read_text("utf-8")
+    assert ".worktrees/" in gitignore_text and "__pycache__/" in gitignore_text
     assert main(["intent", "Support token revocation.", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip() == "INT-001"
     message_file = tmp_path / "input.txt"
