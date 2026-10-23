@@ -12,6 +12,9 @@ traceability_rules:
   require_spec_target_files_covered_by_tasks: true
   test_decorator_name: "traces"
   test_decorator_signature: ["req_id", "ac_id", "spec_id"]
+  test_file_glob: "test_*.py"
+  test_contract_verification_cmd: "python3 -m py_compile <test_file>"
+  implementation_verification_cmd: "pytest -q <test_file>"
   forbid_dependency_cycles_in_tasks: true
   verify_git_commit_traceability: true
   commit_message_pattern: "^(?:(INT|REQ|SPEC|TASK|ESC|DEC)-[0-9]{3,}|REV-[A-Z0-9-]+): .+ \\[traces: (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+)(?:, (?:[A-Z]+-[0-9]{3,}|REV-[A-Z0-9-]+))*\\]$"

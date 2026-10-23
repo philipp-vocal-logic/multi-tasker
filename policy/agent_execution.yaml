@@ -8,6 +8,15 @@ clean_repo_invariants:
   verify_policy_dir_sha256_unchanged: true
   chmod_readonly_paths_in_worktree:
     - "policy"
+  ignored_ephemeral_globs:
+    - ".worktrees/**"
+    - ".report/**"
+    - ".mt_prompt.md"
+    - "**/__pycache__/**"
+    - "**/*.pyc"
+    - "**/*.pyo"
+    - "**/*.pyd"
+    - ".pytest_cache/**"
 
 execution_environments:
   default_environment: "agy"

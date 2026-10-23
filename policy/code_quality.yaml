@@ -1,6 +1,9 @@
 # Code Quality, Typing & KISS/YAGNI Policy
 # Enforced deterministically by `mt check clean_code` wrapping `ruff`, `mypy`, and Python `ast` visitors.
 version: 1
+language: "python"
+source_extensions:
+  - ".py"
 
 output_contract:
   silent_on_pass: true
@@ -38,7 +41,7 @@ ast_rules:
   forbidden_comment_markers: ["TODO", "FIXME", "HACK", "XXX"]
   forbid_bare_except: true
   forbid_pass_only_functions_in_src: true   # Prevents stubbed/unimplemented methods in src/**
-  forbid_print_in_src: true                 # Enforces structured/quiet CLI output
+  forbidden_calls_in_src: ["print"]         # Enforces structured/quiet CLI output
   require_explicit_return_types: true
   min_identifier_length: 3
   allowed_single_char_names: ["_"]
