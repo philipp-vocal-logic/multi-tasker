@@ -297,7 +297,7 @@ def _assemble_prompt_sections(
         "Architecture layers, Glossary terms, and upstream artifacts are provided "
         "below in this document.",
         *_build_execution_steps(agent_role, target_doc, next_id),
-        *render_decomposition_contract(agent_role, next_id),
+        *render_decomposition_contract(agent_role, next_id, repository_root),
         "",
         "## 2. Output Schemas & Section Budgets",
         *output_contract,

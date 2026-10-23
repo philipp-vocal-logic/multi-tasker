@@ -15,7 +15,7 @@ from multi_tasker.checkers.common import (
     parse_python_ast,
 )
 from multi_tasker.domain.models import ArtifactDocument
-from multi_tasker.domain.parser import load_artifacts_by_id
+from multi_tasker.domain.parser import load_artifacts_by_id, load_yaml_file
 
 COMMIT_ID_REGEX = re.compile(r"\b(?:INT|REQ|SPEC|TASK|ESC|DEC|REV)-[0-9]{3,}\b")
 
@@ -55,6 +55,15 @@ def _extract_function_trace_links(
     ]
 
 
+def _load_test_file_glob(repository_root: Path) -> str:
+    """Read test_file_glob from policy/traceability.yaml."""
+    trace_path = repository_root / "policy" / "traceability.yaml"
+    if not trace_path.exists():
+        return "test_*.py"
+    rules = load_yaml_file(trace_path).get("traceability_rules", {})
+    return str(rules.get("test_file_glob", "test_*.py"))
+
+
 def collect_test_trace_links(
     repository_root: Path,
 ) -> list[tuple[str, str, str, str]]:
@@ -63,7 +72,8 @@ def collect_test_trace_links(
     if not test_directory.exists():
         return []
     entries: list[tuple[str, str, str, str]] = []
-    for python_path in sorted(test_directory.rglob("test_*.py")):
+    test_glob = _load_test_file_glob(repository_root)
+    for python_path in sorted(test_directory.rglob(test_glob)):
         relative_path = python_path.relative_to(repository_root).as_posix()
         source_code = python_path.read_text(encoding="utf-8")
         tree, syntax_errors = parse_python_ast(
@@ -321,7 +331,8 @@ def _compute_static_test_metrics(
 ) -> tuple[int, int, int, str]:
     """Return (test_files, test_functions, trace_links, ac_coverage_summary)."""
     test_dir = repository_root / "tests"
-    test_files = len(list(test_dir.rglob("test_*.py"))) if test_dir.is_dir() else 0
+    test_glob = _load_test_file_glob(repository_root)
+    test_files = len(list(test_dir.rglob(test_glob))) if test_dir.is_dir() else 0
     links = collect_test_trace_links(repository_root)
     unique_funcs = len({location for _, _, _, location in links})
     covered_pairs = {(req_id, ac_id) for req_id, ac_id, _, _ in links}

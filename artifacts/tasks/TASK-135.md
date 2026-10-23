@@ -2,7 +2,7 @@
 id: TASK-135
 title: Implement Policy-Driven Gitignore Scaffolding, Lineage Test Glob, and Planner Verification Commands
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-051
 - SPEC-051
@@ -19,6 +19,7 @@ required_files:
 - src/multi_tasker/orchestrator/prompt_context.py
 - src/multi_tasker/orchestrator/prompt_builder.py
 write_files:
+- src/multi_tasker/checkers/common.py
 - src/multi_tasker/orchestrator/lifecycle.py
 - src/multi_tasker/orchestrator/lineage.py
 - src/multi_tasker/orchestrator/prompt_context.py

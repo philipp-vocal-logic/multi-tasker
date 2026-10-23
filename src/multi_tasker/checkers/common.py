@@ -59,6 +59,7 @@ def _is_ephemeral_git_entry(entry: str, globs: tuple[str, ...]) -> bool:
 
 def get_git_changed_files(repository_root: Path) -> list[str]:
     """Return modified and untracked relative file paths from git status."""
+    ephemeral_globs = load_ephemeral_globs(repository_root)
     if not (repository_root / ".git").exists():
         return []
     head_process = subprocess.run(
@@ -79,7 +80,6 @@ def get_git_changed_files(repository_root: Path) -> list[str]:
     )
     if status_process.returncode != 0:
         return []
-    ephemeral_globs = load_ephemeral_globs(repository_root)
     paths: list[str] = []
     for raw_line in status_process.stdout.splitlines():
         if len(raw_line) > 3:

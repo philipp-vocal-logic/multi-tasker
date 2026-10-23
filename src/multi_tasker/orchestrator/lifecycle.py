@@ -7,7 +7,7 @@ import subprocess
 
 import yaml
 
-from multi_tasker.checkers.common import get_git_changed_files
+from multi_tasker.checkers.common import get_git_changed_files, load_ephemeral_globs
 from multi_tasker.checkers.runner import run_checks
 from multi_tasker.domain.models import ArtifactDocument, Finding
 from multi_tasker.domain.parser import (
@@ -23,16 +23,6 @@ from multi_tasker.orchestrator.documentation_generator import (
 )
 from multi_tasker.orchestrator.scheduler import compute_dirty_subgraph
 from multi_tasker.orchestrator.worktree import commit_traceable_change
-
-
-DEFAULT_GITIGNORE_ENTRIES = (
-    ".worktrees/",
-    ".report/",
-    ".mt_prompt.md",
-    "__pycache__/",
-    "*.py[cod]",
-    ".pytest_cache/",
-)
 
 
 VALID_PRESETS = ("python", "multi-tasker")
@@ -120,9 +110,11 @@ def _scaffold_default_policies_and_gitignore(
         gitignore_path.read_text(encoding="utf-8") if gitignore_path.is_file() else ""
     )
     existing_lines = {line.strip() for line in existing_text.splitlines()}
-    missing = [
-        entry for entry in DEFAULT_GITIGNORE_ENTRIES if entry not in existing_lines
+    gitignore_entries = [
+        item.removeprefix("**/").replace("/**", "/")
+        for item in load_ephemeral_globs(repository_root)
     ]
+    missing = [entry for entry in gitignore_entries if entry not in existing_lines]
     if missing:
         prefix = (
             existing_text

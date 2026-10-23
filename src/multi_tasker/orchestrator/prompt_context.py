@@ -125,7 +125,29 @@ def _render_worker_limits_and_ast(repository_root: Path) -> list[str]:
     return lines
 
 
-def render_decomposition_contract(agent_role: str, next_id: str | None) -> list[str]:
+def _load_planner_verification_commands(
+    repository_root: Path | None,
+) -> tuple[str, str]:
+    """Read test_contract and implementation verification_cmd templates from policy."""
+    default_test = "python3 -m py_compile <test_file>"
+    default_impl = "pytest -q <test_file>"
+    if repository_root is None:
+        return default_test, default_impl
+    trace_path = repository_root / "policy" / "traceability.yaml"
+    if not trace_path.exists():
+        return default_test, default_impl
+    rules = load_yaml_file(trace_path).get("traceability_rules", {})
+    return (
+        str(rules.get("test_contract_verification_cmd", default_test)),
+        str(rules.get("implementation_verification_cmd", default_impl)),
+    )
+
+
+def render_decomposition_contract(
+    agent_role: str,
+    next_id: str | None,
+    repository_root: Path | None = None,
+) -> list[str]:
     """Render Requirement or Planner decomposition contract for agent_role."""
     if agent_role == "requirement-agent":
         return [
@@ -137,18 +159,19 @@ def render_decomposition_contract(agent_role: str, next_id: str | None) -> list[
             "(`AC-01`, `AC-02`, `AC-03`, ...)."
         ]
     if agent_role == "planner-agent":
+        test_cmd, impl_cmd = _load_planner_verification_commands(repository_root)
         return [
             f"- **Planner Decomposition Contract**: Author single-concern "
             f"`type: test_contract` Task(s) (`id: {next_id}`, `traces_to: "
             "[REQ-NNN, SPEC-NNN]`, `write_files` covering `SPEC` "
             "`target_files.tests` without `_and_` test filenames, "
-            "`verification_cmd: python3 -m py_compile <test_file>`, "
+            f"`verification_cmd: {test_cmd}`, "
             'decorating tests with `@traces("REQ-NNN", "AC-XX", '
             '"SPEC-NNN")`) and `type: implementation` Task(s) (`traces_to: '
             f"[REQ-NNN, SPEC-NNN]`, `depends_on: [{next_id}]`, "
             "`required_files: [<test_file>]`, `write_files` covering "
             "`SPEC` `target_files.implementation`, "
-            "`verification_cmd: pytest -q <test_file>`)."
+            f"`verification_cmd: {impl_cmd}`)."
         ]
     return []
 
