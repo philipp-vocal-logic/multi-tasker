@@ -2,7 +2,7 @@
 id: TASK-140
 title: Harden Multi-Language Checkers, Layer Glob Matching, and Greenfield Mypy
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-053
 - SPEC-053
@@ -18,7 +18,8 @@ write_files:
 - src/multi_tasker/checkers/language_support.py
 - src/multi_tasker/checkers/architecture_checker.py
 - src/multi_tasker/checkers/clean_code_checker.py
-verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_greenfield_hardening.py -k "not review_prompt"
+verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_greenfield_hardening.py
+  -k "not review_prompt"
 ---
 ## Objective
 Extract `language_parser.py` from `language_support.py` and harden `architecture_checker.py` and `clean_code_checker.py` for greenfield multi-language repositories.

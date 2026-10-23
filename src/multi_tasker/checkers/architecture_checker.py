@@ -50,12 +50,22 @@ def _extract_imports(tree: ast.AST, relative_path: str = "") -> list[tuple[str, 
     return imports
 
 
+def _matches_layer_glob(relative_path: str, pattern: str) -> bool:
+    """Match relative_path against a layer glob without single '*' crossing '/'."""
+    if "**" not in pattern and Path(relative_path).parent != Path(pattern).parent:
+        return False
+    return fnmatch(relative_path, pattern)
+
+
 def _find_layer(
     relative_path: str, layers: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
     """Return the layer configuration matching relative_path."""
     for layer in layers:
-        if any(fnmatch(relative_path, pattern) for pattern in layer.get("paths", [])):
+        if any(
+            _matches_layer_glob(relative_path, str(pattern))
+            for pattern in layer.get("paths", [])
+        ):
             return layer
     return None
 
@@ -103,6 +113,9 @@ def _check_single_import(
     allowed = [str(prefix) for prefix in layer.get("allowed_internal_imports", [])]
     forbidden = [str(prefix) for prefix in layer.get("forbidden_internal_imports", [])]
     layer_name = str(layer.get("name", ""))
+    own_module = _path_to_module(relative_path)
+    if module_name == own_module or module_name.startswith(f"{own_module}."):
+        return None
     top_package = module_name.split(".", maxsplit=1)[0]
     if no_source_tests and relative_path.startswith("src/") and top_package == "tests":
         message = (
@@ -240,7 +253,7 @@ def _scan_architecture_files(
         )
         module_name = _path_to_module(relative_path)
         module_to_path.setdefault(module_name, relative_path)
-        graph.setdefault(module_name, set()).update(edges)
+        graph.setdefault(module_name, set()).update(edges - {module_name})
     return findings, graph, module_to_path
 
 

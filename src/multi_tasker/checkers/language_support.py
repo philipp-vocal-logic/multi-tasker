@@ -1,22 +1,30 @@
-"""Multi-language structural parser for ANSI C (.c, .h) and Rust (.rs) checkers."""
+"""Multi-language structural rules for ANSI C (.c, .h) and Rust (.rs) checkers."""
 
-from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import Any
 
+from multi_tasker.checkers.language_parser import (
+    COMMENT_REGEX,
+    ParsedFunction,
+    blank_preserving_newlines,
+    extract_c_and_rust_functions,
+    extract_declared_variables,
+    line_number_at,
+    mask_comments_and_literals,
+    mask_string_and_character_literals,
+)
 from multi_tasker.domain.models import Finding
 
 NON_PYTHON_STDLIB = set(
     re.findall(
         r"\w+",
-        "assert ctype errno float limits locale math setjmp signal stdarg "
-        "stdbool stddef stdint stdio stdlib string time std core alloc proc_macro test",
+        "assert ctype dirent errno fcntl float inttypes limits locale math "
+        "pthread setjmp signal stdarg stdbool stddef stdint stdio stdlib "
+        "string sys time unistd std core alloc proc_macro test",
     )
 )
-C_CONTROL_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "catch"}
 
-COMMENT_REGEX = re.compile(r"//[^\n]*|/\*[\s\S]*?\*/")
 C_INCLUDE_LOCAL_REGEX = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
 C_INCLUDE_SYS_REGEX = re.compile(r"^\s*#\s*include\s+<([^>]+)>", re.MULTILINE)
 RUST_USE_REGEX = re.compile(r"^\s*(?:pub\s+)?use\s+([a-zA-Z0-9_:]+)", re.MULTILINE)
@@ -24,100 +32,15 @@ RUST_MOD_PATH_REGEX = re.compile(
     r'^\s*#\s*\[\s*path\s*=\s*"([^"]+)"\s*\]\s*\n\s*(?:pub\s+)?mod\s+([a-zA-Z0-9_]+)',
     re.MULTILINE,
 )
-RUST_FN_REGEX = re.compile(
-    r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:const\s+)?(?:unsafe\s+)?"
-    r"fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:<[^>]*>)?\s*\(([^)]*)\)"
-    r"(?:\s*->\s*[^{;]+)?\s*\{",
-    re.MULTILINE,
-)
-C_FN_REGEX = re.compile(
-    r"^[ \t]*(?:[a-zA-Z_][a-zA-Z0-9_*\s]+?)\s+\*?([a-zA-Z_][a-zA-Z0-9_]*)"
-    r"\s*\(([^;{}]*)\)\s*\{",
-    re.MULTILINE,
-)
-VAR_DECL_REGEX = re.compile(
-    r"\b(?:let\s+(?:mut\s+)?|int\s+|long\s+|short\s+|char\s+|float\s+|double\s+|"
-    r"unsigned\s+|size_t\s+)([a-zA-Z_][a-zA-Z0-9_]*)\b"
-)
 TYPE_DECL_REGEX = re.compile(
     r"\b(?:struct|enum|type|union|typedef)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b"
 )
 CALL_REGEX = re.compile(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*!?\s*\(")
 
 
-@dataclass(frozen=True)
-class ParsedFunction:
-    """Extracted function metadata for C and Rust source files."""
-
-    name: str
-    start_line: int
-    end_line: int
-    arguments: list[str]
-    body_text: str
-
-
-def _line_number_at(source_code: str, offset: int) -> int:
-    """Return 1-based line number for a character offset in source_code."""
-    return source_code.count("\n", 0, offset) + 1
-
-
-def _find_closing_brace(source_code: str, open_brace_index: int) -> int:
-    """Find matching closing brace index starting from open_brace_index."""
-    depth = 0
-    for index in range(open_brace_index, len(source_code)):
-        character = source_code[index]
-        if character == "{":
-            depth += 1
-        elif character == "}":
-            depth -= 1
-            if depth == 0:
-                return index
-    return len(source_code) - 1
-
-
-def _parse_arguments(raw_arguments: str, is_rust: bool) -> list[str]:
-    """Extract parameter identifier names from a C or Rust parameter list."""
-    stripped = raw_arguments.strip()
-    if not stripped or (not is_rust and stripped == "void"):
-        return []
-    names: list[str] = []
-    for part in stripped.split(","):
-        cleaned = part.strip()
-        if not cleaned or cleaned in {"self", "&self", "&mut self", "mut self"}:
-            continue
-        target = cleaned.split(":", maxsplit=1)[0].strip() if is_rust else cleaned
-        tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", target)
-        if tokens:
-            names.append(tokens[-1])
-    return names
-
-
-def extract_c_and_rust_functions(
-    source_code: str, relative_path: str
-) -> list[ParsedFunction]:
-    """Extract function spans, arguments, and bodies from a C or Rust file."""
-    is_rust = relative_path.endswith(".rs")
-    pattern = RUST_FN_REGEX if is_rust else C_FN_REGEX
-    functions: list[ParsedFunction] = []
-    for match in pattern.finditer(source_code):
-        name = match.group(1)
-        if not is_rust and name in C_CONTROL_KEYWORDS:
-            continue
-        open_brace = match.end() - 1
-        close_brace = _find_closing_brace(source_code, open_brace)
-        start_line = _line_number_at(source_code, match.start())
-        end_line = _line_number_at(source_code, close_brace)
-        arguments = _parse_arguments(match.group(2), is_rust)
-        body_text = source_code[open_brace + 1 : close_brace].strip()
-        functions.append(
-            ParsedFunction(name, start_line, end_line, arguments, body_text)
-        )
-    return functions
-
-
 def _is_non_python_stub(body_text: str) -> bool:
     """Return True if a C or Rust function body is empty or a todo stub."""
-    cleaned = COMMENT_REGEX.sub("", body_text).strip().rstrip(";").strip()
+    cleaned = body_text.strip().rstrip(";").strip()
     return not cleaned or cleaned.startswith(("todo!(", "unimplemented!("))
 
 
@@ -135,20 +58,21 @@ def _check_non_python_markers(
     pattern = re.compile(
         r"\b(" + "|".join(re.escape(item) for item in markers) + r")\b"
     )
+    masked_literals = mask_string_and_character_literals(source_code)
     return [
         Finding(
             relative_path,
-            _line_number_at(source_code, match.start()),
+            line_number_at(source_code, match.start()),
             "CODE_FORBIDDEN_MARKER",
             f"Comment contains forbidden marker '{found.group(1)}'.",
         )
-        for match in COMMENT_REGEX.finditer(source_code)
-        if (found := pattern.search(match.group(0)))
+        for match in COMMENT_REGEX.finditer(masked_literals)
+        if (found := pattern.search(source_code[match.start() : match.end()]))
     ]
 
 
 def _check_non_python_short_identifiers(
-    source_code: str,
+    masked_code: str,
     relative_path: str,
     functions: list[ParsedFunction],
     ast_configuration: dict[str, Any],
@@ -156,16 +80,14 @@ def _check_non_python_short_identifiers(
     """Check C and Rust parameters and local variables against min_identifier_length."""
     min_len = int(ast_configuration.get("min_identifier_length", 3))
     allowed = set(ast_configuration.get("allowed_single_char_names", ["_"]))
+    variables = extract_declared_variables(masked_code, relative_path.endswith(".rs"))
     items = [
         *(
             (arg, func.start_line, "Argument")
             for func in functions
             for arg in func.arguments
         ),
-        *(
-            (match.group(1), _line_number_at(source_code, match.start()), "Variable")
-            for match in VAR_DECL_REGEX.finditer(source_code)
-        ),
+        *((name, line, "Variable") for name, line in variables),
     ]
     return [
         Finding(
@@ -183,11 +105,12 @@ def check_non_python_clean_code(
     source_code: str, relative_path: str, ast_configuration: dict[str, Any]
 ) -> list[Finding]:
     """Enforce clean_code AST rules on ANSI C (.c, .h) and Rust (.rs) files."""
+    masked = mask_comments_and_literals(source_code)
     functions = extract_c_and_rust_functions(source_code, relative_path)
     findings = [
         *_check_non_python_markers(source_code, relative_path, ast_configuration),
         *_check_non_python_short_identifiers(
-            source_code, relative_path, functions, ast_configuration
+            masked, relative_path, functions, ast_configuration
         ),
     ]
     if ast_configuration.get(
@@ -211,11 +134,11 @@ def check_non_python_clean_code(
         findings.extend(
             Finding(
                 relative_path,
-                _line_number_at(source_code, match.start()),
+                line_number_at(source_code, match.start()),
                 "CODE_PRINT_FORBIDDEN",
                 f"Call '{match.group(1)}' is forbidden in src/.",
             )
-            for match in CALL_REGEX.finditer(source_code)
+            for match in CALL_REGEX.finditer(masked)
             if match.group(1) in forbidden
         )
     return findings
@@ -227,9 +150,10 @@ def _group_non_python_comments(
     """Group C and Rust comments into (doc_blocks, inline_blocks)."""
     blocks_by_kind: dict[bool, list[tuple[int, list[str]]]] = {True: [], False: []}
     prev_end: dict[bool, int] = {True: -2, False: -2}
-    for match in COMMENT_REGEX.finditer(source_code):
-        raw = match.group(0)
-        start = _line_number_at(source_code, match.start())
+    masked_literals = mask_string_and_character_literals(source_code)
+    for match in COMMENT_REGEX.finditer(masked_literals):
+        raw = source_code[match.start() : match.end()]
+        start = line_number_at(source_code, match.start())
         cleaned = [
             stripped
             for line in raw.splitlines()
@@ -319,14 +243,15 @@ def extract_non_python_identifiers(
     source_code: str, relative_path: str
 ) -> list[tuple[str, int]]:
     """Extract function, parameter, variable, and type identifiers from C/Rust code."""
+    masked = mask_comments_and_literals(source_code)
     funcs = extract_c_and_rust_functions(source_code, relative_path)
     return [
         *((func.name, func.start_line) for func in funcs),
         *((arg, func.start_line) for func in funcs for arg in func.arguments),
+        *extract_declared_variables(masked, relative_path.endswith(".rs")),
         *(
-            (match.group(1), _line_number_at(source_code, match.start()))
-            for regex in (VAR_DECL_REGEX, TYPE_DECL_REGEX)
-            for match in regex.finditer(source_code)
+            (match.group(1), line_number_at(masked, match.start(1)))
+            for match in TYPE_DECL_REGEX.finditer(masked)
         ),
     ]
 
@@ -342,34 +267,81 @@ def path_to_language_module(relative_path: str) -> str:
     return ".".join(Path(relative_path).parts)
 
 
+def _resolve_c_include_target(raw_include: str, relative_path: str) -> str:
+    """Resolve a local C #include path to a normalized dotted module name."""
+    raw_parts = Path(raw_include.removesuffix(".h").removesuffix(".c")).parts
+    dotted = ".".join(raw_parts)
+    parent_parts = Path(relative_path).parent.parts
+    if len(raw_parts) == 1 and len(parent_parts) > 1 and parent_parts[0] == "src":
+        return f"{'.'.join(parent_parts)}.{dotted}"
+    if dotted.startswith(("src.", "tests.")):
+        return dotted
+    prefix = "src." if relative_path.startswith("src/") else ""
+    return f"{prefix}{dotted}"
+
+
+def _normalize_rust_use(raw_use: str, current_module: str) -> str:
+    """Normalize a Rust use path (crate, super, self) to a dotted module name."""
+    dotted = raw_use.replace("::", ".")
+    if dotted.startswith("crate."):
+        return f"src.{dotted.removeprefix('crate.')}"
+    for prefix in ("super", "self"):
+        if dotted == prefix or dotted.startswith(f"{prefix}."):
+            return f"{current_module}{dotted.removeprefix(prefix)}"
+    return dotted
+
+
 def extract_non_python_imports(
     source_code: str, relative_path: str
 ) -> list[tuple[str, int]]:
     """Extract normalized dotted imports from C #include or Rust use statements."""
-    imports: list[tuple[str, int]] = []
-    prefix = "src." if relative_path.startswith("src/") else ""
+    code_only = COMMENT_REGEX.sub(blank_preserving_newlines, source_code)
     if relative_path.endswith((".c", ".h")):
-        for match in C_INCLUDE_LOCAL_REGEX.finditer(source_code):
-            dotted = ".".join(
-                Path(match.group(1).removesuffix(".h").removesuffix(".c")).parts
+        local = [
+            (
+                _resolve_c_include_target(match.group(1), relative_path),
+                line_number_at(source_code, match.start()),
             )
-            target = (
-                dotted if dotted.startswith(("src.", "tests.")) else f"{prefix}{dotted}"
+            for match in C_INCLUDE_LOCAL_REGEX.finditer(code_only)
+        ]
+        system = [
+            (
+                Path(match.group(1).removesuffix(".h")).parts[0],
+                line_number_at(source_code, match.start()),
             )
-            imports.append((target, _line_number_at(source_code, match.start())))
-        for match in C_INCLUDE_SYS_REGEX.finditer(source_code):
-            sys_header = Path(match.group(1).removesuffix(".h")).parts[0]
-            imports.append((sys_header, _line_number_at(source_code, match.start())))
-        return imports
-    for match in RUST_USE_REGEX.finditer(source_code):
-        raw_use = match.group(1).replace("::", ".")
-        if raw_use.startswith("crate."):
-            raw_use = f"src.{raw_use.removeprefix('crate.')}"
-        imports.append((raw_use, _line_number_at(source_code, match.start())))
-    for match in RUST_MOD_PATH_REGEX.finditer(source_code):
-        mod_target = path_to_language_module(match.group(1).lstrip("./"))
-        imports.append((mod_target, _line_number_at(source_code, match.start())))
-    return imports
+            for match in C_INCLUDE_SYS_REGEX.finditer(code_only)
+        ]
+        return [*local, *system]
+    current_mod = path_to_language_module(relative_path)
+    uses = [
+        (
+            _normalize_rust_use(match.group(1), current_mod),
+            line_number_at(source_code, match.start()),
+        )
+        for match in RUST_USE_REGEX.finditer(code_only)
+    ]
+    mods = [
+        (
+            path_to_language_module(match.group(1).lstrip("./")),
+            line_number_at(source_code, match.start()),
+        )
+        for match in RUST_MOD_PATH_REGEX.finditer(code_only)
+    ]
+    return [*uses, *mods]
+
+
+def _extract_preceding_annotation_block(
+    lines: list[str], start_line: int, min_line: int
+) -> str:
+    """Collect contiguous comment/attribute lines immediately above start_line."""
+    collected: list[str] = []
+    for index in range(start_line - 2, max(-1, min_line - 1), -1):
+        stripped = lines[index].strip()
+        if not stripped or stripped.startswith(("//", "/*", "*", "*/", "#[")):
+            collected.append(lines[index])
+        else:
+            break
+    return "\n".join(reversed(collected))
 
 
 def extract_non_python_test_functions(
@@ -383,16 +355,13 @@ def extract_non_python_test_functions(
         rf'@?{re.escape(decorator_name)}\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
     )
     lines = source_code.splitlines()
-    return [
-        (
-            func.name,
-            func.start_line,
-            pattern.findall(
-                "\n".join(lines[max(0, func.start_line - 6) : func.start_line])
-            )
-            if argument_count >= 3
-            else [],
-        )
-        for func in extract_c_and_rust_functions(source_code, relative_path)
-        if func.name.startswith("test_")
-    ]
+    functions = extract_c_and_rust_functions(source_code, relative_path)
+    results: list[tuple[str, int, list[tuple[str, str, str]]]] = []
+    for index, func in enumerate(functions):
+        if not func.name.startswith("test_"):
+            continue
+        min_line = functions[index - 1].end_line + 1 if index > 0 else 1
+        preamble = _extract_preceding_annotation_block(lines, func.start_line, min_line)
+        traces_list = pattern.findall(preamble) if argument_count >= 3 else []
+        results.append((func.name, func.start_line, traces_list))
+    return results

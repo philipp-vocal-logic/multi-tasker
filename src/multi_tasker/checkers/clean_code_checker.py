@@ -74,6 +74,27 @@ def _run_ruff(
     return findings
 
 
+def _build_mypy_command_and_path(
+    repository_root: Path, targets: list[str], base_command: list[str]
+) -> tuple[list[str], str]:
+    """Build mypy command flags and MYPYPATH for greenfield and multi-tasker repos."""
+    command = list(base_command)
+    if command and Path(command[0]).name == "mypy":
+        if "--explicit-package-bases" not in command:
+            command.append("--explicit-package-bases")
+        if all(target.startswith("tests/") for target in targets):
+            command.append("--ignore-missing-imports")
+    mt_source = Path(__file__).resolve().parents[2]
+    uses_src_prefix = any(
+        "from src." in (repository_root / target).read_text(encoding="utf-8")
+        or "import src." in (repository_root / target).read_text(encoding="utf-8")
+        for target in targets
+        if (repository_root / target).is_file()
+    )
+    base_dir = repository_root if uses_src_prefix else repository_root / "src"
+    return command, f"{base_dir}{os.pathsep}{mt_source}"
+
+
 def _run_mypy(
     repository_root: Path, targets: list[str], mypy_configuration: dict[str, Any]
 ) -> list[Finding]:
@@ -85,9 +106,11 @@ def _run_mypy(
     if not shutil.which(executable):
         message = f"Linter executable '{executable}' not found in PATH."
         return [Finding("policy/code_quality.yaml", 1, "CODE_LINTER_MISSING", message)]
-    mypy_path = f"{repository_root / 'src'}{os.pathsep}{repository_root}"
+    command, mypy_path = _build_mypy_command_and_path(
+        repository_root, targets, base_command
+    )
     process = subprocess.run(
-        [*base_command, *targets],
+        [*command, *targets],
         cwd=repository_root,
         env={**os.environ, "MYPYPATH": mypy_path},
         capture_output=True,
@@ -107,7 +130,8 @@ def _run_mypy(
     ]
     if process.returncode != 0 and not findings:
         lines = (process.stderr or process.stdout).strip().splitlines()
-        detail = lines[-1] if lines else f"mypy exited with code {process.returncode}."
+        err = next((line for line in lines if ": error:" in line), "")
+        detail = err or (lines[-1] if lines else f"mypy exited ({process.returncode}).")
         return [Finding("policy/code_quality.yaml", 1, "CODE_MYPY", detail)]
     return findings
 
