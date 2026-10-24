@@ -321,8 +321,9 @@ def _step_declarative_stage(
     produced, findings = run_agent_stage(repository_root, role, target_id, options)
     if findings or gate == "human":
         return produced, findings
-    for artifact_id in list(produced):
-        if gate == "review-agent":
+    stage_artifacts = list(produced)
+    if gate == "review-agent":
+        for artifact_id in stage_artifacts:
             rev_ids, rev_findings = run_agent_stage(
                 repository_root, "review-agent", artifact_id, options
             )
@@ -334,6 +335,7 @@ def _step_declarative_stage(
             if verdict_findings:
                 return produced, verdict_findings
             produced.extend(rev_ids)
+    for artifact_id in stage_artifacts:
         approve_stage_artifact(repository_root, artifact_id)
     return produced, []
 

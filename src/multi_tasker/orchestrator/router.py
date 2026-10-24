@@ -1,4 +1,4 @@
-"""Deterministic tiered Escalation router driven by policy/pipeline.yaml."""
+"""Deterministic tiered Escalation router driven by policy/artifact_lifecycle.yaml."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -113,17 +113,20 @@ def find_actionable_stage_target(
         if doc.artifact_type == "REV" and doc.frontmatter.get("verdict") == "fail"
         for target in doc.frontmatter.get("target_artifacts", [])
     }
-    retry_pending = {
-        doc_id
+    retry_upstreams = {
+        str(ref)
         for doc_id, doc in by_id.items()
         if doc_id in failed_targets
         and str(doc.frontmatter.get("status", "")) in {"draft", "blocked"}
+        for ref in doc.frontmatter.get("traces_to", [])
     }
     covered = {
         str(upstream)
-        for doc_id, doc in by_id.items()
-        if doc.artifact_type == downstream_type and doc_id not in retry_pending
+        for doc in by_id.values()
+        if doc.artifact_type == downstream_type
         for upstream in doc.frontmatter.get("traces_to", [])
+        if str(upstream) not in retry_upstreams
+        or str(doc.frontmatter.get("status", "")) not in {"draft", "blocked"}
     }
     for artifact_id, doc in sorted(by_id.items()):
         state = str(doc.frontmatter.get("status", ""))
@@ -176,10 +179,7 @@ def _create_review_escalation(
         update_artifact_frontmatter(
             repository_root / target_doc.path, {"status": "blocked"}
         )
-    changed = [
-        esc_rel,
-        *([target_doc.path] if target_doc is not None else []),
-    ]
+    changed = [esc_rel, *([target_doc.path] if target_doc is not None else [])]
     subject = (
         f"{esc_id}: Escalate {artifact_id} review [traces: {artifact_id}, {esc_id}]"
     )
@@ -216,7 +216,16 @@ def _mark_dirty_subgraph(
     by_identifier: dict[str, ArtifactDocument],
     changed_id: str,
 ) -> None:
-    """Mark downstream approved SPEC and done TASK artifacts as needs_update."""
+    """Unblock resolved targets and mark downstream SPEC/TASK as needs_update."""
+    res_doc = by_identifier.get(changed_id)
+    applies = res_doc.frontmatter.get("applies_to", []) if res_doc else []
+    for target_id in {changed_id, *(str(item) for item in applies)}:
+        doc = by_identifier.get(target_id)
+        if doc and doc.frontmatter.get("status") == "blocked":
+            next_state = "ready" if doc.artifact_type == "TASK" else "draft"
+            update_artifact_frontmatter(
+                repository_root / doc.path, {"status": next_state}
+            )
     for dirty_id in compute_dirty_subgraph(repository_root, changed_id):
         doc = by_identifier.get(dirty_id)
         if doc and doc.frontmatter.get("status") in {"approved", "done"}:
