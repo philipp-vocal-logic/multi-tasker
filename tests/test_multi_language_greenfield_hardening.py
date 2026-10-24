@@ -7,6 +7,7 @@ import pytest
 from multi_tasker.checkers.architecture_checker import check_architecture
 from multi_tasker.checkers.clean_code_checker import check_clean_code
 from multi_tasker.checkers.limits_checker import check_limits
+from multi_tasker.checkers.language_support import extract_non_python_test_functions
 from multi_tasker.checkers.traceability_checker import check_traceability
 from multi_tasker.cli.main import main
 from multi_tasker.domain.models import traces
@@ -139,6 +140,8 @@ def _verify_c_and_rust_comment_and_string_sanitization(base_dir: Path) -> None:
         "//! Clean Rust module where let a and println!(x) appear in docs.\n"
         "use std::collections::HashMap;\n"
         "use super::helper;\n"
+        "use crate::domain::{first_mod, second_mod};\n"
+        'pub fn emit_brace() -> &\'static str { "}" }\n'
         "pub fn pair_values<T>(items: HashMap<String, i32>, val: T) -> [i32; 2]\n"
         "where\n"
         "    T: Clone,\n"
@@ -155,6 +158,8 @@ def _verify_c_and_rust_comment_and_string_sanitization(base_dir: Path) -> None:
 
 
 @traces("REQ-053", "AC-02", "SPEC-053")
+@traces("REQ-054", "AC-01", "SPEC-054")
+@traces("REQ-054", "AC-02", "SPEC-054")
 def test_c_and_rust_comment_string_sanitization_and_signature_trace_parsing(
     tmp_path: Path,
 ) -> None:
@@ -181,7 +186,6 @@ def test_c_and_rust_comment_string_sanitization_and_signature_trace_parsing(
 
     _write_text(
         c_repo / "tests/test_traces.c",
-        "/** Trace isolation test. */\n"
         '/* @traces("REQ-001", "AC-01", "SPEC-001") */\n'
         '/* @traces("REQ-001", "AC-02", "SPEC-001") */\n'
         '/* @traces("REQ-001", "AC-03", "SPEC-001") */\n'
@@ -196,6 +200,10 @@ def test_c_and_rust_comment_string_sanitization_and_signature_trace_parsing(
     ]
     assert any("test_untagged_after_short_fn" in msg for msg in untagged)
     assert not any("test_five_criteria" in msg for msg in untagged)
+    extracted = extract_non_python_test_functions(
+        (c_repo / "tests/test_traces.c").read_text(encoding="utf-8")
+    )
+    assert len(extracted[0][2]) == 5 and extracted[1][2] == []
 
 
 def _seed_task_for_prompt_check(repo: Path) -> None:

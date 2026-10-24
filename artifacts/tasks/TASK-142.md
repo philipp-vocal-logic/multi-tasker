@@ -3,7 +3,7 @@ id: TASK-142
 title: Add TestContracts for Line-1 Traces, String-Return Non-Stubs, and Rust Tuple/Group
   Parsing
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-054
 - SPEC-054
