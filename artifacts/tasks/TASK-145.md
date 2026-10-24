@@ -2,7 +2,7 @@
 id: TASK-145
 title: Add Multi-Language Parallel Layers, MergeGate Fault, and Supersession TestContracts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-055
 - SPEC-055
