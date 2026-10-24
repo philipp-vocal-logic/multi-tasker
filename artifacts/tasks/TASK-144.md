@@ -2,7 +2,7 @@
 id: TASK-144
 title: Add Multi-Language Gate, Review Retry, and Escalation TestContracts
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-055
 - SPEC-055
