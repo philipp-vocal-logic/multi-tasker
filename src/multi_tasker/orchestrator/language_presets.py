@@ -19,8 +19,9 @@ _PRESET_SETTINGS: dict[str, dict[str, Any]] = {
             "-fsyntax-only -Isrc <test_file>"
         ),
         "impl_cmd": (
-            "sh -c 'gcc -std=c89 -pedantic -Wall -Wextra -Werror -Isrc "
-            "<test_file> src/domain/*.c -o .report/test_runner && .report/test_runner'"
+            "sh -c 'mkdir -p .report && gcc -std=c89 -pedantic -Wall -Wextra "
+            '-Werror -Isrc <test_file> $(find src -name "*.c") '
+            "-o .report/test_runner && .report/test_runner'"
         ),
         "test_pattern": r"^tests/.+\.(c|h)$",
         "impl_pattern": r"^src/.+\.(c|h)$",
@@ -35,7 +36,7 @@ _PRESET_SETTINGS: dict[str, dict[str, Any]] = {
             "rustfmt --check --edition 2021 --config skip_children=true <test_file>"
         ),
         "impl_cmd": (
-            "sh -c 'rustc --edition 2021 --test <test_file> "
+            "sh -c 'mkdir -p .report && rustc --edition 2021 --test <test_file> "
             "-o .report/test_runner && .report/test_runner --quiet'"
         ),
         "test_pattern": r"^tests/.+\.rs$",

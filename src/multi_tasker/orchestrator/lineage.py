@@ -367,7 +367,7 @@ def render_test_and_coverage_section(repository_root: Path) -> list[str]:
         and "documentation" in sys.argv
         and not os.environ.get("PYTEST_CURRENT_TEST")
         and not os.environ.get("MT_COVERAGE_ACTIVE")
-        and (repository_root / "src").is_dir()
+        and any((repository_root / "src").rglob("*.py"))
         and (repository_root / "tests").is_dir()
     ):
         collect_pytest_line_coverage(repository_root)

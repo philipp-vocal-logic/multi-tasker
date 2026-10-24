@@ -114,6 +114,7 @@ def create_worktree(
             ".worktrees", "__pycache__", ".pytest_cache", ".git", ".report"
         )
         shutil.copytree(repository_root, worktree_path, ignore=ignored)
+    (worktree_path / ".report").mkdir(parents=True, exist_ok=True)
     for folder in ARTIFACT_DIRECTORY_TO_TYPE:
         (worktree_path / "artifacts" / folder).mkdir(parents=True, exist_ok=True)
     for relative_directory in invariants.get(

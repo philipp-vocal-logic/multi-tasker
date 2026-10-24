@@ -3,7 +3,7 @@ id: TASK-141
 title: Harden Presets, Review Prompt Scope, Worktree Report Directory, and Lineage
   Coverage
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-053
 - SPEC-053
@@ -25,7 +25,8 @@ write_files:
 - src/multi_tasker/orchestrator/prompt_context.py
 - src/multi_tasker/orchestrator/lineage.py
 - src/multi_tasker/orchestrator/worktree.py
-verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_greenfield_hardening.py tests/test_multi_language_pipeline.py
+verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_greenfield_hardening.py
+  tests/test_multi_language_pipeline.py
 ---
 ## Objective
 Harden preset architecture/verification policies, `review-agent` prompt paths, worktree `.report` creation, and language-aware prompt context and documentation.

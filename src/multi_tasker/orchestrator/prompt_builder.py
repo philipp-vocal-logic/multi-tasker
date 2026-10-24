@@ -190,7 +190,11 @@ def _resolve_stage_write_paths(
     next_id: str | None,
 ) -> str:
     """Resolve concrete verification file paths for worker-agent or stage agents."""
-    if target_doc and target_doc.frontmatter.get("write_files"):
+    if (
+        agent_role == "worker-agent"
+        and target_doc
+        and target_doc.frontmatter.get("write_files")
+    ):
         return " ".join(str(item) for item in target_doc.frontmatter["write_files"])
     primary_type = ROLE_TO_OUTPUT_SCHEMA.get(agent_role, "")
     output_dir = ROLE_OUTPUT_DIR.get(primary_type, "")
@@ -222,7 +226,7 @@ def _build_execution_steps(
         "- **Execution Steps**:",
         f"  1. Author the target file(s) in `Allowed Write`{status_hint} directly "
         "from the template, constraints, and inlined context below.",
-        f"  2. Verify once by running `{verify_cmd}`.",
+        f"  2. Run `{verify_cmd}`.",
         "  3. Finish and return a brief summary immediately once Step 2 exits with "
         "code `0` and empty `mt check` stdout (`MergeGate` commits on exit).",
     ]

@@ -119,8 +119,20 @@ def _render_worker_limits_and_ast(repository_root: Path) -> list[str]:
         ]
         lines.append(f"- **Source Limits**: {', '.join(limit_items)}")
     clean_path = repository_root / "policy" / "code_quality.yaml"
-    if clean_path.exists():
-        ast_rules = load_yaml_file(clean_path).get("ast_rules", {})
+    clean_data = load_yaml_file(clean_path) if clean_path.exists() else {}
+    language = str(clean_data.get("language", "python"))
+    decorator_prefix = (
+        "`from multi_tasker.domain.models import traces` with "
+        if language == "python"
+        else "Comment annotation with "
+    )
+    lines.insert(
+        0,
+        f"- **TestContract Decorator**: {decorator_prefix}"
+        '3 string arguments `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`',
+    )
+    if clean_data:
+        ast_rules = clean_data.get("ast_rules", {})
         pairs = ", ".join(f"`{key}={val}`" for key, val in ast_rules.items())
         lines.append(f"- **Clean Code AST Rules**: {pairs}")
     return lines
@@ -186,11 +198,6 @@ def render_code_and_glossary_section(
         *render_architecture_layers(repository_root),
     ]
     if agent_role != "requirement-agent":
-        lines.append(
-            "- **TestContract Decorator**: "
-            "`from multi_tasker.domain.models import traces` "
-            'with 3 string arguments `@traces("REQ-NNN", "AC-XX", "SPEC-NNN")`'
-        )
         lines.extend(_render_worker_limits_and_ast(repository_root))
     if agent_role == "review-agent":
         lines.append(

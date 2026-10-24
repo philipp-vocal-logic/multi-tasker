@@ -39,21 +39,27 @@ DEFAULT_PYTHON_ARCHITECTURE: dict[str, object] = {
         {
             "name": "domain",
             "paths": ["src/domain/**", "src/*.py"],
-            "allowed_internal_imports": ["src.domain", "domain"],
-            "forbidden_internal_imports": ["src.services", "src.cli", "tests"],
+            "allowed_internal_imports": ["src", "domain"],
+            "forbidden_internal_imports": [
+                "src.services",
+                "src.application",
+                "src.cli",
+                "services",
+                "application",
+                "cli",
+                "tests",
+            ],
         },
         {
             "name": "services",
             "paths": ["src/services/**", "src/application/**"],
             "allowed_internal_imports": [
-                "src.domain",
-                "src.services",
-                "src.application",
+                "src",
                 "domain",
                 "services",
                 "application",
             ],
-            "forbidden_internal_imports": ["src.cli", "tests"],
+            "forbidden_internal_imports": ["src.cli", "cli", "tests"],
         },
         {
             "name": "cli",
