@@ -19,6 +19,7 @@ C_FN_REGEX = re.compile(
     re.MULTILINE,
 )
 RUST_LET_REGEX = re.compile(r"\blet\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\b")
+RUST_LET_TUPLE_REGEX = re.compile(r"\blet\s+(?:mut\s+)?\(([^)]+)\)")
 C_VAR_DECL_REGEX = re.compile(
     r"\b(?:(?:const|volatile|static|unsigned|signed|long|short)\s+)*"
     r"(?:int|long|short|char|float|double|bool|_Bool|size_t|ssize_t|ptrdiff_t|"
@@ -51,6 +52,17 @@ def blank_preserving_newlines(match: re.Match[str]) -> str:
 def mask_string_and_character_literals(source_code: str) -> str:
     """Blank C and Rust string and character literals while preserving line numbers."""
     return LITERAL_REGEX.sub(blank_preserving_newlines, source_code)
+
+
+def mask_comments_only(source_code: str) -> str:
+    """Blank C and Rust comments (outside string literals) preserving line numbers."""
+    masked_literals = mask_string_and_character_literals(source_code)
+    chars = list(source_code)
+    for match in COMMENT_REGEX.finditer(masked_literals):
+        for index in range(match.start(), match.end()):
+            if chars[index] != "\n":
+                chars[index] = " "
+    return "".join(chars)
 
 
 def mask_comments_and_literals(source_code: str) -> str:
@@ -105,6 +117,7 @@ def extract_c_and_rust_functions(
     """Extract function spans, arguments, and bodies from a C or Rust file."""
     is_rust = relative_path.endswith(".rs")
     masked = mask_comments_and_literals(source_code)
+    no_comments = mask_comments_only(source_code)
     pattern = RUST_FN_REGEX if is_rust else C_FN_REGEX
     functions: list[ParsedFunction] = []
     for match in pattern.finditer(masked):
@@ -116,7 +129,7 @@ def extract_c_and_rust_functions(
         start_line = line_number_at(source_code, match.start())
         end_line = line_number_at(source_code, close_brace)
         arguments = _parse_arguments(match.group(2), is_rust)
-        body_text = masked[open_brace + 1 : close_brace].strip()
+        body_text = no_comments[open_brace + 1 : close_brace].strip()
         functions.append(
             ParsedFunction(name, start_line, end_line, arguments, body_text)
         )
@@ -128,7 +141,13 @@ def extract_declared_variables(
 ) -> list[tuple[str, int]]:
     """Extract local and file-scope variable declarations from masked C/Rust code."""
     pattern = RUST_LET_REGEX if is_rust else C_VAR_DECL_REGEX
-    return [
+    items = [
         (match.group(1), line_number_at(masked_code, match.start(1)))
         for match in pattern.finditer(masked_code)
     ]
+    if is_rust:
+        for match in RUST_LET_TUPLE_REGEX.finditer(masked_code):
+            line = line_number_at(masked_code, match.start())
+            tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", match.group(1))
+            items.extend((tok, line) for tok in tokens if tok != "mut")
+    return items

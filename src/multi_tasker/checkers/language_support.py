@@ -7,11 +7,11 @@ from typing import Any
 from multi_tasker.checkers.language_parser import (
     COMMENT_REGEX,
     ParsedFunction,
-    blank_preserving_newlines,
     extract_c_and_rust_functions,
     extract_declared_variables,
     line_number_at,
     mask_comments_and_literals,
+    mask_comments_only,
     mask_string_and_character_literals,
 )
 from multi_tasker.domain.models import Finding
@@ -27,7 +27,12 @@ NON_PYTHON_STDLIB = set(
 
 C_INCLUDE_LOCAL_REGEX = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
 C_INCLUDE_SYS_REGEX = re.compile(r"^\s*#\s*include\s+<([^>]+)>", re.MULTILINE)
-RUST_USE_REGEX = re.compile(r"^\s*(?:pub\s+)?use\s+([a-zA-Z0-9_:]+)", re.MULTILINE)
+RUST_USE_REGEX = re.compile(
+    r"^\s*(?:pub\s+)?use\s+([a-zA-Z0-9_:]+)(?!\s*::\s*\{)", re.MULTILINE
+)
+RUST_USE_GROUP_REGEX = re.compile(
+    r"^\s*(?:pub\s+)?use\s+([a-zA-Z0-9_:]+)::\{([^}]+)\}", re.MULTILINE
+)
 RUST_MOD_PATH_REGEX = re.compile(
     r'^\s*#\s*\[\s*path\s*=\s*"([^"]+)"\s*\]\s*\n\s*(?:pub\s+)?mod\s+([a-zA-Z0-9_]+)',
     re.MULTILINE,
@@ -291,11 +296,28 @@ def _normalize_rust_use(raw_use: str, current_module: str) -> str:
     return dotted
 
 
+def _extract_rust_grouped_uses(
+    code_only: str, source_code: str, current_mod: str
+) -> list[tuple[str, int]]:
+    """Expand grouped Rust use statements like use prefix::{a, b}."""
+    results: list[tuple[str, int]] = []
+    for match in RUST_USE_GROUP_REGEX.finditer(code_only):
+        base = match.group(1).strip(":")
+        line = line_number_at(source_code, match.start())
+        for item in match.group(2).split(","):
+            entry = item.strip().split(" as ", maxsplit=1)[0].strip()
+            if entry:
+                results.append(
+                    (_normalize_rust_use(f"{base}::{entry}", current_mod), line)
+                )
+    return results
+
+
 def extract_non_python_imports(
     source_code: str, relative_path: str
 ) -> list[tuple[str, int]]:
     """Extract normalized dotted imports from C #include or Rust use statements."""
-    code_only = COMMENT_REGEX.sub(blank_preserving_newlines, source_code)
+    code_only = mask_comments_only(source_code)
     if relative_path.endswith((".c", ".h")):
         local = [
             (
@@ -320,6 +342,7 @@ def extract_non_python_imports(
         )
         for match in RUST_USE_REGEX.finditer(code_only)
     ]
+    grouped = _extract_rust_grouped_uses(code_only, source_code, current_mod)
     mods = [
         (
             path_to_language_module(match.group(1).lstrip("./")),
@@ -327,7 +350,7 @@ def extract_non_python_imports(
         )
         for match in RUST_MOD_PATH_REGEX.finditer(code_only)
     ]
-    return [*uses, *mods]
+    return [*uses, *grouped, *mods]
 
 
 def _extract_preceding_annotation_block(
@@ -335,7 +358,7 @@ def _extract_preceding_annotation_block(
 ) -> str:
     """Collect contiguous comment/attribute lines immediately above start_line."""
     collected: list[str] = []
-    for index in range(start_line - 2, max(-1, min_line - 1), -1):
+    for index in range(start_line - 2, max(-1, min_line - 2), -1):
         stripped = lines[index].strip()
         if not stripped or stripped.startswith(("//", "/*", "*", "*/", "#[")):
             collected.append(lines[index])

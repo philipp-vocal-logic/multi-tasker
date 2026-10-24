@@ -3,7 +3,7 @@ id: TASK-143
 title: Implement Line-1 Trace Preamble Fix, String-Return Non-Stubs, and Rust Tuple/Group
   Parsing
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-054
 - SPEC-054
