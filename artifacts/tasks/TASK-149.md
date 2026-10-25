@@ -2,7 +2,7 @@
 id: TASK-149
 title: Add TestContract for Bidirectional Dependency Parity in test_architecture_checker
 type: test_contract
-status: ready
+status: done
 traces_to:
 - REQ-057
 - SPEC-057
