@@ -34,7 +34,7 @@ DEFAULT_PYTHON_ARCHITECTURE: dict[str, object] = {
         "forbid_circular_imports": True,
         "forbid_src_importing_tests": True,
     },
-    "allowed_third_party_packages": ["yaml", "jsonschema", "pytest", "multi_tasker"],
+    "allowed_third_party_packages": ["yaml", "pytest", "multi_tasker"],
     "layers": [
         {
             "name": "domain",

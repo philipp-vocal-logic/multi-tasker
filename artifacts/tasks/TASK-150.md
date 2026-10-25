@@ -2,7 +2,7 @@
 id: TASK-150
 title: Remove Unused jsonschema from DEFAULT_PYTHON_ARCHITECTURE in lifecycle
 type: implementation
-status: ready
+status: done
 traces_to:
 - REQ-057
 - SPEC-057
