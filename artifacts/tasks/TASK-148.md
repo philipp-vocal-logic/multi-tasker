@@ -2,17 +2,17 @@
 id: TASK-148
 title: Implement Disjoint-Branch Rust and C Regular Expressions in language_parser
 type: implementation
-status: ready
+status: done
 traces_to:
-  - REQ-056
-  - SPEC-056
+- REQ-056
+- SPEC-056
 depends_on:
-  - TASK-147
+- TASK-147
 required_files:
-  - tests/test_multi_language_greenfield_hardening.py
-  - src/multi_tasker/checkers/language_parser.py
+- tests/test_multi_language_greenfield_hardening.py
+- src/multi_tasker/checkers/language_parser.py
 write_files:
-  - src/multi_tasker/checkers/language_parser.py
+- src/multi_tasker/checkers/language_parser.py
 verification_cmd: pytest -o pythonpath=src -q tests/test_multi_language_greenfield_hardening.py
 ---
 ## Objective

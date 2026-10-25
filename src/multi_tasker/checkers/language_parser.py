@@ -10,11 +10,11 @@ LITERAL_REGEX = re.compile(r'r#*"[\s\S]*?"#*|"(\\.|[^"\\])*"|\'(\\.|[^\'\\\n])\'
 RUST_FN_REGEX = re.compile(
     r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:const\s+)?(?:unsafe\s+)?"
     r"fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:<[^>]*>)?\s*\(([^)]*)\)"
-    r"(?:\s*->\s*(?:\[[^\]]*\]|[^{;])+)?(?:\s+where\s+[^{;]+)?\s*\{",
+    r"(?:\[[^\]{}]*\]|[^{;\[])*\{",
     re.MULTILINE,
 )
 C_FN_REGEX = re.compile(
-    r"^[ \t]*(?:[a-zA-Z_][a-zA-Z0-9_*\s]+?)\s+\*?([a-zA-Z_][a-zA-Z0-9_]*)"
+    r"^[ \t]*(?:[a-zA-Z_][a-zA-Z0-9_]*[ \t*]+)+([a-zA-Z_][a-zA-Z0-9_]*)"
     r"\s*\(([^;{}]*)\)\s*\{",
     re.MULTILINE,
 )
@@ -23,7 +23,7 @@ RUST_LET_TUPLE_REGEX = re.compile(r"\blet\s+(?:mut\s+)?\(([^)]+)\)")
 C_VAR_DECL_REGEX = re.compile(
     r"\b(?:(?:const|volatile|static|unsigned|signed|long|short)\s+)*"
     r"(?:int|long|short|char|float|double|bool|_Bool|size_t|ssize_t|ptrdiff_t|"
-    r"u?int(?:8|16|32|64|ptr|max)_t|unsigned|signed)\s+\*?\s*"
+    r"u?int(?:8|16|32|64|ptr|max)_t|unsigned|signed)\s+(?:\*\s*)?"
     r"([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[=;\[])"
 )
 
