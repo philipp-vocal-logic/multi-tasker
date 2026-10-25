@@ -7,6 +7,7 @@ import pytest
 from multi_tasker.checkers.architecture_checker import check_architecture
 from multi_tasker.checkers.clean_code_checker import check_clean_code
 from multi_tasker.checkers.limits_checker import check_limits
+from multi_tasker.checkers.language_parser import RUST_FN_REGEX
 from multi_tasker.checkers.language_support import extract_non_python_test_functions
 from multi_tasker.checkers.traceability_checker import check_traceability
 from multi_tasker.cli.main import main
@@ -155,11 +156,14 @@ def _verify_c_and_rust_comment_and_string_sanitization(base_dir: Path) -> None:
     assert check_clean_code(rust_repo) == []
     assert check_limits(rust_repo) == []
     assert check_architecture(rust_repo) == []
+    assert "[^{;]+" not in RUST_FN_REGEX.pattern
+    assert RUST_FN_REGEX.search("fn A()->" + "[]" * 40) is None
 
 
 @traces("REQ-053", "AC-02", "SPEC-053")
 @traces("REQ-054", "AC-01", "SPEC-054")
 @traces("REQ-054", "AC-02", "SPEC-054")
+@traces("REQ-056", "AC-01", "SPEC-056")
 def test_c_and_rust_comment_string_sanitization_and_signature_trace_parsing(
     tmp_path: Path,
 ) -> None:

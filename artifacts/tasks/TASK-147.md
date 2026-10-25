@@ -2,15 +2,15 @@
 id: TASK-147
 title: Add TestContract for Linear-Time Rust Function Signature Regex
 type: test_contract
-status: ready
+status: done
 traces_to:
-  - REQ-056
-  - SPEC-056
+- REQ-056
+- SPEC-056
 depends_on: []
 required_files:
-  - tests/test_multi_language_greenfield_hardening.py
+- tests/test_multi_language_greenfield_hardening.py
 write_files:
-  - tests/test_multi_language_greenfield_hardening.py
+- tests/test_multi_language_greenfield_hardening.py
 verification_cmd: python3 -m py_compile tests/test_multi_language_greenfield_hardening.py
 ---
 ## Objective
